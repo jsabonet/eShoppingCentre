@@ -118,6 +118,27 @@ SIMPLE_JWT = {
 
 CORS_ALLOWED_ORIGINS = config('CORS_ORIGINS', default='http://localhost:3000').split(',')
 
+# ──────────────────────────────────────────────
+# Firebase Authentication
+# ──────────────────────────────────────────────
+# Path to the Firebase service account JSON key file.
+# Set via FIREBASE_SERVICE_ACCOUNT_KEY env var or GOOGLE_APPLICATION_CREDENTIALS.
+FIREBASE_SERVICE_ACCOUNT_KEY = config('FIREBASE_SERVICE_ACCOUNT_KEY', default='')
+
+# Add Firebase authentication as an additional auth class.
+# JWTAuthentication remains the primary method; FirebaseIDTokenAuthentication
+# allows clients to send Firebase ID tokens directly as Bearer tokens.
+REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = (
+    'rest_framework_simplejwt.authentication.JWTAuthentication',
+    'apps.users.firebase_auth.FirebaseIDTokenAuthentication',
+)
+
+# Django auth backends: model backend + Firebase backend.
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'apps.users.firebase_auth.FirebaseAuthBackend',
+]
+
 CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 

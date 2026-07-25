@@ -16,8 +16,12 @@ urlpatterns = [
     path('api/v1/affiliates/', include('apps.affiliates.urls')),
     path('api/v1/wallet/', include('apps.wallet.urls')),
     path('api/v1/courses/', include('apps.courses.urls')),
+    path('api/v1/blog/', include('apps.blog.urls')),
     path('api/v1/reviews/', include('apps.reviews.urls')),
     path('api/v1/admin/', include('apps.users.urls_admin')),
+    path('api/v1/admin/categories/', include('apps.products.urls_admin')),
+    path('api/v1/admin/blog/', include('apps.blog.urls_admin')),
+    path('api/v1/admin/courses/', include('apps.courses.urls_admin')),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
 ]

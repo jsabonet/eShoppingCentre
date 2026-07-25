@@ -16,6 +16,12 @@ class User(AbstractUser):
     is_verified = models.BooleanField(default=False)
     date_of_birth = models.DateField(null=True, blank=True)
     bio = models.TextField(blank=True)
+    firebase_uid = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    auth_provider = models.CharField(
+        max_length=20,
+        choices=[('email', 'Email'), ('google', 'Google'), ('facebook', 'Facebook')],
+        default='email',
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']

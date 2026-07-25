@@ -6,6 +6,7 @@ class Store(BaseModel):
     STATUS_CHOICES = [
         ('pending', 'Pendente'),
         ('active', 'Activa'),
+        ('rejected', 'Rejeitada'),
         ('suspended', 'Suspensa'),
         ('closed', 'Fechada'),
     ]

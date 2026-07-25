@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Django
+*.log
+*.pot
+*.pyc
+staticfiles/
+media/
+
+# Virtual Environment
+venv/
+.env
+.venv
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase / Credentials sensíveis
+credentials/
+*.firebase-adminsdk*.json
+firebase-adminsdk*.json
+
+# Docker
+docker-compose.override.yml
+.env.production
+
+# SSL certificates (gerados no servidor)
+nginx/ssl/
+*.pem

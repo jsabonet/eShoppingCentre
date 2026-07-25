@@ -66,15 +66,22 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         }
 
 
+from django.utils.text import slugify
+
 class CategorySerializer(serializers.ModelSerializer):
     product_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
         fields = ('id', 'name', 'slug', 'description', 'image', 'product_count', 'sort_order')
+        read_only_fields = ('slug',)
 
     def get_product_count(self, obj):
         return obj.products.filter(status='active').count()
+
+    def create(self, validated_data):
+        validated_data['slug'] = slugify(validated_data['name'])
+        return super().create(validated_data)
 
 
 class WishlistItemSerializer(serializers.ModelSerializer):

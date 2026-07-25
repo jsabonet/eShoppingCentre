@@ -46,3 +46,11 @@ class AddressSerializer(serializers.ModelSerializer):
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True, validators=[validate_password])
+
+
+class FirebaseTokenSerializer(serializers.Serializer):
+    """Serializer for Firebase ID token exchange."""
+    id_token = serializers.CharField(required=True)
+    firebase_uid = serializers.CharField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+    is_new_user = serializers.BooleanField(read_only=True)

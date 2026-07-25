@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils.text import slugify
 from .models import BlogPost
 
 
@@ -13,3 +14,8 @@ class BlogPostDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = BlogPost
         fields = '__all__'
+        read_only_fields = ('slug', 'read_time', 'published_at')
+
+    def create(self, validated_data):
+        validated_data['slug'] = slugify(validated_data['title'])
+        return super().create(validated_data)
