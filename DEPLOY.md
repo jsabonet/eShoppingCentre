@@ -147,7 +147,7 @@ mkdir -p /app/nginx/ssl
 
 ```bash
 cd /app
-git clone https://github.com/SEU_USER/eShoppingCentre.git
+git clone https://github.com/jsabonet/eShoppingCentre.git
 cd /app/eShoppingCentre
 ```
 
@@ -164,7 +164,7 @@ nano .env   # preencher TODOS os valores
 mkdir -p /app/eShoppingCentre/backend/credentials
 
 # Do teu computador:
-scp firebase-adminsdk.json root@<IP>:/app/eShoppingCentre/backend/credentials/
+scp firebase-adminsdk.json root@46.101.163.186:/app/eShoppingCentre/backend/credentials/
 ```
 
 ---
@@ -179,7 +179,7 @@ nano /app/eShoppingCentre/.env
 
 ```env
 # Domínio
-DOMAIN=eshoppingcentre.co.mz
+DOMAIN=eshoppingcentre.com
 
 # Django (gera com: openssl rand -base64 50)
 SECRET_KEY=<CHAVE_ALEATORIA_50_CARACTERES>
