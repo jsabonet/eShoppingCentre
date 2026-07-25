@@ -27,23 +27,23 @@ fi
 
 # ─── 4. Build & start containers ───
 echo "🏗️  A construir imagens Docker..."
-docker compose -f docker-compose.prod.yml build --pull
+docker compose build --pull
 
 echo "🔄 A reiniciar serviços..."
-docker compose -f docker-compose.prod.yml down --remove-orphans
-docker compose -f docker-compose.prod.yml up -d
+docker compose down --remove-orphans
+docker compose up -d
 
 # ─── 5. Run migrations ───
 echo "🗄️  A aplicar migrações..."
-docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
+docker compose exec -T backend python manage.py migrate --noinput
 
 # ─── 6. Collect static ───
 echo "📁 A recolher ficheiros estáticos..."
-docker compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput
+docker compose exec -T backend python manage.py collectstatic --noinput
 
 # ─── 7. Clean up old images ───
 echo "🧹 A limpar imagens antigas..."
 docker image prune -af
 
 echo "✅ Deploy concluído!"
-docker compose -f docker-compose.prod.yml ps
+docker compose ps

@@ -276,7 +276,7 @@ AWS_S3_ENDPOINT_URL=https://ams3.digitaloceanspaces.com
 apt install certbot -y
 
 # Parar nginx se estiver a correr
-docker compose -f /app/eShoppingCentre/docker-compose.prod.yml stop nginx 2>/dev/null || true
+docker compose -f /app/eShoppingCentre/docker-compose.yml stop nginx 2>/dev/null || true
 
 # Obter certificado
 certbot certonly --standalone \
@@ -293,7 +293,7 @@ cp /etc/letsencrypt/live/eshoppingcentre.co.mz/privkey.pem /app/eShoppingCentre/
 ### 9.2 Renovação automática
 
 ```bash
-(crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'cd /app/eShoppingCentre && docker compose -f docker-compose.prod.yml restart nginx'") | crontab -
+(crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'cd /app/eShoppingCentre && docker compose restart nginx'") | crontab -
 ```
 
 ---
@@ -311,10 +311,10 @@ O script faz: build → inicia containers → migrações → collectstatic → 
 ### Verificar
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
+docker compose ps
 # Todos os 7 serviços devem estar "Up"
 
-docker compose -f docker-compose.prod.yml logs --tail=50
+docker compose logs --tail=50
 ```
 
 Abre `https://eshoppingcentre.co.mz` no browser.
@@ -325,7 +325,7 @@ Abre `https://eshoppingcentre.co.mz` no browser.
 
 ```bash
 cd /app/eShoppingCentre
-docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
+docker compose exec backend python manage.py createsuperuser
 # Email: admin@eshoppingcentre.co.mz
 # Username: admin
 # Password: <forte>
@@ -355,7 +355,7 @@ nano /app/backups/backup-db.sh
 #!/bin/bash
 cd /app/eShoppingCentre
 DATE=$(date +%Y%m%d_%H%M%S)
-docker compose -f docker-compose.prod.yml exec -T db pg_dump -U eshopping eshoppingcentre > "/app/backups/db_$DATE.sql"
+docker compose exec -T db pg_dump -U eshopping eshoppingcentre > "/app/backups/db_$DATE.sql"
 gzip "/app/backups/db_$DATE.sql"
 find /app/backups -name "db_*.sql.gz" -mtime +7 -delete
 echo "Backup: db_$DATE.sql.gz"
@@ -372,7 +372,7 @@ chmod +x /app/backups/backup-db.sh
 
 ```bash
 gunzip /app/backups/db_20260725_020000.sql.gz
-docker compose -f docker-compose.prod.yml exec -T db psql -U eshopping eshoppingcentre < /app/backups/db_20260725_020000.sql
+docker compose exec -T db psql -U eshopping eshoppingcentre < /app/backups/db_20260725_020000.sql
 ```
 
 ---
@@ -381,16 +381,16 @@ docker compose -f docker-compose.prod.yml exec -T db psql -U eshopping eshopping
 
 ```bash
 # Estado dos containers
-docker compose -f docker-compose.prod.yml ps
+docker compose ps
 
 # Uso de recursos
 docker stats --no-stream
 
 # Logs em tempo real
-docker compose -f docker-compose.prod.yml logs -f --tail=100
+docker compose logs -f --tail=100
 
 # Logs de serviço específico
-docker compose -f docker-compose.prod.yml logs -f backend
+docker compose logs -f backend
 
 # Health check
 curl -I https://eshoppingcentre.co.mz
@@ -417,9 +417,9 @@ git pull origin main
 ```bash
 cd /app/eShoppingCentre
 git pull origin main
-docker compose -f docker-compose.prod.yml build --pull backend frontend
-docker compose -f docker-compose.prod.yml up -d --no-deps backend frontend
-docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
+docker compose build --pull backend frontend
+docker compose up -d --no-deps backend frontend
+docker compose exec backend python manage.py migrate --noinput
 docker image prune -af
 ```
 
