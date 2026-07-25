@@ -280,7 +280,7 @@ docker compose -f /app/eShoppingCentre/docker-compose.prod.yml stop nginx 2>/dev
 
 # Obter certificado
 certbot certonly --standalone \
-  -d eshoppingcentre.co.mz \
+  -d eshoppingcentre.com\
   -d www.eshoppingcentre.co.mz \
   --email teu-email@exemplo.com \
   --agree-tos --non-interactive
