@@ -88,7 +88,7 @@ No painel do teu domínio, adiciona estes registos:
 Verificar propagação:
 
 ```bash
-nslookup eshoppingcentre.co.mz
+nslookup e-shoppingcentre.com
 ```
 
 ---
@@ -179,12 +179,12 @@ nano /app/eShoppingCentre/.env
 
 ```env
 # Domínio
-DOMAIN=eshoppingcentre.com
+DOMAIN=e-shoppingcentre.com
 
 # Django (gera com: openssl rand -base64 50)
 SECRET_KEY=<CHAVE_ALEATORIA_50_CARACTERES>
 DEBUG=False
-ALLOWED_HOSTS=eshoppingcentre.co.mz,www.eshoppingcentre.co.mz
+ALLOWED_HOSTS=e-shoppingcentre.com,www.e-shoppingcentre.com
 
 # Database
 DB_NAME=eshoppingcentre
@@ -211,10 +211,10 @@ EMAIL_PORT=587
 EMAIL_HOST_USER=apikey
 EMAIL_HOST_PASSWORD=SG....
 EMAIL_USE_TLS=True
-DEFAULT_FROM_EMAIL=noreply@eshoppingcentre.co.mz
+DEFAULT_FROM_EMAIL=noreply@e-shoppingcentre.com
 
 # Frontend
-FRONTEND_URL=https://eshoppingcentre.co.mz
+FRONTEND_URL=https://e-shoppingcentre.com
 
 # Firebase Client (copiar do Firebase Console)
 NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyBDT4Q4Lt2KFnmOsXbQev_as3GaeUPGdQk
@@ -233,7 +233,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:1017529752588:web:fc57ffd6f0bbafc8fb6229
 
 1. [console.firebase.google.com](https://console.firebase.google.com)
 2. Authentication → Settings → **Authorized domains**
-3. Adiciona: `eshoppingcentre.co.mz`
+3. Adiciona: `e-shoppingcentre.com`
 
 ### 7.2 Sign-in Method
 
@@ -280,14 +280,14 @@ docker compose -f /app/eShoppingCentre/docker-compose.yml stop nginx 2>/dev/null
 
 # Obter certificado
 certbot certonly --standalone \
-  -d eshoppingcentre.com\
-  -d www.eshoppingcentre.co.mz \
-  --email teu-email@exemplo.com \
+  -d e-shoppingcentre.com\
+  -d www.e-shoppingcentre.com \
+  --email suporte@e-shoppingcentre.com \
   --agree-tos --non-interactive
 
 # Copiar para nginx
-cp /etc/letsencrypt/live/eshoppingcentre.co.mz/fullchain.pem /app/eShoppingCentre/nginx/ssl/
-cp /etc/letsencrypt/live/eshoppingcentre.co.mz/privkey.pem /app/eShoppingCentre/nginx/ssl/
+cp /etc/letsencrypt/live/e-shoppingcentre.com/fullchain.pem /app/eShoppingCentre/nginx/ssl/
+cp /etc/letsencrypt/live/e-shoppingcentre.com/privkey.pem /app/eShoppingCentre/nginx/ssl/
 ```
 
 ### 9.2 Renovação automática
@@ -317,7 +317,7 @@ docker compose ps
 docker compose logs --tail=50
 ```
 
-Abre `https://eshoppingcentre.co.mz` no browser.
+Abre `https://e-shoppingcentre.com` no browser.
 
 ---
 
@@ -326,20 +326,20 @@ Abre `https://eshoppingcentre.co.mz` no browser.
 ```bash
 cd /app/eShoppingCentre
 docker compose exec backend python manage.py createsuperuser
-# Email: admin@eshoppingcentre.co.mz
+# Email: admin@e-shoppingcentre.com
 # Username: admin
 # Password: <forte>
 ```
 
 ### Tornar admin no frontend
 
-1. Acede a `https://eshoppingcentre.co.mz/admin/` (Django Admin)
+1. Acede a `https://e-shoppingcentre.com/admin/` (Django Admin)
 2. Users → clica no teu user
 3. Roles: `["buyer", "admin"]`
 4. ✅ Staff status + Superuser status
 5. Guarda
 
-Agora podes aceder ao painel Next.js em `https://eshoppingcentre.co.mz/admin`.
+Agora podes aceder ao painel Next.js em `https://e-shoppingcentre.com/admin`.
 
 ---
 
@@ -393,8 +393,8 @@ docker compose logs -f --tail=100
 docker compose logs -f backend
 
 # Health check
-curl -I https://eshoppingcentre.co.mz
-curl https://eshoppingcentre.co.mz/api/v1/products/?page_size=1
+curl -I https://e-shoppingcentre.com
+curl https://e-shoppingcentre.com/api/v1/products/?page_size=1
 ```
 
 Digital Ocean Dashboard → Monitoring → CPU, RAM, Disk, Network (grátis).
@@ -482,7 +482,7 @@ git revert HEAD --no-edit
 - [ ] `./deploy.sh` executado
 - [ ] Superusuário criado
 - [ ] Backup diário agendado
-- [ ] Site online em `https://eshoppingcentre.co.mz`
+- [ ] Site online em `https://e-shoppingcentre.com`
 
 ---
 
