@@ -1,0 +1,26 @@
+---
+---
+
+<script is:inline src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaReadyCallback&render=explicit" async="true"></script>
+<script is:inline>
+  // Setup reCAPTCHA v2 for all forms
+  function onRecaptchaReadyCallback() {
+    const allForms = document.getElementsByTagName('form')
+    for (let i = 0; i < allForms.length; i++) {
+      // Create reCAPTCHA container element
+      const recaptchaDiv = document.createElement('div')
+      recaptchaDiv.id = `grecaptcha-${i}`
+      // Insert the element into the form
+      const submitButton = allForms[i].querySelector('button[type="submit"]')
+      if (submitButton) {
+        submitButton.parentNode.insertBefore(recaptchaDiv, submitButton)
+      } else {
+        allForms[i].appendChild(recaptchaDiv)
+      }
+      // Render reCAPTCHA into the created element
+      grecaptcha.render(`grecaptcha-${i}`, {
+        sitekey: '6Ley3fAdAAAAAE8EheVrtAjuLpKWwJu_hTr-qaNM'
+      })
+    }
+  }
+</script>
