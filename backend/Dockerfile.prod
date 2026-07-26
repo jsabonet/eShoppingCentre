@@ -37,11 +37,9 @@ COPY . .
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
-# Create media directory
-RUN mkdir -p /app/media && chown -R django:django /app/media /app/staticfiles
-
-# Copy credentials (will be mounted as volume in production)
-RUN mkdir -p /app/credentials && chown django:django /app/credentials
+# Create media directory and fix permissions for non-root user
+RUN mkdir -p /app/media /app/credentials && \
+    chown -R django:django /app
 
 USER django
 
@@ -56,4 +54,5 @@ CMD ["gunicorn", "config.asgi:application", \
      "--max-requests-jitter", "100", \
      "--timeout", "120", \
      "--keep-alive", "5", \
+     "--worker-tmp-dir", "/dev/shm", \
      "--log-level", "info"]
