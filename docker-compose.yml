@@ -3,8 +3,6 @@
 # Deploy: Digital Ocean Droplet
 # ──────────────────────────────────────────────
 
-version: '3.8'
-
 services:
   # ─── PostgreSQL ───
   db:
@@ -93,6 +91,12 @@ services:
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - FIREBASE_SERVICE_ACCOUNT_KEY=/app/credentials/firebase-adminsdk.json
+      # AWS S3 / Spaces (para media files)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-}
+      - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME:-auto}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-}
     volumes:
       - media_data:/app/media
       - ./backend/credentials:/app/credentials:ro
@@ -121,6 +125,12 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
+      # AWS S3 / Spaces (para media files)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-}
+      - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME:-auto}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-}
     depends_on:
       db:
         condition: service_healthy
