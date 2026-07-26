@@ -117,9 +117,11 @@ function AdminSidebarContent({ collapsed, onClose, onLogout, user }: {
       {/* Sidebar header */}
       <div className="flex items-center justify-between px-3 py-3.5 border-b border-slate-700">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold text-sm">
-            E
-          </div>
+          <img
+            src="https://cdn.b12.io/client_media/iKv1biKD/12049a95-7e70-11f1-8605-0242ac110002-NOVO_LOGO.png"
+            alt="eShopping"
+            className="w-8 h-8 rounded-lg object-contain bg-white p-0.5"
+          />
           {!collapsed && <span className="font-bold text-sm">eShopping</span>}
         </div>
         <button onClick={onClose} className="lg:hidden p-1 hover:bg-slate-700 rounded">
