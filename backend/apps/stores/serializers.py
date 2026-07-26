@@ -4,12 +4,15 @@ from .models import Store
 
 
 class StoreSerializer(serializers.ModelSerializer):
+    tier = serializers.CharField(read_only=True)
+    tier_display = serializers.CharField(read_only=True)
+
     class Meta:
         model = Store
-        fields = ('id', 'name', 'slug', 'description', 'logo', 'banner',
-                  'category', 'rating', 'total_sales', 'total_products',
-                  'location', 'status')
-        read_only_fields = ('id', 'rating', 'total_sales', 'total_products', 'status')
+        fields = ('id', 'name', 'slug', 'description', 'tagline', 'logo', 'banner',
+                  'theme_color', 'category', 'rating', 'total_sales', 'total_products',
+                  'location', 'status', 'tier', 'tier_display')
+        read_only_fields = ('id', 'rating', 'total_sales', 'total_products', 'status', 'tier', 'tier_display')
 
 
 class StoreDetailSerializer(serializers.ModelSerializer):

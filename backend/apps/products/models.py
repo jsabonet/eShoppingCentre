@@ -78,8 +78,33 @@ class ProductImage(BaseModel):
     class Meta:
         ordering = ['sort_order']
 
+
+class ProductVariant(BaseModel):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
+    sku = models.CharField(max_length=100, blank=True)
+    name = models.CharField(max_length=255, help_text='Ex: "Azul / M" ou "Vermelho"')
+    price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
+                                help_text='Preço específico da variante. Se vazio, usa o preço base do produto.')
+    stock = models.PositiveIntegerField(default=0)
+    image = models.ImageField(upload_to='products/variants/', blank=True)
+    attributes = models.JSONField(default=dict, help_text='{"Cor": "Azul", "Tamanho": "M"}')
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'name']
+        indexes = [
+            models.Index(fields=['product', 'is_active']),
+            models.Index(fields=['sku']),
+        ]
+        unique_together = [['product', 'sku']]
+
     def __str__(self):
-        return f'Image for {self.product.name}'
+        return f'{self.product.name} - {self.name}'
+
+    @property
+    def effective_price(self):
+        return self.price if self.price is not None else self.product.price
 
 
 class ProductVariation(BaseModel):
@@ -104,3 +129,39 @@ class WishlistItem(BaseModel):
 
     def __str__(self):
         return f'{self.user.email} - {self.product.name}'
+
+
+class Coupon(BaseModel):
+    DISCOUNT_TYPE_CHOICES = [
+        ('percentage', 'Percentagem (%)'),
+        ('fixed', 'Valor Fixo (MZN)'),
+    ]
+    store = models.ForeignKey('stores.Store', on_delete=models.CASCADE, related_name='coupons')
+    code = models.CharField(max_length=50, unique=True)
+    discount_type = models.CharField(max_length=20, choices=DISCOUNT_TYPE_CHOICES, default='percentage')
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2)
+    min_purchase = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    max_uses = models.PositiveIntegerField(default=0, help_text='0 = ilimitado')
+    used_count = models.PositiveIntegerField(default=0)
+    max_per_user = models.PositiveIntegerField(default=1)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True,
+                                help_text='Restringir a um produto específico')
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True,
+                                 help_text='Restringir a uma categoria')
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['code']), models.Index(fields=['store', 'is_active'])]
+
+    def __str__(self):
+        return self.code
+
+    @property
+    def is_valid(self):
+        from django.utils import timezone
+        now = timezone.now()
+        return (self.is_active and self.starts_at <= now <= self.ends_at and
+                (self.max_uses == 0 or self.used_count < self.max_uses))

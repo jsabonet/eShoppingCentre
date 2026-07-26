@@ -92,6 +92,7 @@ export interface Product {
 export interface ProductDetail extends Product {
   images: ProductImage[];
   store: StoreSummary;
+  variants: ProductVariant[];
   variations: ProductVariation[];
   specifications: Record<string, string>;
   tags: string[];
@@ -102,6 +103,20 @@ export interface ProductImage {
   image: string;
   alt_text: string;
   is_primary: boolean;
+}
+
+export interface ProductVariant {
+  id: string;
+  name: string;
+  sku: string;
+  price: number | null;
+  effective_price: number;
+  stock: number;
+  image: string | null;
+  image_url: string | null;
+  attributes: Record<string, string>;
+  is_active: boolean;
+  sort_order: number;
 }
 
 export interface ProductVariation {
@@ -116,8 +131,10 @@ export interface Store {
   name: string;
   slug: string;
   description: string;
+  tagline: string;
   logo: string | null;
   banner: string | null;
+  theme_color: string;
   category: string;
   rating: number;
   total_sales: number;
@@ -133,6 +150,8 @@ export interface StoreDetail extends Store {
   shipping_policy: string;
   return_policy: string;
   default_affiliate_commission: number;
+  website: string;
+  created_at: string;
 }
 
 export interface StoreSummary {
@@ -331,10 +350,29 @@ export const productsAPI = {
     api.post<Product>('/products/', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
 
   update: (id: string, data: FormData) =>
-    api.patch<Product>(`/products/${id}/`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    api.patch<Product>(`/products/${id}/update/`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
 
   delete: (id: string) =>
-    api.delete(`/products/${id}/`),
+    api.delete(`/products/${id}/delete/`),
+
+  myProducts: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<Product>>('/products/my/', { params }),
+
+  addImage: (productId: string, data: FormData) =>
+    api.post(`/products/${productId}/images/`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+
+  // Variants
+  listVariants: (productId: string) =>
+    api.get<ProductVariant[]>(`/products/${productId}/variants/`),
+
+  createVariant: (productId: string, data: Partial<ProductVariant>) =>
+    api.post<ProductVariant>(`/products/${productId}/variants/`, data),
+
+  updateVariant: (productId: string, variantId: string, data: Partial<ProductVariant>) =>
+    api.patch<ProductVariant>(`/products/${productId}/variants/${variantId}/`, data),
+
+  deleteVariant: (productId: string, variantId: string) =>
+    api.delete(`/products/${productId}/variants/${variantId}/`),
 };
 
 export const categoriesAPI = {
@@ -349,18 +387,52 @@ export const storesAPI = {
   getBySlug: (slug: string) =>
     api.get<StoreDetail>(`/stores/${slug}/`),
 
-  register: (data: any) =>
-    api.post<Store>('/stores/register/', data),
+  register: (data: FormData) =>
+    api.post<Store>('/stores/register/', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
 
   myStore: () => api.get<StoreDetail>('/stores/me/'),
 
   updateMyStore: (data: any) => api.patch<StoreDetail>('/stores/me/', data),
 
-  myStats: () => api.get<{ total_products: number; total_orders: number; total_revenue: number; pending_orders: number }>('/stores/me/stats/'),
+  dashboard: () =>
+    api.get<SellerDashboard>('/stores/me/stats/'),
 
   myEarnings: (params?: Record<string, any>) =>
     api.get<{ transactions: WalletTransaction[] }>('/stores/me/earnings/', { params }),
 };
+
+export interface DashboardOrder {
+  id: string;
+  order_number: string;
+  customer: string;
+  items_count: number;
+  total: number;
+  status: string;
+  status_display: string;
+  payment_method: string;
+  created_at: string;
+}
+
+export interface DashboardProduct {
+  id: string;
+  name: string;
+  slug: string;
+  sales: number;
+  revenue: number;
+  image: string | null;
+}
+
+export interface SellerDashboard {
+  today_sales: number;
+  today_revenue: number;
+  total_revenue: number;
+  total_products: number;
+  total_orders: number;
+  pending_orders: number;
+  store_rating: number;
+  recent_orders: DashboardOrder[];
+  top_products: DashboardProduct[];
+}
 
 export const ordersAPI = {
   create: (data: {
@@ -376,8 +448,11 @@ export const ordersAPI = {
   myOrders: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<Order>>('/users/me/orders/', { params }),
 
-  updateStatus: (id: string, data: { status: string; tracking_code?: string }) =>
-    api.patch<Order>(`/orders/${id}/`, data),
+  storeOrders: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<Order>>('/orders/store/', { params }),
+
+  updateStoreOrderStatus: (id: string, data: { status: string; tracking_code?: string }) =>
+    api.patch<Order>(`/orders/${id}/update-status/`, data),
 
   cancel: (id: string) => api.post(`/orders/${id}/cancel/`),
 };
@@ -400,7 +475,28 @@ export const affiliatesAPI = {
 
   requestPayout: (data: { amount: number; method: string; account_details: Record<string, string> }) =>
     api.post('/affiliates/me/payouts/', data),
+
+  storeAffiliates: () =>
+    api.get<StoreAffiliatesData>('/affiliates/store/'),
 };
+
+export interface StoreAffiliatesData {
+  affiliates: StoreAffiliate[];
+  total_affiliates: number;
+  total_clicks: number;
+  total_sales: number;
+  total_commission: number;
+}
+
+export interface StoreAffiliate {
+  id: string;
+  name: string;
+  email: string;
+  total_clicks: number;
+  total_sales: number;
+  total_commission: number;
+  is_active: boolean;
+}
 
 export const usersAPI = {
   me: () => api.get<User>('/users/me/'),

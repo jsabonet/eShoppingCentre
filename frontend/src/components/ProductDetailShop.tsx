@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { useState } from 'react';
 import { Star, Truck, Shield, RotateCcw, ShoppingCart } from 'lucide-react';
 import { CartProvider, useCart } from '../contexts/CartContext';
 import ProductCard from './ProductCard';
@@ -47,6 +48,28 @@ function StarRatingLg({ rating }: { rating: number }) {
 
 function ProductDetailContent({ product, categoryName, categorySlug, relatedProducts }: ProductDetailShopProps) {
   const { addToCart } = useCart();
+  const variants = product.variants || [];
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId) || null;
+  const displayPrice = selectedVariant?.price ?? product.price;
+  const displayStock = selectedVariant ? selectedVariant.stock : (product.inStock ? 1 : 0);
+  const displayImage = selectedVariant?.image || product.image;
+
+  // Group variant attributes for rendering selectors
+  const attrKeys = variants.length > 0
+    ? [...new Set(variants.flatMap((v) => Object.keys(v.attributes || {})))]
+    : [];
+
+  const groupedByAttr = (key: string) => {
+    const seen = new Set<string>();
+    return variants.filter((v) => {
+      const val = v.attributes?.[key];
+      if (!val || seen.has(val)) return false;
+      seen.add(val);
+      return true;
+    });
+  };
 
   return (
     <>
@@ -59,8 +82,8 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
               <div className="sticky top-32">
                 <div className="aspect-square bg-card border border-border rounded-lg overflow-hidden mb-4">
                   <img
-                    src={product.image}
-                    alt={product.name}
+                    src={displayImage}
+                    alt={selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -127,6 +150,34 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                 <p className="text-muted-foreground leading-relaxed">{product.description}</p>
               </div>
 
+              {/* Variant Selector */}
+              {variants.length > 0 && attrKeys.map((key) => (
+                <div key={key} className="mb-4">
+                  <p className="text-sm font-medium mb-2">{key}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {groupedByAttr(key).map((v) => {
+                      const isSelected = selectedVariantId === v.id;
+                      const attrVal = v.attributes?.[key];
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => setSelectedVariantId(v.id)}
+                          className={`px-3 py-1.5 border rounded-lg text-sm transition-all ${
+                            isSelected
+                              ? 'border-accent bg-accent/10 text-accent font-medium'
+                              : 'border-border hover:border-accent/50'
+                          } ${!v.is_active ? 'opacity-40 cursor-not-allowed' : ''}`}
+                          disabled={!v.is_active}
+                        >
+                          {attrVal || v.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
               {/* Benefits */}
               <div className="space-y-3 mb-6">
                 <div className="flex items-center gap-3 text-sm">
@@ -148,26 +199,40 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
             <div className="lg:col-span-3">
               <div className="sticky top-32 border border-border rounded-lg p-4 bg-card">
                 <p className="text-2xl font-bold mb-1">
-                  MZN {formatPrice(product.price)}
+                  MZN {formatPrice(displayPrice)}
                 </p>
+                {selectedVariant && selectedVariant.price !== null && selectedVariant.price !== product.price && (
+                  <p className="text-xs text-muted-foreground mb-1">Preço base: MZN {formatPrice(product.price)}</p>
+                )}
                 <p className="text-sm text-green-600 font-medium mb-4">
                   <Truck size={14} className="inline" /> Frete grátis
                 </p>
 
                 <p className="text-sm mb-2">
-                  <span className="text-green-600 font-semibold">Em estoque</span>
+                  {displayStock > 0 ? (
+                    <span className="text-green-600 font-semibold">
+                      {variants.length > 0 ? `${displayStock} em estoque` : 'Em estoque'}
+                    </span>
+                  ) : (
+                    <span className="text-red-600 font-semibold">Fora de estoque</span>
+                  )}
                 </p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Entrega em 3-5 dias úteis
-                </p>
-
-                <button
-                  onClick={() => addToCart(product)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors mb-2"
-                >
-                  <ShoppingCart size={18} />
-                  Adicionar ao Carrinho
-                </button>
+                {selectedVariant && <p className="text-xs text-muted-foreground mb-4">{selectedVariant.name}</p>}
+                {!selectedVariant && variants.length > 0 && (
+                  <p className="text-xs text-amber-600 mb-4">Seleccione as opções acima</p>
+                )}
+                {(!variants.length || selectedVariant) && (
+                  <>
+                    <p className="text-sm text-muted-foreground mb-4">Entrega em 3-5 dias úteis</p>
+                    <button
+                      onClick={() => addToCart({ ...product, price: displayPrice, inStock: displayStock > 0, image: displayImage })}
+                      disabled={displayStock === 0}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ShoppingCart size={18} /> Adicionar ao Carrinho
+                    </button>
+                  </>
+                )}
 
                 <a
                   href="/cart"

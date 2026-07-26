@@ -1,8 +1,8 @@
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Order
-from .serializers import OrderSerializer, CreateOrderSerializer
+from .models import Order, ReturnRequest
+from .serializers import OrderSerializer, CreateOrderSerializer, ReturnRequestSerializer
 
 
 class CreateOrderView(APIView):
@@ -76,3 +76,35 @@ class CancelOrderView(APIView):
         except Order.DoesNotExist:
             return Response({'detail': 'Encomenda não encontrada.'},
                           status=status.HTTP_404_NOT_FOUND)
+
+
+# ─── Return / Devolutions ───
+
+class CreateReturnView(generics.CreateAPIView):
+    """Buyer requests a return."""
+    serializer_class = ReturnRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        order = serializer.validated_data['order']
+        serializer.save(buyer=self.request.user, store=order.store)
+
+
+class StoreReturnsView(generics.ListAPIView):
+    """Vendor views returns for their store."""
+    serializer_class = ReturnRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return ReturnRequest.objects.filter(
+            store=self.request.user.store
+        ).order_by('-created_at')
+
+
+class ManageReturnView(generics.UpdateAPIView):
+    """Vendor approves/rejects a return."""
+    serializer_class = ReturnRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return ReturnRequest.objects.filter(store=self.request.user.store)

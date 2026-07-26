@@ -1,11 +1,12 @@
 from rest_framework import generics, permissions, status, filters
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
-from .models import Category, Product, ProductImage, WishlistItem
+from .models import Category, Product, ProductImage, ProductVariant, Coupon, WishlistItem
 from .serializers import (
     CategorySerializer, ProductListSerializer, ProductDetailSerializer,
-    ProductImageSerializer, WishlistItemSerializer,
+    ProductImageSerializer, ProductVariantSerializer, SellerProductSerializer, WishlistItemSerializer,
 )
 from .filters import ProductFilter
 from apps.stores.permissions import IsStoreOwner
@@ -76,7 +77,7 @@ class ProductDetailView(generics.RetrieveAPIView):
 
 
 class MyProductListView(generics.ListAPIView):
-    serializer_class = ProductListSerializer
+    serializer_class = SellerProductSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -130,3 +131,83 @@ class WishlistDeleteView(generics.DestroyAPIView):
 
     def get_queryset(self):
         return self.request.user.wishlist.all()
+
+
+# ─── Variant Management ───
+
+class ProductVariantListView(generics.ListCreateAPIView):
+    """List or create variants for a product (vendor only)."""
+    serializer_class = ProductVariantSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        product = Product.objects.get(id=self.kwargs['product_id'])
+        return product.variants.all()
+
+    def perform_create(self, serializer):
+        product = Product.objects.get(id=self.kwargs['product_id'])
+        serializer.save(product=product)
+
+
+class ProductVariantDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete a single variant."""
+    serializer_class = ProductVariantSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return ProductVariant.objects.filter(
+            product__store=self.request.user.store
+        )
+
+
+# ─── Coupon Management ───
+
+class CouponListView(generics.ListCreateAPIView):
+    serializer_class = None  # set below
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        from .serializers import CouponSerializer
+        return CouponSerializer
+
+    def get_queryset(self):
+        return Coupon.objects.filter(store=self.request.user.store)
+
+    def perform_create(self, serializer):
+        serializer.save(store=self.request.user.store)
+
+
+class CouponDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        from .serializers import CouponSerializer
+        return CouponSerializer
+
+    def get_queryset(self):
+        return Coupon.objects.filter(store=self.request.user.store)
+
+
+class ValidateCouponView(APIView):
+    """Validate a coupon code (public)."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        code = request.data.get('code', '').strip().upper()
+        try:
+            coupon = Coupon.objects.get(code=code, is_active=True)
+            if not coupon.is_valid:
+                return Response({'valid': False, 'detail': 'Cupão expirado ou esgotado.'}, status=400)
+            return Response({
+                'valid': True,
+                'code': coupon.code,
+                'discount_type': coupon.discount_type,
+                'discount_value': float(coupon.discount_value),
+                'min_purchase': float(coupon.min_purchase),
+                'discount_description': (
+                    f'{coupon.discount_value}% de desconto' if coupon.discount_type == 'percentage'
+                    else f'{float(coupon.discount_value):.2f} MZN de desconto'
+                ),
+            })
+        except Coupon.DoesNotExist:
+            return Response({'valid': False, 'detail': 'Cupão inválido.'}, status=404)

@@ -159,18 +159,18 @@ export default function SellerRegisterPage() {
 
     try {
       const isCompany = form.sellerType === 'company';
-      const payload: Record<string, any> = {
-        name: form.storeName,
-        description: form.description,
-        category: form.category,
-        location: form.location,
-        phone: isCompany ? form.companyPhone : form.phone,
-        email: isCompany ? (form.companyEmail || user?.email || '') : (form.email || user?.email || ''),
-        shipping_policy: form.shippingPolicy,
-        return_policy: form.returnPolicy,
-      };
+      const fd = new FormData();
+      fd.append('name', form.storeName);
+      fd.append('description', form.description);
+      fd.append('category', form.category);
+      fd.append('location', form.location);
+      fd.append('phone', isCompany ? form.companyPhone : form.phone);
+      fd.append('email', isCompany ? (form.companyEmail || user?.email || '') : (form.email || user?.email || ''));
+      fd.append('shipping_policy', form.shippingPolicy);
+      fd.append('return_policy', form.returnPolicy);
+      if (logoFile) fd.append('logo', logoFile);
 
-      await storesAPI.register(payload);
+      await storesAPI.register(fd);
       setSuccess(true);
     } catch (err: any) {
       const data = err.response?.data;

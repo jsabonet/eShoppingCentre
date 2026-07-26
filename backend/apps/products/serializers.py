@@ -1,11 +1,28 @@
 from rest_framework import serializers
-from .models import Category, Product, ProductImage, ProductVariation, WishlistItem
+from .models import Category, Product, ProductImage, ProductVariant, ProductVariation, Coupon, WishlistItem
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
         fields = ('id', 'image', 'alt_text', 'is_primary', 'sort_order')
+
+
+class ProductVariantSerializer(serializers.ModelSerializer):
+    effective_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductVariant
+        fields = ('id', 'name', 'sku', 'price', 'effective_price', 'stock',
+                  'image', 'image_url', 'attributes', 'is_active', 'sort_order')
+        read_only_fields = ('id',)
+
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+        return None
 
 
 class ProductVariationSerializer(serializers.ModelSerializer):
@@ -40,9 +57,38 @@ class ProductListSerializer(serializers.ModelSerializer):
         return None
 
 
+class SellerProductSerializer(serializers.ModelSerializer):
+    """Richer serializer for seller product management (includes status, stock, etc.)"""
+    primary_image = serializers.SerializerMethodField()
+    variant_count = serializers.SerializerMethodField()
+    discount_percentage = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ('id', 'name', 'slug', 'price', 'compare_price', 'discount_percentage',
+                  'primary_image', 'product_type', 'status', 'stock', 'sku',
+                  'sales_count', 'rating', 'review_count', 'is_on_sale',
+                  'is_featured', 'variant_count', 'created_at')
+
+    def get_primary_image(self, obj):
+        img = obj.images.filter(is_primary=True).first()
+        if img:
+            request = self.context.get('request')
+            return request.build_absolute_uri(img.image.url) if request else img.image.url
+        return None
+
+    def get_variant_count(self, obj):
+        return obj.variants.filter(is_active=True).count()
+
+    def get_discount_percentage(self, obj):
+        if obj.compare_price and obj.compare_price > 0:
+            return round((1 - obj.price / obj.compare_price) * 100)
+        return None
+
+
 class ProductDetailSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
-    variations = ProductVariationSerializer(many=True, read_only=True)
+    variants = ProductVariantSerializer(many=True, read_only=True)
     store = serializers.SerializerMethodField()
     category_name = serializers.CharField(source='category.name', read_only=True)
     category_slug = serializers.CharField(source='category.slug', read_only=True)
@@ -101,3 +147,15 @@ class WishlistItemSerializer(serializers.ModelSerializer):
             product=product,
         )
         return wishlist_item
+
+
+class CouponSerializer(serializers.ModelSerializer):
+    is_valid = serializers.BooleanField(read_only=True)
+    store_name = serializers.CharField(source='store.name', read_only=True)
+
+    class Meta:
+        model = Coupon
+        fields = ('id', 'code', 'discount_type', 'discount_value', 'min_purchase',
+                  'max_uses', 'used_count', 'max_per_user', 'starts_at', 'ends_at',
+                  'is_active', 'is_valid', 'product', 'category', 'store_name', 'created_at')
+        read_only_fields = ('id', 'used_count', 'store', 'created_at')

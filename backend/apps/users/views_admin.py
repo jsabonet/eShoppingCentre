@@ -3,6 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Sum
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from django.conf import settings
 from apps.users.models import User
 from apps.stores.models import Store
 from apps.orders.models import Order
@@ -100,6 +102,36 @@ class AdminStoreManageView(APIView):
                 return Response({'detail': f'Acção inválida. Use: {", ".join(valid_actions.keys())}'}, status=400)
             store.status = valid_actions[action]
             store.save()
+
+            # Send email notification to store owner
+            owner_email = store.owner.email
+            if owner_email:
+                if action == 'approve':
+                    send_mail(
+                        subject=f'🎉 A sua loja "{store.name}" foi aprovada!',
+                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
+                                f'A sua loja "{store.name}" foi aprovada e já está activa no eShoppingCentre.\n\n'
+                                f'Aceda ao seu painel de vendedor: https://eshoppingcentre.co.mz/seller/dashboard\n\n'
+                                f'Obrigado por se juntar a nós!\nEquipa eShoppingCentre',
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[owner_email],
+                        fail_silently=True,
+                    )
+                elif action == 'reject':
+                    reason = request.data.get('reason', 'Não especificado')
+                    send_mail(
+                        subject=f'A sua loja "{store.name}" precisa de ajustes',
+                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
+                                f'A sua loja "{store.name}" não foi aprovada desta vez.\n\n'
+                                f'Motivo: {reason}\n\n'
+                                f'Por favor, corrija os dados e submeta novamente.\n'
+                                f'Aceda: https://eshoppingcentre.co.mz/seller/register\n\n'
+                                f'Equipa eShoppingCentre',
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[owner_email],
+                        fail_silently=True,
+                    )
+
             return Response({'status': store.status, 'name': store.name})
 
         # Update store fields

@@ -63,3 +63,27 @@ class OrderItem(BaseModel):
 
     def __str__(self):
         return f'{self.product_name} x{self.quantity}'
+
+
+class ReturnRequest(BaseModel):
+    STATUS_CHOICES = [
+        ('requested', 'Solicitada'),
+        ('approved', 'Aprovada'),
+        ('rejected', 'Rejeitada'),
+        ('shipped', 'Devolução Enviada'),
+        ('received', 'Recebida'),
+        ('refunded', 'Reembolsada'),
+    ]
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='returns')
+    buyer = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='returns')
+    store = models.ForeignKey('stores.Store', on_delete=models.CASCADE, related_name='returns')
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='requested')
+    vendor_notes = models.TextField(blank=True)
+    refund_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Return #{self.id} - {self.order.order_number}'

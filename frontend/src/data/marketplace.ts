@@ -7,6 +7,17 @@ export interface Category {
   productCount: number;
 }
 
+export interface ProductVariant {
+  id: string;
+  name: string;
+  sku: string;
+  price: number | null;
+  stock: number;
+  image: string | null;
+  attributes: Record<string, string>;
+  is_active: boolean;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -22,6 +33,7 @@ export interface Product {
   badge?: 'sale' | 'new';
   inStock: boolean;
   featured?: boolean;
+  variants?: ProductVariant[];
 }
 
 export interface Banner {

@@ -1,6 +1,7 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.db import IntegrityError
+from django.http import Http404
 from .models import Store
 from .serializers import StoreSerializer, StoreDetailSerializer
 
@@ -23,6 +24,8 @@ class MyStoreView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
+        if not hasattr(self.request.user, 'store'):
+            raise Http404('Nenhuma loja encontrada para este utilizador.')
         return self.request.user.store
 
 

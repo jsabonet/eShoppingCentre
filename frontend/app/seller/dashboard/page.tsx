@@ -1,37 +1,105 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Package, ShoppingCart, DollarSign, TrendingUp, Users, Eye, ArrowUp, ArrowDown, Plus, LayoutDashboard } from 'lucide-react';
+import {
+  Package, ShoppingCart, DollarSign, TrendingUp, Star, Clock,
+  ArrowUp, ArrowDown, Plus, AlertCircle, RefreshCw
+} from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
+import LoadingSpinner from '@/src/components/LoadingSpinner';
+import { storesAPI } from '@/src/lib/api';
+import type { SellerDashboard } from '@/src/lib/api';
 
-const stats = [
-  { label: 'Vendas Hoje', value: '12', change: '+25%', up: true, icon: TrendingUp, color: 'bg-green-100 text-green-700' },
-  { label: 'Receita Total', value: '45.600 MZN', change: '+12%', up: true, icon: DollarSign, color: 'bg-blue-100 text-blue-700' },
-  { label: 'Produtos', value: '156', change: '+3 esta semana', up: true, icon: Package, color: 'bg-purple-100 text-purple-700' },
-  { label: 'Encomendas Pendentes', value: '8', change: '-2', up: false, icon: ShoppingCart, color: 'bg-orange-100 text-orange-700' },
-  { label: 'Total de Encomendas', value: '342', change: '+18%', up: true, icon: ShoppingCart, color: 'bg-teal-100 text-teal-700' },
-  { label: 'Avaliação', value: '4.8 ★', change: 'Excelente', up: true, icon: Eye, color: 'bg-pink-100 text-pink-700' },
-  { label: 'Afiliados', value: '23', change: '+5 este mês', up: true, icon: Users, color: 'bg-indigo-100 text-indigo-700' },
-  { label: 'Comissões Pagas', value: '3.450 MZN', change: '+8%', up: true, icon: DollarSign, color: 'bg-amber-100 text-amber-700' },
-];
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
 
-const recentOrders = [
-  { id: 'PED-0421', customer: 'João Silva', items: 3, total: '12.300 MZN', status: 'Pendente', date: 'Hoje, 14:30' },
-  { id: 'PED-0420', customer: 'Maria Santos', items: 1, total: '4.798 MZN', status: 'Confirmado', date: 'Hoje, 11:20' },
-  { id: 'PED-0419', customer: 'Carlos Macamo', items: 2, total: '3.499 MZN', status: 'Enviado', date: 'Ontem' },
-  { id: 'PED-0418', customer: 'Ana Mondlane', items: 1, total: '2.899 MZN', status: 'Entregue', date: 'Ontem' },
-  { id: 'PED-0417', customer: 'Pedro Chissano', items: 4, total: '8.990 MZN', status: 'Entregue', date: '20 Jul' },
-];
+function fmtPrice(v: number): string {
+  return v.toLocaleString('pt-MZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' MZN';
+}
 
-const topProducts = [
-  { name: 'Smartphone Pro Max', sales: 45, revenue: '224.999 MZN' },
-  { name: 'Fone Bluetooth Premium', sales: 32, revenue: '28.796 MZN' },
-  { name: 'Smartwatch Sport GPS', sales: 28, revenue: '36.372 MZN' },
-  { name: 'Laptop Ultrabook 15"', sales: 20, revenue: '129.980 MZN' },
-  { name: 'Caixa de Som Bluetooth', sales: 18, revenue: '8.098 MZN' },
-];
+function fmtNum(v: number): string {
+  return v.toLocaleString('pt-MZ');
+}
+
+function timeAgo(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Agora mesmo';
+  if (mins < 60) return `Há ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Ontem';
+  if (days < 7) return `Há ${days} dias`;
+  return d.toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short' });
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-700',
+  confirmed: 'bg-blue-100 text-blue-700',
+  processing: 'bg-indigo-100 text-indigo-700',
+  shipped: 'bg-purple-100 text-purple-700',
+  delivered: 'bg-green-100 text-green-700',
+  cancelled: 'bg-red-100 text-red-700',
+  refunded: 'bg-gray-100 text-gray-700',
+};
 
 export default function SellerDashboardPage() {
+  const [data, setData] = useState<SellerDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchDashboard = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data: d } = await storesAPI.dashboard();
+      setData(d);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Erro ao carregar dashboard.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+
+  if (loading && !data) {
+    return (
+      <SellerLayout>
+        <div className="flex-1 flex items-center justify-center">
+          <LoadingSpinner size={36} message="A carregar dashboard..." />
+        </div>
+      </SellerLayout>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <SellerLayout>
+        <div className="p-6 flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <AlertCircle size={48} className="text-red-400 mx-auto mb-3" />
+            <p className="text-red-600 font-medium mb-2">{error}</p>
+            <button onClick={fetchDashboard} className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm hover:bg-accent/90 flex items-center gap-2 mx-auto">
+              <RefreshCw size={14} /> Tentar novamente
+            </button>
+          </div>
+        </div>
+      </SellerLayout>
+    );
+  }
+
+  const stats = data ? [
+    { label: 'Vendas Hoje', value: fmtNum(data.today_sales), icon: TrendingUp, color: 'bg-green-100 text-green-700', sub: fmtPrice(data.today_revenue) },
+    { label: 'Receita Total', value: fmtPrice(data.total_revenue), icon: DollarSign, color: 'bg-blue-100 text-blue-700', sub: `${fmtNum(data.total_orders)} encomendas` },
+    { label: 'Produtos Activos', value: fmtNum(data.total_products), icon: Package, color: 'bg-purple-100 text-purple-700', sub: 'em catálogo' },
+    { label: 'Pendentes', value: fmtNum(data.pending_orders), icon: Clock, color: data.pending_orders > 0 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500', sub: 'por processar' },
+    { label: 'Avaliação', value: `${data.store_rating.toFixed(1)} ★`, icon: Star, color: 'bg-pink-100 text-pink-700', sub: 'média da loja' },
+  ] : [];
+
   return (
     <SellerLayout>
       <div className="p-6">
@@ -40,16 +108,21 @@ export default function SellerDashboardPage() {
             <h1 className="text-2xl font-bold">Dashboard</h1>
             <p className="text-sm text-muted-foreground">Bem-vindo de volta! Aqui está o resumo da sua loja.</p>
           </div>
-          <Link
-            href="/seller/products/new"
-            className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors flex items-center gap-2"
-          >
-            <Plus size={16} /> Novo Produto
-          </Link>
+          <div className="flex items-center gap-2">
+            <button onClick={fetchDashboard} disabled={loading} className="p-2 hover:bg-muted rounded-lg transition-colors" title="Actualizar">
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            </button>
+            <Link
+              href="/seller/products/new"
+              className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors flex items-center gap-2"
+            >
+              <Plus size={16} /> Novo Produto
+            </Link>
+          </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -58,13 +131,10 @@ export default function SellerDashboardPage() {
                   <div className={`p-2 rounded-lg ${stat.color}`}>
                     <Icon size={20} />
                   </div>
-                  <span className={`flex items-center gap-1 text-xs font-medium ${stat.up ? 'text-green-600' : 'text-red-600'}`}>
-                    {stat.up ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-                    {stat.change}
-                  </span>
                 </div>
                 <p className="text-2xl font-bold">{stat.value}</p>
                 <p className="text-xs text-muted-foreground">{stat.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{stat.sub}</p>
               </div>
             );
           })}
@@ -78,21 +148,19 @@ export default function SellerDashboardPage() {
               <Link href="/seller/orders" className="text-sm text-accent hover:underline">Ver todas</Link>
             </div>
             <div className="divide-y divide-border">
-              {recentOrders.map((order) => (
+              {data?.recent_orders?.length === 0 && (
+                <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma encomenda ainda.</p>
+              )}
+              {data?.recent_orders?.map((order) => (
                 <div key={order.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
                   <div>
                     <p className="font-medium text-sm">{order.customer}</p>
-                    <p className="text-xs text-muted-foreground">{order.id} • {order.date}</p>
+                    <p className="text-xs text-muted-foreground">{order.order_number} • {timeAgo(order.created_at)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-sm">{order.total}</p>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      order.status === 'Pendente' ? 'bg-yellow-100 text-yellow-700' :
-                      order.status === 'Confirmado' ? 'bg-blue-100 text-blue-700' :
-                      order.status === 'Enviado' ? 'bg-purple-100 text-purple-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>
-                      {order.status}
+                    <p className="font-medium text-sm">{order.total.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</p>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700'}`}>
+                      {order.status_display}
                     </span>
                   </div>
                 </div>
@@ -106,18 +174,31 @@ export default function SellerDashboardPage() {
               <h2 className="font-bold">Produtos Mais Vendidos</h2>
             </div>
             <div className="divide-y divide-border">
-              {topProducts.map((product, i) => (
-                <div key={product.name} className="p-4 flex items-center gap-4">
-                  <span className="w-6 h-6 rounded-full bg-accent/10 text-accent text-xs font-bold flex items-center justify-center flex-shrink-0">
-                    {i + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{product.name}</p>
-                    <p className="text-xs text-muted-foreground">{product.sales} unidades vendidas</p>
+              {data?.top_products?.length === 0 && (
+                <p className="p-6 text-center text-sm text-muted-foreground">Nenhum produto vendido ainda.</p>
+              )}
+              {data?.top_products?.map((product, i) => {
+                const imgUrl = product.image
+                  ? (product.image.startsWith('http') ? product.image : `${MEDIA_BASE}${product.image.startsWith('/') ? '' : '/'}${product.image}`)
+                  : null;
+                return (
+                  <div key={product.id} className="p-4 flex items-center gap-4">
+                    <span className="w-6 h-6 rounded-full bg-accent/10 text-accent text-xs font-bold flex items-center justify-center flex-shrink-0">
+                      {i + 1}
+                    </span>
+                    {imgUrl && (
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">{product.sales} unidades vendidas</p>
+                    </div>
+                    <span className="text-sm font-semibold text-accent">{product.revenue.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</span>
                   </div>
-                  <span className="text-sm font-semibold text-accent">{product.revenue}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

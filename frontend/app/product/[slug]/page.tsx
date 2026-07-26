@@ -46,9 +46,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
     image: product.images?.[0]?.image || '',
     category: product.category_slug || '', rating: parseFloat(product.rating), reviewCount: product.review_count || 0,
     badge: product.is_on_sale ? 'sale' as const : undefined,
-    inStock: product.stock > 0,
+    inStock: product.stock > 0 || (product.variants?.length > 0),
     originalPrice: product.compare_price ? parseFloat(product.compare_price) : undefined,
     discount: product.discount_percentage ?? undefined,
+    variants: (product.variants || []).map((v: any) => ({
+      id: v.id, name: v.name, sku: v.sku || '',
+      price: v.price != null ? parseFloat(v.price) : null,
+      stock: v.stock, image: v.image_url || v.image || null,
+      attributes: v.attributes || {}, is_active: v.is_active,
+    })),
   };
 
   return (

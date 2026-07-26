@@ -1,12 +1,18 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Package, ShoppingCart, Users, DollarSign, Settings, Store,
-  ChevronLeft, ChevronRight, LogOut, Plus, ExternalLink, TrendingUp, Gift, Menu, X
+  ChevronLeft, ChevronRight, LogOut, Plus, ExternalLink, TrendingUp, Gift, Menu, X, AlertCircle
 } from 'lucide-react';
+import { storesAPI } from '@/src/lib/api';
+import LoadingSpinner from '@/src/components/LoadingSpinner';
+
+// Module-level cache — persists across page navigations within the seller area
+let cachedStore: { name: string; slug: string; status: string } | null = null;
+let cacheChecked = false;
 
 interface SellerLayoutProps {
   children: React.ReactNode;
@@ -23,8 +29,111 @@ const navItems = [
 
 export default function SellerLayout({ children }: SellerLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [storeName, setStoreName] = useState<string | null>(cachedStore?.name ?? null);
+  const [storeSlug, setStoreSlug] = useState(cachedStore?.slug ?? '');
+  const [storeStatus, setStoreStatus] = useState<string | null>(cachedStore?.status ?? null);
+  const [checking, setChecking] = useState(!cacheChecked);
+
+  useEffect(() => {
+    if (pathname === '/seller/register') {
+      setChecking(false);
+      return;
+    }
+
+    // Use cached data if available
+    if (cachedStore) {
+      setStoreName(cachedStore.name);
+      setStoreSlug(cachedStore.slug);
+      setStoreStatus(cachedStore.status);
+      setChecking(false);
+      return;
+    }
+
+    // Already fetching
+    if (cacheChecked) return;
+
+    cacheChecked = true;
+    (async () => {
+      try {
+        const { data } = await storesAPI.myStore();
+        cachedStore = { name: data.name, slug: data.slug, status: data.status };
+        setStoreName(data.name);
+        setStoreSlug(data.slug);
+        setStoreStatus(data.status);
+      } catch {
+        router.replace('/seller/register');
+      } finally {
+        setChecking(false);
+      }
+    })();
+  }, [pathname, router]);
+
+  // Loading state — only shown on first visit (no cache)
+  if (checking && !cachedStore) {
+    return (
+      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
+        <LoadingSpinner size={36} message="A verificar loja..." />
+      </div>
+    );
+  }
+
+  // Loading state
+  if (checking) {
+    return (
+      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
+        <LoadingSpinner size={36} message="A verificar loja..." />
+      </div>
+    );
+  }
+
+  // Pending store
+  if (storeStatus === 'pending') {
+    return (
+      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center p-6">
+        <div className="max-w-md text-center">
+          <div className="inline-flex p-4 bg-yellow-100 rounded-full mb-4">
+            <AlertCircle size={48} className="text-yellow-600" />
+          </div>
+          <h1 className="text-2xl font-bold mb-3">Loja em Análise ⏳</h1>
+          <p className="text-muted-foreground mb-6">
+            A sua loja <strong>{storeName}</strong> ainda está a ser revista pela nossa equipa.
+            Receberá um email quando for aprovada.
+          </p>
+          <Link href="/" className="px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 inline-block">
+            Voltar à Página Inicial
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Rejected store
+  if (storeStatus === 'rejected' || storeStatus === 'suspended') {
+    return (
+      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center p-6">
+        <div className="max-w-md text-center">
+          <div className="inline-flex p-4 bg-red-100 rounded-full mb-4">
+            <AlertCircle size={48} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold mb-3">Loja {storeStatus === 'rejected' ? 'Rejeitada' : 'Suspensa'}</h1>
+          <p className="text-muted-foreground mb-6">
+            A sua loja <strong>{storeName}</strong> foi {storeStatus === 'rejected' ? 'rejeitada' : 'suspensa'}.
+            {storeStatus === 'rejected' && ' Pode registar uma nova loja com os dados corrigidos.'}
+          </p>
+          {storeStatus === 'rejected' && (
+            <Link href="/seller/register" className="px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 inline-block">
+              Registar Nova Loja
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!storeName) return null;
 
   return (
     <div className="min-h-[calc(100vh-200px)] bg-muted/30 flex">
@@ -39,7 +148,13 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
           {!collapsed && (
             <div>
               <h2 className="font-bold text-sm">Painel do Vendedor</h2>
-              <p className="text-xs text-muted-foreground">TechnoMoz</p>
+              {storeName === null ? (
+                <p className="text-xs text-muted-foreground animate-pulse">A carregar...</p>
+              ) : storeName ? (
+                <p className="text-xs text-muted-foreground">{storeName}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Sem loja</p>
+              )}
             </div>
           )}
           <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 hover:bg-muted rounded-md transition-colors">
@@ -72,7 +187,7 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
         {/* Store Link */}
         <div className="p-3 border-t border-border">
           <Link
-            href="/store/tecnomoz"
+            href={storeSlug ? `/store/${storeSlug}` : '#'}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <ExternalLink size={18} />

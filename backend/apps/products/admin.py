@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, ProductImage, ProductVariation
+from .models import Category, Product, ProductImage, ProductVariant, ProductVariation
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -20,3 +20,10 @@ class ProductImageAdmin(admin.ModelAdmin):
 @admin.register(ProductVariation)
 class ProductVariationAdmin(admin.ModelAdmin):
     list_display = ('product', 'name', 'price_modifier', 'stock', 'is_active')
+
+
+@admin.register(ProductVariant)
+class ProductVariantAdmin(admin.ModelAdmin):
+    list_display = ('product', 'name', 'sku', 'price', 'stock', 'is_active')
+    search_fields = ('name', 'sku')
+    list_filter = ('is_active',)

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db import transaction
-from .models import Order, OrderItem
+from .models import Order, OrderItem, ReturnRequest
 from apps.products.models import Product
 
 
@@ -9,6 +9,25 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = ('id', 'product_name', 'product_image', 'quantity', 'unit_price', 'total_price')
         read_only_fields = ('product_name', 'product_image', 'unit_price', 'total_price')
+
+
+class ReturnRequestSerializer(serializers.ModelSerializer):
+    order_number = serializers.CharField(source='order.order_number', read_only=True)
+    buyer_name = serializers.SerializerMethodField()
+    store_name = serializers.CharField(source='store.name', read_only=True)
+
+    class Meta:
+        model = ReturnRequest
+        fields = ('id', 'order', 'order_number', 'reason', 'status', 'vendor_notes',
+                  'refund_amount', 'buyer_name', 'store_name', 'created_at')
+        read_only_fields = ('id', 'buyer', 'store', 'created_at')
+
+    def get_buyer_name(self, obj):
+        return obj.buyer.get_full_name() or obj.buyer.email
+
+    def create(self, validated_data):
+        validated_data['buyer'] = self.context['request'].user
+        return super().create(validated_data)
 
 
 class OrderSerializer(serializers.ModelSerializer):

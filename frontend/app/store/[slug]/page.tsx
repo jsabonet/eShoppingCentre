@@ -1,16 +1,10 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { ChevronRight, Store, Star, MapPin, Package, TrendingUp, Shield, Clock, Phone, Mail } from 'lucide-react';
+import { ChevronRight, Phone, Mail, Shield, Clock, Package } from 'lucide-react';
+import StoreOwnerEditable from '@/src/components/StoreOwnerEditable';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-const MEDIA_BASE = 'http://localhost:8000';
-
-function mediaUrl(path: string | null): string {
-  if (!path) return '';
-  if (path.startsWith('http')) return path;
-  return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
-}
 
 interface StorePageProps {
   params: Promise<{ slug: string }>;
@@ -68,36 +62,16 @@ export default async function StorePage({ params }: StorePageProps) {
         </div>
       </div>
 
-      {/* Banner & Header */}
+      {/* Banner & Header — editable by store owner */}
       <div className="bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 border-b border-border">
-        {store.banner && (
-          <div className="w-full h-48 md:h-64 overflow-hidden">
-            <img src={mediaUrl(store.banner)} alt={store.name} className="w-full h-full object-cover" />
-          </div>
-        )}
-        <div className="max-w-[1500px] mx-auto px-4 py-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 -mt-12 relative z-10">
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl border-4 border-white shadow-lg overflow-hidden bg-white flex-shrink-0">
-              {store.logo ? (
-                <img src={mediaUrl(store.logo)} alt={store.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-accent/10 flex items-center justify-center text-2xl font-bold text-accent">
-                  {store.name?.charAt(0) || 'L'}
-                </div>
-              )}
-            </div>
-            <div className="flex-1">
-              <h1 className="text-2xl md:text-3xl font-bold">{store.name}</h1>
-              <p className="text-muted-foreground">{store.description}</p>
-              <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1"><Star size={14} className="text-yellow-500 fill-yellow-500" /> {parseFloat(store.rating || 0).toFixed(1)}</span>
-                <span className="flex items-center gap-1"><MapPin size={14} /> {store.location || 'Moçambique'}</span>
-                <span className="flex items-center gap-1"><Package size={14} /> {store.total_products || 0} produtos</span>
-                <span className="flex items-center gap-1"><TrendingUp size={14} /> {store.total_sales || 0} vendas</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <StoreOwnerEditable store={{
+          id: store.id, name: store.name, slug: store.slug,
+          tagline: store.tagline || '', description: store.description || '',
+          logo: store.logo, banner: store.banner,
+          theme_color: store.theme_color || '#2563eb',
+          location: store.location, rating: parseFloat(store.rating || '0'),
+          total_products: store.total_products || 0, total_sales: store.total_sales || 0,
+        }} />
       </div>
 
       {/* Info + Products */}
