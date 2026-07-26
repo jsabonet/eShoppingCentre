@@ -19,6 +19,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "eShoppingCentre",
   description: "A sua plataforma global de e-commerce",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
