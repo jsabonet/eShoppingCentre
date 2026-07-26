@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: "eShoppingCentre",
   description: "A sua plataforma global de e-commerce",
   icons: {
-    icon: "https://cdn.b12.io/client_media/iKv1biKD/12049a95-7e70-11f1-8605-0242ac110002-NOVO_LOGO.png",
+    icon: "/icon.png",
   },
 };
 
