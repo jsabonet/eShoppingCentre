@@ -3,6 +3,8 @@
 import { useState, useEffect, createContext, useContext, useCallback, type ReactNode } from 'react';
 import { authAPI, usersAPI, type User } from '@/src/lib/api';
 import { signInWithGoogle, signOutFirebase } from '@/src/lib/firebase';
+import { useInactivityTimer } from '@/src/hooks/useInactivityTimer';
+import SessionExpiryWarning from '@/src/components/SessionExpiryWarning';
 
 interface AuthContextType {
   user: User | null;
@@ -86,6 +88,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  // ─── Session inactivity timer (only active when authenticated) ───
+  const { remaining, showWarning, resetTimer } = useInactivityTimer({
+    timeout: 30 * 60 * 1000,      // 30 minutes inactivity
+    warningBefore: 60 * 1000,      // warn 1 minute before
+    onLogout: logout,
+  });
+
   const loginWithGoogle = useCallback(async (): Promise<{ isNewUser: boolean }> => {
     // Step 1: Firebase popup → get ID token
     const { idToken } = await signInWithGoogle();
@@ -117,6 +126,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithGoogle,
       }}
     >
+      {/* Session expiry warning modal */}
+      {user && showWarning && (
+        <SessionExpiryWarning
+          remaining={remaining}
+          onExtend={resetTimer}
+          onLogout={logout}
+        />
+      )}
       {children}
     </AuthContext.Provider>
   );
