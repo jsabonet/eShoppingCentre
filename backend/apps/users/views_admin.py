@@ -82,8 +82,37 @@ class AdminAllStoresView(generics.ListAPIView):
 
 
 class AdminStoreManageView(APIView):
-    """Admin: gerir loja (aprovar, rejeitar, suspender, reactivar, actualizar)"""
+    """Admin: gerir loja (aprovar, rejeitar, suspender, reactivar, actualizar, eliminar)"""
     permission_classes = [permissions.IsAdminUser]
+
+    def delete(self, request, pk):
+        """Eliminar loja permanentemente da base de dados."""
+        try:
+            store = Store.objects.get(id=pk)
+        except Store.DoesNotExist:
+            return Response({'detail': 'Loja não encontrada.'}, status=404)
+
+        store_name = store.name
+        owner_email = store.owner.email
+
+        # Delete (cascades: products, orders via products)
+        store.delete()
+
+        # Notify owner
+        if owner_email:
+            send_mail(
+                subject=f'A sua loja "{store_name}" foi removida',
+                message=f'Olá,\n\n'
+                        f'A sua loja "{store_name}" foi removida permanentemente do eShoppingCentre '
+                        f'por um administrador.\n\n'
+                        f'Para mais informações, contacte o suporte.\n\n'
+                        f'Equipa eShoppingCentre',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[owner_email],
+                fail_silently=True,
+            )
+
+        return Response({'detail': f'Loja "{store_name}" eliminada permanentemente.'}, status=200)
 
     def patch(self, request, pk):
         action = request.data.get('action', '')
