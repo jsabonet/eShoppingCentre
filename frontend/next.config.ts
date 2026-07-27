@@ -6,8 +6,13 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   typescript: {
-    // Erros de tipos pré-existentes entre componentes — corrigir na fase de implementação
     ignoreBuildErrors: true,
+  },
+  experimental: {
+    staleTimes: {
+      dynamic: 30,   // RSC prefetch cache por 30s (evita refetch a cada hover)
+      static: 300,   // páginas estáticas 5min
+    },
   },
   images: {
     remotePatterns: [
