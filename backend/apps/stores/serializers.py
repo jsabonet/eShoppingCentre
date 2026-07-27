@@ -11,8 +11,8 @@ class StoreSerializer(serializers.ModelSerializer):
         model = Store
         fields = ('id', 'name', 'slug', 'description', 'tagline', 'logo', 'banner',
                   'theme_color', 'category', 'rating', 'total_sales', 'total_products',
-                  'location', 'status', 'tier', 'tier_display')
-        read_only_fields = ('id', 'rating', 'total_sales', 'total_products', 'status', 'tier', 'tier_display')
+                  'location', 'status', 'product_type', 'tier', 'tier_display')
+        read_only_fields = ('id', 'rating', 'total_sales', 'total_products', 'status', 'product_type', 'tier', 'tier_display')
 
 
 class StoreDetailSerializer(serializers.ModelSerializer):

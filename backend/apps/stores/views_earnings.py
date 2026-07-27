@@ -65,7 +65,8 @@ class StoreStatsView(APIView):
         } for p in top]
 
         return Response({
-            # Stats cards
+            # Stats cards — common
+            'product_type': store.product_type,
             'today_sales': today_orders.count(),
             'today_revenue': today_revenue,
             'total_revenue': total_revenue,
@@ -73,6 +74,9 @@ class StoreStatsView(APIView):
             'total_orders': orders.count(),
             'pending_orders': orders.filter(status='pending').count(),
             'store_rating': float(store.rating),
+            # Type-specific stats
+            'downloaded_today': 0,  # placeholder for digital products
+            'active_students': 0,   # placeholder for courses
             # Lists
             'recent_orders': recent_data,
             'top_products': top_data,

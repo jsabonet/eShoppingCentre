@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Package, ShoppingCart, DollarSign, TrendingUp, Star, Clock,
-  ArrowUp, ArrowDown, Plus, AlertCircle, RefreshCw
+  ArrowUp, ArrowDown, Plus, AlertCircle, RefreshCw, Download, Users
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -92,13 +92,28 @@ export default function SellerDashboardPage() {
     );
   }
 
-  const stats = data ? [
+  const productType = data?.product_type || 'physical';
+
+  const baseStats = [
     { label: 'Vendas Hoje', value: fmtNum(data.today_sales), icon: TrendingUp, color: 'bg-green-100 text-green-700', sub: fmtPrice(data.today_revenue) },
     { label: 'Receita Total', value: fmtPrice(data.total_revenue), icon: DollarSign, color: 'bg-blue-100 text-blue-700', sub: `${fmtNum(data.total_orders)} encomendas` },
     { label: 'Produtos Activos', value: fmtNum(data.total_products), icon: Package, color: 'bg-purple-100 text-purple-700', sub: 'em catálogo' },
-    { label: 'Pendentes', value: fmtNum(data.pending_orders), icon: Clock, color: data.pending_orders > 0 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500', sub: 'por processar' },
     { label: 'Avaliação', value: `${data.store_rating.toFixed(1)} ★`, icon: Star, color: 'bg-pink-100 text-pink-700', sub: 'média da loja' },
-  ] : [];
+  ];
+
+  const typeStats: Record<string, { label: string; value: string; icon: any; color: string; sub: string }[]> = {
+    physical: [
+      { label: 'Pendentes', value: fmtNum(data.pending_orders), icon: Clock, color: data.pending_orders > 0 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500', sub: 'por processar' },
+    ],
+    digital: [
+      { label: 'Downloads Hoje', value: fmtNum(data.downloaded_today || 0), icon: Download, color: 'bg-cyan-100 text-cyan-700', sub: 'imediatos' },
+    ],
+    course: [
+      { label: 'Alunos Activos', value: fmtNum(data.active_students || 0), icon: Users, color: 'bg-indigo-100 text-indigo-700', sub: 'matriculados' },
+    ],
+  };
+
+  const stats = data ? [...baseStats, ...(typeStats[productType] || typeStats.physical)] : [];
 
   return (
     <SellerLayout>
@@ -122,7 +137,7 @@ export default function SellerDashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -141,10 +156,12 @@ export default function SellerDashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Orders */}
+          {/* Recent Orders / Activity */}
           <div className="bg-card border border-border rounded-xl">
             <div className="p-4 border-b border-border flex items-center justify-between">
-              <h2 className="font-bold">Encomendas Recentes</h2>
+              <h2 className="font-bold">
+                {productType === 'course' ? 'Alunos Recentes' : productType === 'digital' ? 'Downloads Recentes' : 'Encomendas Recentes'}
+              </h2>
               <Link href="/seller/orders" className="text-sm text-accent hover:underline">Ver todas</Link>
             </div>
             <div className="divide-y divide-border">

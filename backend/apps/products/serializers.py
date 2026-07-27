@@ -90,12 +90,18 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     store = serializers.SerializerMethodField()
+    category = serializers.SlugRelatedField(
+        slug_field='slug',
+        queryset=Category.objects.filter(is_active=True),
+        help_text='Slug da categoria (ex: "moda", "eletronicos")'
+    )
     category_name = serializers.CharField(source='category.name', read_only=True)
     category_slug = serializers.CharField(source='category.slug', read_only=True)
 
     class Meta:
         model = Product
         fields = '__all__'
+        extra_kwargs = {'slug': {'required': False, 'allow_blank': True}}
 
     def get_store(self, obj):
         logo_url = None
@@ -116,14 +122,25 @@ from django.utils.text import slugify
 
 class CategorySerializer(serializers.ModelSerializer):
     product_count = serializers.SerializerMethodField()
+    parent_slug = serializers.CharField(source='parent.slug', read_only=True, allow_null=True)
+    children = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ('id', 'name', 'slug', 'description', 'image', 'product_count', 'sort_order')
+        fields = ('id', 'name', 'slug', 'description', 'image', 'parent_slug',
+                  'product_count', 'children', 'product_type', 'sort_order')
         read_only_fields = ('slug',)
 
     def get_product_count(self, obj):
         return obj.products.filter(status='active').count()
+
+    def get_children(self, obj):
+        # Only include children in root-level listing, not recursive
+        if hasattr(obj, '_prefetched_children'):
+            children = obj._prefetched_children
+        else:
+            children = obj.children.filter(is_active=True)
+        return [{'name': c.name, 'slug': c.slug} for c in children[:20]]
 
     def create(self, validated_data):
         validated_data['slug'] = slugify(validated_data['name'])

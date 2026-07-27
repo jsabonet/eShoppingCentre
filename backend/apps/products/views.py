@@ -13,9 +13,29 @@ from apps.stores.permissions import IsStoreOwner
 
 
 class CategoryListView(generics.ListAPIView):
-    queryset = Category.objects.filter(is_active=True)
     serializer_class = CategorySerializer
     permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        qs = Category.objects.filter(is_active=True)
+        parent = self.request.query_params.get('parent', None)
+        root = self.request.query_params.get('root', None)
+        product_type = self.request.query_params.get('product_type', None)
+
+        if parent is not None:
+            # Filter children of a specific parent (by slug)
+            qs = qs.filter(parent__slug=parent)
+        elif root == 'true':
+            # Only root categories (no parent)
+            qs = qs.filter(parent__isnull=True)
+        elif parent == '':
+            # Empty parent = all categories including children — return all
+            pass
+
+        if product_type:
+            qs = qs.filter(product_type=product_type)
+
+        return qs.select_related('parent').order_by('sort_order', 'name')
 
 
 class CategoryDetailView(generics.RetrieveAPIView):
@@ -87,7 +107,7 @@ class MyProductListView(generics.ListAPIView):
         return store.products.filter(~Q(status='deleted')).select_related('category').order_by('-created_at')
 
 
-class ProductUpdateView(generics.UpdateAPIView):
+class ProductUpdateView(generics.RetrieveUpdateAPIView):
     serializer_class = ProductDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
 

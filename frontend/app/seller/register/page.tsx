@@ -168,6 +168,7 @@ export default function SellerRegisterPage() {
       fd.append('email', isCompany ? (form.companyEmail || user?.email || '') : (form.email || user?.email || ''));
       fd.append('shipping_policy', form.shippingPolicy);
       fd.append('return_policy', form.returnPolicy);
+      fd.append('product_type', form.productType);
       if (logoFile) fd.append('logo', logoFile);
 
       await storesAPI.register(fd);

@@ -5,27 +5,45 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Package, ShoppingCart, Users, DollarSign, Settings, Store,
-  ChevronLeft, ChevronRight, LogOut, Plus, ExternalLink, TrendingUp, Gift, Menu, X, AlertCircle
+  ChevronLeft, ChevronRight, LogOut, Plus, ExternalLink, TrendingUp, Gift, Menu, X, AlertCircle,
+  GraduationCap, Award
 } from 'lucide-react';
 import { storesAPI } from '@/src/lib/api';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 
 // Module-level cache — persists across page navigations within the seller area
-let cachedStore: { name: string; slug: string; status: string } | null = null;
+let cachedStore: { name: string; slug: string; status: string; productType: string } | null = null;
 let cacheChecked = false;
 
 interface SellerLayoutProps {
   children: React.ReactNode;
 }
 
-const navItems = [
+const BASE_NAV = [
   { href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/seller/products', label: 'Produtos', icon: Package },
   { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart },
-  { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
   { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
   { href: '/seller/settings', label: 'Configurações', icon: Settings },
 ];
+
+const TYPE_NAV: Record<string, { href: string; label: string; icon: any }[]> = {
+  physical: [
+    { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
+  ],
+  digital: [
+    { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
+  ],
+  course: [
+    { href: '/seller/students', label: 'Alunos', icon: GraduationCap },
+    { href: '/seller/certificates', label: 'Certificados', icon: Award },
+    { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
+  ],
+};
+
+function getNavItems(productType: string) {
+  return [...BASE_NAV, ...(TYPE_NAV[productType] || TYPE_NAV.physical)];
+}
 
 export default function SellerLayout({ children }: SellerLayoutProps) {
   const pathname = usePathname();
@@ -35,7 +53,10 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
   const [storeName, setStoreName] = useState<string | null>(cachedStore?.name ?? null);
   const [storeSlug, setStoreSlug] = useState(cachedStore?.slug ?? '');
   const [storeStatus, setStoreStatus] = useState<string | null>(cachedStore?.status ?? null);
+  const [productType, setProductType] = useState<string>(cachedStore?.productType ?? 'physical');
   const [checking, setChecking] = useState(!cacheChecked);
+
+  const navItems = getNavItems(productType);
 
   useEffect(() => {
     if (pathname === '/seller/register') {
@@ -59,10 +80,11 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
     (async () => {
       try {
         const { data } = await storesAPI.myStore();
-        cachedStore = { name: data.name, slug: data.slug, status: data.status };
+        cachedStore = { name: data.name, slug: data.slug, status: data.status, productType: data.product_type || 'physical' };
         setStoreName(data.name);
         setStoreSlug(data.slug);
         setStoreStatus(data.status);
+        setProductType(data.product_type || 'physical');
       } catch {
         router.replace('/seller/register');
       } finally {

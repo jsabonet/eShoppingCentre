@@ -52,4 +52,23 @@ class StoreRegisterView(generics.CreateAPIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user, status='pending')
+        product_type = self.request.data.get('product_type', 'physical')
+        # Smart defaults based on product type
+        defaults = {}
+        if product_type == 'physical':
+            defaults['default_affiliate_commission'] = 10.00
+            defaults['low_stock_threshold'] = 5
+        elif product_type == 'digital':
+            defaults['default_affiliate_commission'] = 15.00
+            defaults['low_stock_threshold'] = 0  # Not applicable
+        elif product_type == 'course':
+            defaults['default_affiliate_commission'] = 20.00
+            defaults['low_stock_threshold'] = 0  # Not applicable
+
+        # Only apply defaults if not explicitly provided
+        for k, v in defaults.items():
+            if k not in self.request.data:
+                setattr(serializer, k, v)  # fallback — will be overridden by validated_data
+
+        serializer.save(owner=self.request.user, status='pending',
+                        **{k: v for k, v in defaults.items() if k not in serializer.validated_data})

@@ -136,6 +136,7 @@ export interface Store {
   banner: string | null;
   theme_color: string;
   category: string;
+  product_type: 'physical' | 'digital' | 'course';
   rating: number;
   total_sales: number;
   total_products: number;
@@ -359,7 +360,7 @@ export const productsAPI = {
     api.get<PaginatedResponse<Product>>('/products/my/', { params }),
 
   addImage: (productId: string, data: FormData) =>
-    api.post(`/products/${productId}/images/`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    api.post(`/products/${productId}/images/`, data),
 
   // Variants
   listVariants: (productId: string) =>
@@ -423,6 +424,7 @@ export interface DashboardProduct {
 }
 
 export interface SellerDashboard {
+  product_type: 'physical' | 'digital' | 'course';
   today_sales: number;
   today_revenue: number;
   total_revenue: number;
@@ -430,6 +432,8 @@ export interface SellerDashboard {
   total_orders: number;
   pending_orders: number;
   store_rating: number;
+  downloaded_today: number;
+  active_students: number;
   recent_orders: DashboardOrder[];
   top_products: DashboardProduct[];
 }

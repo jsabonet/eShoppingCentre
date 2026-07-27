@@ -23,17 +23,35 @@ export interface Product {
   slug: string;
   name: string;
   description: string;
+  shortDescription?: string;
   price: number;
   originalPrice?: number;
   discount?: number;
   image: string;
+  images?: string[];
   category: string;
   rating: number;
   reviewCount: number;
   badge?: 'sale' | 'new';
   inStock: boolean;
   featured?: boolean;
+  brand?: string;
+  condition?: string;
+  warrantyDays?: number;
+  videoUrl?: string;
   variants?: ProductVariant[];
+  // Extended fields
+  sku?: string;
+  barcode?: string;
+  weight?: string;
+  height?: string;
+  width?: string;
+  length?: string;
+  tags?: string[];
+  specifications?: Record<string, string>;
+  salesCount?: number;
+  storeName?: string;
+  storeSlug?: string;
 }
 
 export interface Banner {

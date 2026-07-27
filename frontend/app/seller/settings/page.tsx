@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, Save, Upload, X, Palette, Store, Info, Phone, Mail, MapPin, Percent, FileText, ShieldCheck } from 'lucide-react';
+import { Settings, Save, Upload, X, Palette, Store, Info, Phone, Mail, MapPin, Percent, FileText, ShieldCheck, Image, Layout, CheckCircle2 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { storesAPI } from '@/src/lib/api';
@@ -34,6 +34,15 @@ export default function SellerSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [storeSlug, setStoreSlug] = useState('');
+  const [activeTab, setActiveTab] = useState('appearance');
+
+  const TABS = [
+    { id: 'appearance', label: 'Aparência', icon: Palette },
+    { id: 'description', label: 'Descrição', icon: Info },
+    { id: 'contact', label: 'Contacto', icon: Phone },
+    { id: 'commission', label: 'Comissão', icon: Percent },
+    { id: 'policies', label: 'Políticas', icon: ShieldCheck },
+  ];
 
   const [form, setForm] = useState({
     name: '',
@@ -196,13 +205,13 @@ export default function SellerSettingsPage() {
 
         {/* ─── Preview ─── */}
         <div className="bg-card border border-border rounded-xl overflow-hidden mb-6">
-          <div className="h-36 bg-muted relative">
+          <div className="h-48 md:h-64 bg-muted relative">
             {displayBanner ? (
               <img src={displayBanner} alt="Banner" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center gap-3"
                 style={{ background: `linear-gradient(135deg, ${form.theme_color}22, ${form.theme_color}44)` }}>
-                <Store size={48} className="text-muted-foreground/20" />
+                <Store size={64} className="text-muted-foreground/20" />
                 <div className="text-xs text-muted-foreground/50">
                   <p>Banner: 1200×400px</p>
                   <p>PNG ou JPG, máx 2MB</p>
@@ -224,183 +233,253 @@ export default function SellerSettingsPage() {
             )}
             <input ref={bannerInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleBannerChange} />
           </div>
-          <div className="px-5 -mt-8 relative z-10 flex items-end gap-4 pb-5">
-            <div className="w-16 h-16 rounded-xl border-4 border-card shadow-md overflow-hidden bg-white shrink-0 relative group">
-              {displayLogo ? (
-                <img src={displayLogo} alt="Logo" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-xl font-bold text-white"
-                  style={{ backgroundColor: form.theme_color }}>
-                  {form.name?.charAt(0) || 'L'}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => logoInputRef.current?.click()}
-                className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium gap-0.5"
-              >
-                <Upload size={14} />
-                <span className="text-[10px]">Logo</span>
-              </button>
-              {displayLogo && (
-                <button type="button" onClick={clearLogo}
-                  className="absolute top-0 right-0 p-0.5 bg-black/40 text-white rounded-bl-lg hover:bg-black/60">
-                  <X size={12} />
+          <div className="max-w-[1500px] mx-auto px-4 py-6">
+            <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 ${displayBanner ? '-mt-12' : ''} relative z-10`}>
+              <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl border border-border/50 overflow-hidden bg-white shrink-0 relative group">
+                {displayLogo ? (
+                  <img src={displayLogo} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-white"
+                    style={{ backgroundColor: form.theme_color }}>
+                    {form.name?.charAt(0) || 'L'}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium gap-0.5"
+                >
+                  <Upload size={14} />
+                  <span className="text-[10px]">Logo</span>
                 </button>
-              )}
-            </div>
-            <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleLogoChange} />
-            <div className="mb-1">
-              <p className="font-bold text-lg">{form.name || 'Nome da Loja'}</p>
-              <p className="text-xs text-muted-foreground">{form.tagline || 'Slogan da loja'}</p>
+                {displayLogo && (
+                  <button type="button" onClick={clearLogo}
+                    className="absolute top-0 right-0 p-0.5 bg-black/40 text-white rounded-bl-lg hover:bg-black/60">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+              <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleLogoChange} />
+              <div className={`flex-1 ${displayBanner ? 'backdrop-blur-md bg-white/75 dark:bg-black/60 rounded-xl px-4 py-3' : ''}`}>
+                <h1 className="text-2xl md:text-3xl font-bold">{form.name || 'Nome da Loja'}</h1>
+                <p className="text-sm text-muted-foreground">{form.tagline || 'Slogan da loja'}</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit}>
+          {/* ─── Tab Bar ─── */}
+          <div className="flex flex-col sm:flex-row gap-1 bg-muted/40 p-1 rounded-xl mb-6 sticky top-0 z-20 backdrop-blur-sm">
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    isActive
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                  }`}
+                >
+                  <Icon size={16} className="shrink-0" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
           {/* ─── Aparência ─── */}
-          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Palette size={18} className="text-accent" />
-              <h2 className="font-bold">Aparência da Loja</h2>
-            </div>
-            <p className="text-sm text-muted-foreground -mt-2">Estes elementos aparecem na página pública da sua loja e na listagem de lojas.</p>
-
-            {/* Image Guidelines */}
-            <div className="bg-muted/50 border border-border rounded-lg p-3 text-xs text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground mb-1">📐 Formatos Recomendados</p>
-              <p><strong>Logo:</strong> Quadrado, mín 200×200px. PNG ou SVG (fundo transparente). Máx 1MB.</p>
-              <p><strong>Banner/Capa:</strong> Horizontal, 1200×400px (proporção 3:1). PNG ou JPG. Máx 2MB.</p>
-              <p>Use o preview acima para ver como as imagens ficam antes de guardar.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Nome da Loja</label>
-              <input type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Slogan / Tagline</label>
-              <input type="text" value={form.tagline} onChange={(e) => updateField('tagline', e.target.value)}
-                placeholder="Ex: Os melhores preços em tecnologia"
-                className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Cor Temática</label>
-              <div className="flex flex-wrap gap-2">
-                {THEME_COLORS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => updateField('theme_color', c.value)}
-                    className={`w-9 h-9 rounded-lg border-2 transition-all ${form.theme_color === c.value ? 'border-foreground scale-110 shadow-md' : 'border-transparent hover:scale-105'}`}
-                    style={{ backgroundColor: c.value }}
-                    title={c.name}
-                  />
-                ))}
+          {activeTab === 'appearance' && (
+            <div className="bg-card border border-border rounded-xl p-6 space-y-6">
+              <div>
+                <h2 className="font-bold text-lg">Aparência da Loja</h2>
+                <p className="text-sm text-muted-foreground">Estes elementos aparecem na página pública da sua loja e na listagem de lojas.</p>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">Usada nos botões, links e destaques da página da loja.</p>
-            </div>
-          </div>
 
-          {/* ─── Descrição & Sobre ─── */}
-          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Info size={18} className="text-accent" />
-              <h2 className="font-bold">Descrição da Loja</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-muted/30 border border-border rounded-xl p-4 flex gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                    <Image size={20} className="text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div className="space-y-1.5 min-w-0">
+                    <p className="text-sm font-semibold">Logótipo</p>
+                    <div className="space-y-0.5 text-xs text-muted-foreground">
+                      <p className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-500 shrink-0" /> Quadrado, mín 200×200px</p>
+                      <p className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-500 shrink-0" /> PNG ou SVG (fundo transparente)</p>
+                      <p className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-500 shrink-0" /> Máx 1MB</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-muted/30 border border-border rounded-xl p-4 flex gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <Layout size={20} className="text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="space-y-1.5 min-w-0">
+                    <p className="text-sm font-semibold">Banner / Capa</p>
+                    <div className="space-y-0.5 text-xs text-muted-foreground">
+                      <p className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-500 shrink-0" /> Horizontal, 1200×400px (3:1)</p>
+                      <p className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-500 shrink-0" /> PNG ou JPG</p>
+                      <p className="flex items-center gap-1.5"><CheckCircle2 size={11} className="text-green-500 shrink-0" /> Máx 2MB</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Nome da Loja</label>
+                  <input type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)}
+                    placeholder="Ex: TechnoMoz"
+                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Slogan / Tagline</label>
+                  <input type="text" value={form.tagline} onChange={(e) => updateField('tagline', e.target.value)}
+                    placeholder="Ex: Os melhores preços em tecnologia"
+                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Cor Temática</label>
+                <div className="flex flex-wrap gap-2.5">
+                  {THEME_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => updateField('theme_color', c.value)}
+                      className={`relative w-10 h-10 rounded-xl border-2 transition-all duration-200 ${
+                        form.theme_color === c.value
+                          ? 'border-foreground scale-110 shadow-lg ring-2 ring-foreground/20'
+                          : 'border-transparent hover:scale-105 hover:shadow-md'
+                      }`}
+                      style={{ backgroundColor: c.value }}
+                      title={c.name}
+                    >
+                      {form.theme_color === c.value && (
+                        <CheckCircle2 size={14} className="absolute -top-1.5 -right-1.5 text-foreground bg-background rounded-full" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2.5">Define a cor dos botões, links e destaques na página pública da sua loja.</p>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Descrição Curta</label>
-              <textarea value={form.description} onChange={(e) => updateField('description', e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring h-20 resize-none" />
-              <p className="text-xs text-muted-foreground mt-1">Aparece nos cards de listagem de lojas.</p>
+          )}
+
+          {/* ─── Descrição ─── */}
+          {activeTab === 'description' && (
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+              <div>
+                <h2 className="font-bold text-lg">Descrição da Loja</h2>
+                <p className="text-sm text-muted-foreground">Conte aos clientes quem é e o que torna a sua loja especial.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Descrição Curta</label>
+                <textarea value={form.description} onChange={(e) => updateField('description', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring h-20 resize-none text-sm"
+                  placeholder="Breve descrição que aparece nos cards de listagem..." />
+                <p className="text-xs text-muted-foreground mt-1.5">Aparece nos cards de listagem de lojas. Máx 2-3 frases.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Sobre a Loja</label>
+                <textarea value={form.about} onChange={(e) => updateField('about', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring h-28 resize-none text-sm"
+                  placeholder="Conte a história da sua loja, missão, valores, o que diferencia os seus produtos..." />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Sobre a Loja</label>
-              <textarea value={form.about} onChange={(e) => updateField('about', e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring h-24 resize-none"
-                placeholder="Conte a história da sua loja, missão, valores..." />
-            </div>
-          </div>
+          )}
 
           {/* ─── Contacto ─── */}
-          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Phone size={18} className="text-accent" />
-              <h2 className="font-bold">Informações de Contacto</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {activeTab === 'contact' && (
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Telefone</label>
-                <input type="text" value={form.phone} onChange={(e) => updateField('phone', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                <h2 className="font-bold text-lg">Informações de Contacto</h2>
+                <p className="text-sm text-muted-foreground">Como os clientes podem entrar em contacto com a sua loja.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Telefone</label>
+                  <input type="text" value={form.phone} onChange={(e) => updateField('phone', e.target.value)}
+                    placeholder="+258 84 123 4567"
+                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Email</label>
+                  <input type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)}
+                    placeholder="contacto@sualoja.co.mz"
+                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
-                <input type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                <label className="block text-sm font-medium mb-1.5">Localização</label>
+                <select value={form.location} onChange={(e) => updateField('location', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm">
+                  {LOCATIONS.map((loc) => <option key={loc}>{loc}</option>)}
+                </select>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Localização</label>
-              <select value={form.location} onChange={(e) => updateField('location', e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                {LOCATIONS.map((loc) => <option key={loc}>{loc}</option>)}
-              </select>
-            </div>
-          </div>
+          )}
 
           {/* ─── Comissão ─── */}
-          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Percent size={18} className="text-accent" />
-              <h2 className="font-bold">Comissão & Stock</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {activeTab === 'commission' && (
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Comissão de Afiliados (%)</label>
-                <p className="text-xs text-muted-foreground mb-1">Percentagem padrão para novos produtos.</p>
-                <div className="flex items-center gap-2">
-                  <input type="number" value={form.default_affiliate_commission} onChange={(e) => updateField('default_affiliate_commission', e.target.value)}
-                    min="0" max="100" step="0.5"
-                    className="w-24 px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                  <span className="text-muted-foreground">%</span>
+                <h2 className="font-bold text-lg">Comissão & Stock</h2>
+                <p className="text-sm text-muted-foreground">Configure as comissões de afiliados e alertas de inventário.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="bg-muted/30 rounded-xl p-4">
+                  <label className="block text-sm font-medium mb-1">Comissão de Afiliados (%)</label>
+                  <p className="text-xs text-muted-foreground mb-3">Percentagem padrão para novos produtos. Pode alterar por produto.</p>
+                  <div className="flex items-center gap-2">
+                    <input type="number" value={form.default_affiliate_commission} onChange={(e) => updateField('default_affiliate_commission', e.target.value)}
+                      min="0" max="100" step="0.5"
+                      className="w-24 px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+                    <span className="text-muted-foreground text-sm">%</span>
+                  </div>
+                </div>
+                <div className="bg-muted/30 rounded-xl p-4">
+                  <label className="block text-sm font-medium mb-1">Alerta de Stock Baixo</label>
+                  <p className="text-xs text-muted-foreground mb-3">Notificado quando o stock atingir este valor ou menos.</p>
+                  <div className="flex items-center gap-2">
+                    <input type="number" value={form.low_stock_threshold} onChange={(e) => updateField('low_stock_threshold', e.target.value)}
+                      min="1" max="100"
+                      className="w-24 px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+                    <span className="text-muted-foreground text-sm">unidades</span>
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Alerta de Stock Baixo</label>
-                <p className="text-xs text-muted-foreground mb-1">Notificar quando stock ≤ este valor.</p>
-                <div className="flex items-center gap-2">
-                  <input type="number" value={form.low_stock_threshold} onChange={(e) => updateField('low_stock_threshold', e.target.value)}
-                    min="1" max="100"
-                    className="w-24 px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                  <span className="text-muted-foreground">unidades</span>
-                </div>
-              </div>
             </div>
-          </div>
+          )}
 
           {/* ─── Políticas ─── */}
-          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-              <ShieldCheck size={18} className="text-accent" />
-              <h2 className="font-bold">Políticas</h2>
+          {activeTab === 'policies' && (
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+              <div>
+                <h2 className="font-bold text-lg">Políticas</h2>
+                <p className="text-sm text-muted-foreground">Defina as políticas da sua loja visíveis para os clientes.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Política de Envio</label>
+                <textarea value={form.shipping_policy} onChange={(e) => updateField('shipping_policy', e.target.value)}
+                  placeholder="Ex: Enviamos para todo Moçambique em 2-5 dias úteis. Frete grátis acima de 199 MZN."
+                  className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring h-24 resize-none text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Política de Devolução</label>
+                <textarea value={form.return_policy} onChange={(e) => updateField('return_policy', e.target.value)}
+                  placeholder="Ex: Aceitamos devoluções em até 7 dias após a entrega. O produto deve estar nas condições originais."
+                  className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring h-24 resize-none text-sm" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Política de Envio</label>
-              <textarea value={form.shipping_policy} onChange={(e) => updateField('shipping_policy', e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring h-20 resize-none" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Política de Devolução</label>
-              <textarea value={form.return_policy} onChange={(e) => updateField('return_policy', e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring h-20 resize-none" />
-            </div>
-          </div>
+          )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end mt-6">
             <button type="submit" disabled={saving}
               className="px-6 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors flex items-center gap-2 disabled:opacity-60">
               <Save size={16} /> {saving ? 'A guardar...' : 'Salvar Configurações'}

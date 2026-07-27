@@ -5,6 +5,13 @@ import { ChevronRight, Phone, Mail, Shield, Clock, Package } from 'lucide-react'
 import StoreOwnerEditable from '@/src/components/StoreOwnerEditable';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
+
+function mediaUrl(path: string | null): string {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+}
 
 interface StorePageProps {
   params: Promise<{ slug: string }>;

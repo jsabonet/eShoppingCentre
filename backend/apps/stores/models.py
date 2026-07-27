@@ -12,6 +12,12 @@ class Store(BaseModel):
         ('closed', 'Fechada'),
     ]
 
+    PRODUCT_TYPE_CHOICES = [
+        ('physical', 'Produtos Físicos'),
+        ('digital', 'Produtos Digitais'),
+        ('course', 'Cursos'),
+    ]
+
     owner = models.OneToOneField('users.User', on_delete=models.CASCADE, related_name='store')
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
@@ -22,6 +28,8 @@ class Store(BaseModel):
     banner = models.ImageField(upload_to='stores/banners/', blank=True)
     theme_color = models.CharField(max_length=7, blank=True, default='#2563eb', help_text='Cor hexadecimal (ex: #2563eb)')
     category = models.CharField(max_length=100)
+    product_type = models.CharField(max_length=20, choices=PRODUCT_TYPE_CHOICES, default='physical',
+                                    help_text='Tipo de produto que esta loja vende')
     phone = models.CharField(max_length=20)
     email = models.EmailField()
     location = models.CharField(max_length=255)

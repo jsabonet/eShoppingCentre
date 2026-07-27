@@ -1,7 +1,7 @@
 ﻿"use client";
 
-import { useState } from 'react';
-import { Star, Truck, Shield, RotateCcw, ShoppingCart } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play } from 'lucide-react';
 import { CartProvider, useCart } from '../contexts/CartContext';
 import ProductCard from './ProductCard';
 import CartDrawer from './CartDrawer';
@@ -54,7 +54,20 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
   const selectedVariant = variants.find((v) => v.id === selectedVariantId) || null;
   const displayPrice = selectedVariant?.price ?? product.price;
   const displayStock = selectedVariant ? selectedVariant.stock : (product.inStock ? 1 : 0);
-  const displayImage = selectedVariant?.image || product.image;
+
+  // Build image gallery
+  const galleryImages: string[] = product.images && product.images.length > 0
+    ? product.images
+    : (product.image ? [product.image] : []);
+
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  // Reset image index when product changes
+  useEffect(() => { setSelectedImageIndex(0); }, [product.id]);
+
+  // When variant changes, reset to variant image or first gallery image
+  const variantImage = selectedVariant?.image || undefined;
+  const displayImage = variantImage || galleryImages[selectedImageIndex] || undefined;
 
   // Group variant attributes for rendering selectors
   const attrKeys = variants.length > 0
@@ -81,32 +94,30 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
             <div className="lg:col-span-5">
               <div className="sticky top-32">
                 <div className="aspect-square bg-card border border-border rounded-lg overflow-hidden mb-4">
-                  <img
-                    src={displayImage}
-                    alt={selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}
-                    className="w-full h-full object-cover"
-                  />
+                  {displayImage ? (
+                    <img
+                      src={displayImage}
+                      alt={selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-sm">Sem imagem</div>
+                  )}
                 </div>
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="aspect-square bg-card border-2 border-accent rounded-md overflow-hidden cursor-pointer">
-                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                {galleryImages.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {galleryImages.slice(0, 4).map((img, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => { setSelectedImageIndex(i); setSelectedVariantId(null); }}
+                        className={`aspect-square bg-card border-2 ${!variantImage && i === selectedImageIndex ? 'border-accent' : 'border-border'} rounded-md overflow-hidden cursor-pointer hover:border-accent/50 transition-colors`}
+                      >
+                        <img src={img} alt={`${product.name} ${i + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
                   </div>
-                  <div className="aspect-square bg-card border border-border rounded-md overflow-hidden cursor-pointer opacity-60">
-                    <div className="w-full h-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                      Imagem 2
-                    </div>
-                  </div>
-                  <div className="aspect-square bg-card border border-border rounded-md overflow-hidden cursor-pointer opacity-60">
-                    <div className="w-full h-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                      Imagem 3
-                    </div>
-                  </div>
-                  <div className="aspect-square bg-card border border-border rounded-md overflow-hidden cursor-pointer opacity-60">
-                    <div className="w-full h-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                      Imagem 4
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -149,6 +160,48 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                 <h3 className="font-bold mb-2">Sobre este produto</h3>
                 <p className="text-muted-foreground leading-relaxed">{product.description}</p>
               </div>
+
+              {/* Product Details — brand, condition, warranty, video */}
+              <div className="mb-6 space-y-2">
+                {product.brand && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Tag size={14} className="text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">Marca:</span>
+                    <span className="font-medium">{product.brand}</span>
+                  </div>
+                )}
+                {product.condition && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <BadgeCheck size={14} className="text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">Condição:</span>
+                    <span className="font-medium">
+                      {product.condition === 'new' ? 'Novo' : product.condition === 'used' ? 'Usado' : 'Recondicionado'}
+                    </span>
+                  </div>
+                )}
+                {product.warrantyDays ? (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock size={14} className="text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">Garantia:</span>
+                    <span className="font-medium text-green-600">{product.warrantyDays} dias</span>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Video */}
+              {product.videoUrl && (
+                <div className="mb-6">
+                  <h3 className="font-bold mb-2 flex items-center gap-2"><Play size={16} /> Vídeo</h3>
+                  <div className="aspect-video rounded-lg overflow-hidden bg-black">
+                    <iframe
+                      src={product.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                      className="w-full h-full"
+                      allowFullScreen
+                      title="Vídeo do produto"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Variant Selector */}
               {variants.length > 0 && attrKeys.map((key) => (
@@ -225,7 +278,7 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                   <>
                     <p className="text-sm text-muted-foreground mb-4">Entrega em 3-5 dias úteis</p>
                     <button
-                      onClick={() => addToCart({ ...product, price: displayPrice, inStock: displayStock > 0, image: displayImage })}
+                      onClick={() => addToCart({ ...product, price: displayPrice, inStock: displayStock > 0, image: displayImage || '' })}
                       disabled={displayStock === 0}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -263,18 +316,58 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                     <td className="py-2 font-medium text-muted-foreground">Categoria</td>
                     <td className="py-2">{categoryName || 'Geral'}</td>
                   </tr>
+                  {product.sku && (
+                    <tr className="border-b border-border">
+                      <td className="py-2 font-medium text-muted-foreground">SKU</td>
+                      <td className="py-2">{product.sku}</td>
+                    </tr>
+                  )}
+                  {product.barcode && (
+                    <tr className="border-b border-border">
+                      <td className="py-2 font-medium text-muted-foreground">Cod. Barras</td>
+                      <td className="py-2">{product.barcode}</td>
+                    </tr>
+                  )}
+                  {product.brand && (
+                    <tr className="border-b border-border">
+                      <td className="py-2 font-medium text-muted-foreground">Marca</td>
+                      <td className="py-2">{product.brand}</td>
+                    </tr>
+                  )}
+                  {product.condition && (
+                    <tr className="border-b border-border">
+                      <td className="py-2 font-medium text-muted-foreground">Condicao</td>
+                      <td className="py-2">{{new:'Novo',used:'Usado',refurbished:'Recondicionado'}[product.condition] || product.condition}</td>
+                    </tr>
+                  )}
+                  {(product.weight || product.height || product.width || product.length) && (
+                    <tr className="border-b border-border">
+                      <td className="py-2 font-medium text-muted-foreground">Dimensoes</td>
+                      <td className="py-2">{[product.weight && `${product.weight}kg`, product.height && `${product.height}cm(A)`, product.width && `${product.width}cm(L)`, product.length && `${product.length}cm(C)`].filter(Boolean).join(' × ')}</td>
+                    </tr>
+                  )}
                   <tr className="border-b border-border">
                     <td className="py-2 font-medium text-muted-foreground">Disponibilidade</td>
-                    <td className="py-2 text-green-600 font-medium">Em estoque</td>
+                    <td className="py-2">{product.inStock ? <span className="text-green-600 font-medium">Em estoque</span> : <span className="text-red-600 font-medium">Fora de estoque</span>}</td>
                   </tr>
-                  <tr className="border-b border-border">
-                    <td className="py-2 font-medium text-muted-foreground">Garantia</td>
-                    <td className="py-2">12 meses</td>
-                  </tr>
-                  <tr className="border-b border-border">
-                    <td className="py-2 font-medium text-muted-foreground">Frete</td>
-                    <td className="py-2 text-green-600 font-medium">Grátis</td>
-                  </tr>
+                  {product.warrantyDays ? (
+                    <tr className="border-b border-border">
+                      <td className="py-2 font-medium text-muted-foreground">Garantia</td>
+                      <td className="py-2">{product.warrantyDays} dias</td>
+                    </tr>
+                  ) : null}
+                  {product.salesCount != null && (
+                    <tr className="border-b border-border">
+                      <td className="py-2 font-medium text-muted-foreground">Vendidos</td>
+                      <td className="py-2">{product.salesCount}</td>
+                    </tr>
+                  )}
+                  {product.storeName && (
+                    <tr className="border-b border-border">
+                      <td className="py-2 font-medium text-muted-foreground">Loja</td>
+                      <td className="py-2">{product.storeName}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

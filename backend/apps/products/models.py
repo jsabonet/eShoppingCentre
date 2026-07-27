@@ -3,11 +3,18 @@ from apps.core.models import BaseModel
 
 
 class Category(BaseModel):
+    PRODUCT_TYPE_CHOICES = [
+        ('physical', 'Produtos Físicos'),
+        ('digital', 'Produtos Digitais'),
+        ('course', 'Cursos'),
+    ]
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     description = models.TextField(blank=True)
     image = models.ImageField(upload_to='categories/', blank=True)
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children')
+    product_type = models.CharField(max_length=20, choices=PRODUCT_TYPE_CHOICES, default='physical',
+                                    help_text='Filtrar categorias por tipo de produto')
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
 
@@ -31,18 +38,41 @@ class Product(BaseModel):
         ('inactive', 'Inactivo'),
         ('deleted', 'Removido'),
     ]
+    CONDITION_CHOICES = [
+        ('new', 'Novo'),
+        ('used', 'Usado'),
+        ('refurbished', 'Recondicionado'),
+    ]
 
     store = models.ForeignKey('stores.Store', on_delete=models.CASCADE, related_name='products')
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='products')
     product_type = models.CharField(max_length=20, choices=PRODUCT_TYPE_CHOICES, default='physical')
     name = models.CharField(max_length=500)
-    slug = models.SlugField(max_length=500)
+    slug = models.SlugField(max_length=500, blank=True)
     description = models.TextField()
+    short_description = models.CharField(max_length=300, blank=True, help_text='Descrição curta para cards/listagens')
     price = models.DecimalField(max_digits=12, decimal_places=2)
     compare_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     stock = models.PositiveIntegerField(default=0)
     sku = models.CharField(max_length=100, blank=True)
+    # ─── Novos campos físicos ───
+    barcode = models.CharField(max_length=50, blank=True, help_text='GTIN, EAN, UPC ou ISBN')
+    brand = models.CharField(max_length=255, blank=True, help_text='Marca ou fabricante')
+    condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, default='new')
+    weight = models.DecimalField(max_digits=8, decimal_places=3, null=True, blank=True, help_text='Peso em kg')
+    height = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, help_text='Altura em cm')
+    width = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, help_text='Largura em cm')
+    length = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, help_text='Comprimento em cm')
+    allow_backorder = models.BooleanField(default=False, help_text='Permitir venda sem stock')
+    min_order_quantity = models.PositiveIntegerField(default=1, help_text='Quantidade mínima por encomenda')
+    # ─── SEO ───
+    meta_title = models.CharField(max_length=200, blank=True, help_text='Título SEO (usa nome se vazio)')
+    meta_description = models.TextField(max_length=320, blank=True, help_text='Descrição SEO (usa descrição se vazio)')
+    # ─── Media extra ───
+    video_url = models.URLField(blank=True, help_text='YouTube ou Vimeo')
+    warranty_days = models.PositiveIntegerField(default=0, help_text='Dias de garantia (0 = sem garantia)')
+    # ─── Campos existentes ───
     is_featured = models.BooleanField(default=False)
     is_on_sale = models.BooleanField(default=False)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
@@ -63,6 +93,12 @@ class Product(BaseModel):
             models.Index(fields=['store', 'status']),
         ]
         unique_together = [['store', 'slug']]
+
+    def save(self, *args, **kwargs):
+        if not self.slug and self.name:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
