@@ -95,7 +95,10 @@ class AdminStoreManageView(APIView):
         store_name = store.name
         owner_email = store.owner.email
 
-        # Delete (cascades: products, orders via products)
+        # Preservar nome da loja nos pedidos antes do CASCADE
+        store.orders.update(store_name=store.name)
+
+        # Delete (cascades: products, coupons, returns. orders preserved via SET_NULL)
         store.delete()
 
         # Notify owner

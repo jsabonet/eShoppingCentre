@@ -15,7 +15,8 @@ class Order(BaseModel):
     ]
 
     buyer = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='orders')
-    store = models.ForeignKey('stores.Store', on_delete=models.CASCADE, related_name='orders')
+    store = models.ForeignKey('stores.Store', null=True, blank=True, on_delete=models.SET_NULL, related_name='orders')
+    store_name = models.CharField(max_length=255, blank=True, help_text='Nome da loja no momento do pedido (preservado se loja for eliminada)')
     order_number = models.CharField(max_length=50, unique=True, db_index=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     subtotal = models.DecimalField(max_digits=12, decimal_places=2)
@@ -45,6 +46,8 @@ class Order(BaseModel):
     def save(self, *args, **kwargs):
         if not self.order_number:
             self.order_number = f'PED-{uuid.uuid4().hex[:8].upper()}'
+        if self.store and not self.store_name:
+            self.store_name = self.store.name
         super().save(*args, **kwargs)
 
     def __str__(self):
