@@ -59,7 +59,9 @@ class ProductListView(generics.ListCreateAPIView):
         return ProductDetailSerializer
 
     def get_queryset(self):
-        return Product.objects.filter(status='active').select_related('store', 'category')
+        return Product.objects.filter(
+            status='active', store__status='active'
+        ).select_related('store', 'category')
 
     def perform_create(self, serializer):
         store = self.request.user.store
@@ -78,7 +80,9 @@ class ProductSearchView(generics.ListAPIView):
             return Product.objects.none()
         normalized = query.lower()
         words = normalized.split()
-        qs = Product.objects.filter(status='active').select_related('store', 'category')
+        qs = Product.objects.filter(
+            status='active', store__status='active'
+        ).select_related('store', 'category')
         for word in words:
             qs = qs.filter(
                 Q(name__icontains=word) |
@@ -90,7 +94,7 @@ class ProductSearchView(generics.ListAPIView):
 
 
 class ProductDetailView(generics.RetrieveAPIView):
-    queryset = Product.objects.filter(status='active')
+    queryset = Product.objects.filter(status='active', store__status='active')
     serializer_class = ProductDetailSerializer
     lookup_field = 'slug'
     permission_classes = [permissions.AllowAny]

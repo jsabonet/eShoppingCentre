@@ -146,6 +146,30 @@ class AdminStoreManageView(APIView):
                         recipient_list=[owner_email],
                         fail_silently=True,
                     )
+                elif action == 'suspend':
+                    send_mail(
+                        subject=f'A sua loja "{store.name}" foi suspensa',
+                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
+                                f'A sua loja "{store.name}" foi suspensa por um administrador.\n\n'
+                                f'Os seus produtos foram removidos do marketplace. '
+                                f'Contacte o suporte para mais informações.\n\n'
+                                f'Equipa eShoppingCentre',
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[owner_email],
+                        fail_silently=True,
+                    )
+                elif action == 'reactivate':
+                    send_mail(
+                        subject=f'A sua loja "{store.name}" foi reactivada!',
+                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
+                                f'A sua loja "{store.name}" foi reactivada e já está novamente activa '
+                                f'no eShoppingCentre.\n\n'
+                                f'Aceda ao seu painel: https://eshoppingcentre.co.mz/seller/dashboard\n\n'
+                                f'Equipa eShoppingCentre',
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[owner_email],
+                        fail_silently=True,
+                    )
                 elif action == 'reject':
                     reason = request.data.get('reason', 'Não especificado')
                     send_mail(

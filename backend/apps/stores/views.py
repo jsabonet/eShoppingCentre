@@ -13,7 +13,8 @@ class StoreListView(generics.ListAPIView):
 
 
 class StoreDetailView(generics.RetrieveAPIView):
-    queryset = Store.objects.all()
+    # Public: apenas lojas activas. Owner vê a sua via MyStoreView.
+    queryset = Store.objects.filter(status='active')
     serializer_class = StoreDetailSerializer
     lookup_field = 'slug'
     permission_classes = [permissions.AllowAny]
