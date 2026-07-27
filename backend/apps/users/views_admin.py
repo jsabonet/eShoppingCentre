@@ -126,9 +126,15 @@ class AdminStoreManageView(APIView):
             valid_actions = {
                 'approve': 'active', 'reject': 'rejected',
                 'suspend': 'suspended', 'reactivate': 'active', 'close': 'closed',
+                'delete': None,  # tratado abaixo
             }
             if action not in valid_actions:
                 return Response({'detail': f'Acção inválida. Use: {", ".join(valid_actions.keys())}'}, status=400)
+
+            # ─── Delete via PATCH (para compatibilidade com frontend) ───
+            if action == 'delete':
+                return self.delete(request, pk)
+
             store.status = valid_actions[action]
             store.save()
 
