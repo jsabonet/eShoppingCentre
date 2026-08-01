@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { ChevronRight, Phone, Mail, Shield, Clock, Package } from 'lucide-react';
+import { ChevronRight, Phone, Mail, Shield, Clock, Package, Download, Truck, Monitor, FileText } from 'lucide-react';
 import StoreOwnerEditable from '@/src/components/StoreOwnerEditable';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -52,6 +52,8 @@ export default async function StorePage({ params }: StorePageProps) {
     inStock: p.stock > 0,
     originalPrice: p.compare_price ? parseFloat(p.compare_price) : undefined,
     discount: p.discount_percentage ?? undefined,
+    digitalFormat: p.digital_format || '',
+    digitalLicense: p.digital_license || '',
   }));
 
   return (
@@ -93,6 +95,24 @@ export default async function StorePage({ params }: StorePageProps) {
 
             <div className="bg-card border border-border rounded-xl p-5 space-y-3">
               <h3 className="font-bold">Informações</h3>
+
+              {/* Store type badge */}
+              <div className="flex items-center gap-2 text-sm">
+                {store.product_type === 'physical' ? (
+                  <span className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium">
+                    <Truck size={13} /> Produtos Físicos
+                  </span>
+                ) : store.product_type === 'digital' ? (
+                  <span className="flex items-center gap-1.5 px-2 py-1 bg-green-50 text-green-700 rounded-md text-xs font-medium">
+                    <Download size={13} /> Download Imediato
+                  </span>
+                ) : store.product_type === 'course' ? (
+                  <span className="flex items-center gap-1.5 px-2 py-1 bg-purple-50 text-purple-700 rounded-md text-xs font-medium">
+                    <Monitor size={13} /> Cursos Online
+                  </span>
+                ) : null}
+              </div>
+
               {store.phone && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone size={14} /> <span>{store.phone}</span>
@@ -111,17 +131,34 @@ export default async function StorePage({ params }: StorePageProps) {
               </div>
             </div>
 
-            {store.shipping_policy && (
+            {store.product_type === 'physical' && store.shipping_policy && (
               <div className="bg-card border border-border rounded-xl p-5">
-                <h3 className="font-bold mb-2">Política de Envio</h3>
+                <h3 className="font-bold mb-2 flex items-center gap-2"><Truck size={15} /> Política de Envio</h3>
                 <p className="text-sm text-muted-foreground">{store.shipping_policy}</p>
               </div>
             )}
 
-            {store.return_policy && (
+            {store.product_type === 'physical' && store.return_policy && (
               <div className="bg-card border border-border rounded-xl p-5">
                 <h3 className="font-bold mb-2">Devoluções</h3>
                 <p className="text-sm text-muted-foreground">{store.return_policy}</p>
+              </div>
+            )}
+
+            {store.product_type === 'digital' && store.return_policy && (
+              <div className="bg-card border border-border rounded-xl p-5">
+                <h3 className="font-bold mb-2 flex items-center gap-2"><Shield size={15} /> Política de Reembolso</h3>
+                <p className="text-sm text-muted-foreground">{store.return_policy}</p>
+              </div>
+            )}
+
+            {store.product_type === 'digital' && (
+              <div className="bg-card border border-border rounded-xl p-5">
+                <h3 className="font-bold mb-2 flex items-center gap-2"><FileText size={15} /> Entrega Digital</h3>
+                <p className="text-sm text-muted-foreground">
+                  Após a confirmação do pagamento, receberá imediatamente um link para download do produto.
+                  O acesso ao download estará disponível conforme a política de cada produto.
+                </p>
               </div>
             )}
           </div>
@@ -143,6 +180,11 @@ export default async function StorePage({ params }: StorePageProps) {
                       <p className="font-bold text-accent mt-1">{product.price.toLocaleString('pt-MZ')} MZN</p>
                       {product.originalPrice && (
                         <p className="text-xs text-muted-foreground line-through">{product.originalPrice.toLocaleString('pt-MZ')} MZN</p>
+                      )}
+                      {product.digitalFormat && (
+                        <span className="inline-block mt-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
+                          {product.digitalFormat}
+                        </span>
                       )}
                     </div>
                   </Link>

@@ -65,7 +65,20 @@ class ProductListView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         store = self.request.user.store
-        serializer.save(store=store)
+        product = serializer.save(store=store)
+
+        # If it's a course product, auto-create the Course object
+        if product.product_type == 'course':
+            from apps.courses.models import Course
+            Course.objects.get_or_create(
+                product=product,
+                defaults={
+                    'instructor': self.request.user,
+                    'level': self.request.data.get('course_level', 'beginner'),
+                    'duration': self.request.data.get('course_duration', ''),
+                    'total_lessons': int(self.request.data.get('total_lessons', 0)),
+                }
+            )
 
 
 class ProductSearchView(generics.ListAPIView):
@@ -108,7 +121,12 @@ class MyProductListView(generics.ListAPIView):
         store = getattr(self.request.user, 'store', None)
         if not store:
             return Product.objects.none()
-        return store.products.filter(~Q(status='deleted')).select_related('category').order_by('-created_at')
+        qs = store.products.filter(~Q(status='deleted')).select_related('category').order_by('-created_at')
+        # Allow filtering by product_type (e.g. ?product_type=course for courses page)
+        product_type = self.request.query_params.get('product_type', None)
+        if product_type and product_type in ('physical', 'digital', 'course'):
+            qs = qs.filter(product_type=product_type)
+        return qs
 
 
 class ProductUpdateView(generics.RetrieveUpdateAPIView):

@@ -151,6 +151,7 @@ export interface StoreDetail extends Store {
   shipping_policy: string;
   return_policy: string;
   default_affiliate_commission: number;
+  low_stock_threshold: number;
   website: string;
   created_at: string;
 }
@@ -424,6 +425,8 @@ export interface DashboardProduct {
 }
 
 export interface SellerDashboard {
+  store_name: string;
+  tagline: string;
   product_type: 'physical' | 'digital' | 'course';
   today_sales: number;
   today_revenue: number;
@@ -550,10 +553,11 @@ export const adminAPI = {
   approveStore: (id: string) => api.patch(`/admin/stores/${id}/approve/`),
   // Full store management
   allStores: () => api.get('/admin/stores/all/'),
-  manageStore: (id: string, action: 'approve' | 'reject' | 'suspend' | 'reactivate' | 'close') =>
-    api.patch(`/admin/stores/${id}/manage/`, { action }),
-  updateStoreDetails: (id: string, data: any) =>
-    api.patch(`/admin/stores/${id}/manage/`, data),
+  getStore: (id: string) => api.get(`/admin/stores/${id}/manage/`),
+  manageStore: (id: string, action: 'approve' | 'reject' | 'suspend' | 'reactivate' | 'close' | 'request_docs' | 'clear_documents', reason?: string, documents?: string[]) =>
+    api.patch(`/admin/stores/${id}/manage/`, { action, reason, documents }),
+  updateStoreDetails: (id: string, data: any, isFormData?: boolean) =>
+    api.patch(`/admin/stores/${id}/manage/`, data, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   // All orders
   allOrders: (params?: Record<string, any>) => api.get('/admin/orders/all/', { params }),
   pendingPayouts: () => api.get('/admin/payouts/pending/'),

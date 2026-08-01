@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
   useCallback,
   type ReactNode,
 } from 'react';
@@ -87,7 +88,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, totalPrice, isCartOpen, setIsCartOpen, getCartCount }}
+      value={useMemo(() => ({ items, addToCart, removeFromCart, updateQuantity, clearCart, totalPrice, isCartOpen, setIsCartOpen, getCartCount }), [items, addToCart, removeFromCart, updateQuantity, clearCart, totalPrice, isCartOpen, getCartCount])}
     >
       {children}
     </CartContext.Provider>

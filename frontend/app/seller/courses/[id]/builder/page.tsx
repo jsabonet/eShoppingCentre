@@ -1,0 +1,277 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import {
+  Plus, GripVertical, Eye, EyeOff, Trash2, ChevronDown, ChevronRight,
+  Save, ArrowLeft, Play, FileText, Upload
+} from 'lucide-react';
+import SellerLayout from '@/src/components/SellerLayout';
+import LoadingSpinner from '@/src/components/LoadingSpinner';
+import VideoUploader from '@/src/components/VideoUploader';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+interface LessonData {
+  id: string;
+  title: string;
+  description: string;
+  video_url: string;
+  video_provider: string;
+  duration: string;
+  content: string;
+  is_free_preview: boolean;
+  sort_order: number;
+  cloudflare_video_uid?: string;
+  cloudflare_video_status?: string;
+}
+
+interface ModuleData {
+  id: string;
+  title: string;
+  description: string;
+  sort_order: number;
+  lessons: LessonData[];
+}
+
+export default function CourseBuilderPage() {
+  const { id: courseId } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [modules, setModules] = useState<ModuleData[]>([]);
+  const [courseTitle, setCourseTitle] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+
+  const apiHeaders = () => {
+    const token = localStorage.getItem('access_token');
+    return token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+  };
+
+  const fetchBuilder = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/courses/${courseId}/builder/`, { headers: apiHeaders() });
+      if (!res.ok) throw new Error('Erro');
+      const data = await res.json();
+      setCourseTitle(data.course_title || '');
+      setModules(data.modules || []);
+      setExpandedModules(new Set((data.modules || []).map((m: ModuleData) => m.id)));
+    } catch { setModules([]); }
+    finally { setLoading(false); }
+  }, [courseId]);
+
+  useEffect(() => { fetchBuilder(); }, [fetchBuilder]);
+
+  const toggleModule = (id: string) => {
+    setExpandedModules(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // ─── Module CRUD ───
+  const addModule = async () => {
+    const title = prompt('Nome do modulo:');
+    if (!title?.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/courses/${courseId}/modules/`, {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({ title: title.trim(), description: '' }),
+      });
+      if (res.ok) fetchBuilder();
+    } catch {}
+  };
+
+  const updateModuleTitle = async (moduleId: string, title: string) => {
+    try {
+      await fetch(`${API_URL}/courses/modules/${moduleId}/`, {
+        method: 'PUT', headers: apiHeaders(),
+        body: JSON.stringify({ title }),
+      });
+    } catch {}
+  };
+
+  const deleteModule = async (moduleId: string) => {
+    if (!confirm('Remover este modulo e todas as suas aulas?')) return;
+    try {
+      await fetch(`${API_URL}/courses/modules/${moduleId}/delete/`, { method: 'DELETE', headers: apiHeaders() });
+      fetchBuilder();
+    } catch {}
+  };
+
+  // ─── Lesson CRUD ───
+  const addLesson = async (moduleId: string) => {
+    const title = prompt('Titulo da aula:');
+    if (!title?.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/courses/modules/${moduleId}/lessons/`, {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({ title: title.trim() }),
+      });
+      if (res.ok) fetchBuilder();
+    } catch {}
+    finally { setSaving(false); }
+  };
+
+  const updateLesson = async (lessonId: string, field: string, value: any) => {
+    try {
+      await fetch(`${API_URL}/courses/lessons/${lessonId}/`, {
+        method: 'PUT', headers: apiHeaders(),
+        body: JSON.stringify({ [field]: value }),
+      });
+    } catch {}
+  };
+
+  const deleteLesson = async (lessonId: string) => {
+    if (!confirm('Remover esta aula?')) return;
+    try {
+      await fetch(`${API_URL}/courses/lessons/${lessonId}/delete/`, { method: 'DELETE', headers: apiHeaders() });
+      fetchBuilder();
+    } catch {}
+  };
+
+  const toggleFreePreview = async (lesson: LessonData) => {
+    const newVal = !lesson.is_free_preview;
+    // Optimistic update
+    setModules(prev => prev.map(m => ({
+      ...m,
+      lessons: m.lessons.map(l => l.id === lesson.id ? { ...l, is_free_preview: newVal } : l),
+    })));
+    await updateLesson(lesson.id, 'is_free_preview', newVal);
+  };
+
+  if (loading) {
+    return (
+      <SellerLayout>
+        <div className="flex-1 flex items-center justify-center">
+          <LoadingSpinner size={32} message="A carregar curso..." />
+        </div>
+      </SellerLayout>
+    );
+  }
+
+  return (
+    <SellerLayout>
+      <div className="p-6 max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-8">
+          <Link href="/seller/products" className="p-1.5 hover:bg-muted rounded-md">
+            <ArrowLeft size={20} />
+          </Link>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">Construtor de Curso</h1>
+            <p className="text-sm text-muted-foreground">
+              {courseTitle || 'Curso'} — Organize modulos e aulas.
+            </p>
+          </div>
+          <button onClick={addModule}
+            className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 flex items-center gap-2">
+            <Plus size={16} /> Novo Modulo
+          </button>
+        </div>
+
+        {/* Modules */}
+        <div className="space-y-4">
+          {modules.map((mod) => (
+            <div key={mod.id} className="border border-border rounded-xl bg-card overflow-hidden">
+              {/* Module Header */}
+              <div className="flex items-center gap-3 p-4 hover:bg-muted/20 transition-colors">
+                <button onClick={() => toggleModule(mod.id)} className="p-0.5">
+                  {expandedModules.has(mod.id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </button>
+                <GripVertical size={16} className="text-muted-foreground" />
+                <input
+                  type="text"
+                  defaultValue={mod.title}
+                  onBlur={(e) => { if (e.target.value.trim() && e.target.value !== mod.title) updateModuleTitle(mod.id, e.target.value.trim()); }}
+                  className="flex-1 px-2 py-1 border border-transparent hover:border-border rounded bg-transparent focus:outline-none focus:ring-2 focus:ring-ring font-bold"
+                  placeholder="Titulo do modulo..."
+                />
+                <span className="text-xs text-muted-foreground">{mod.lessons.length} aulas</span>
+                <button onClick={() => deleteModule(mod.id)} className="p-1 text-muted-foreground hover:text-red-500 transition-colors">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+
+              {/* Lessons */}
+              {expandedModules.has(mod.id) && (
+                <div className="px-4 pb-4 space-y-2 border-t border-border pt-3">
+                  {mod.lessons.map((lesson) => (
+                    <div key={lesson.id} className="border border-border rounded-lg p-3 bg-background">
+                      <div className="flex items-center gap-2 mb-2">
+                        <GripVertical size={14} className="text-muted-foreground" />
+                        <Play size={14} className="text-muted-foreground" />
+                        <input
+                          type="text"
+                          defaultValue={lesson.title}
+                          onBlur={(e) => { if (e.target.value.trim() && e.target.value !== lesson.title) updateLesson(lesson.id, 'title', e.target.value.trim()); }}
+                          className="flex-1 px-2 py-1 border border-transparent hover:border-border rounded bg-transparent focus:outline-none focus:ring-2 focus:ring-ring text-sm font-medium"
+                          placeholder="Titulo da aula..."
+                        />
+                        <button
+                          onClick={() => toggleFreePreview(lesson)}
+                          title={lesson.is_free_preview ? 'Aula gratuita (pre-visualizacao)' : 'Aula privada'}
+                          className="p-1 rounded hover:bg-muted transition-colors"
+                        >
+                          {lesson.is_free_preview
+                            ? <Eye size={16} className="text-green-500" />
+                            : <EyeOff size={16} className="text-muted-foreground" />}
+                        </button>
+                        <button onClick={() => deleteLesson(lesson.id)} className="p-1 text-muted-foreground hover:text-red-500 transition-colors">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+
+                      {/* Video upload & management */}
+                      <div className="ml-7">
+                        <VideoUploader
+                          lessonId={lesson.id}
+                          existingVideoStatus={lesson.cloudflare_video_status}
+                          onUploadComplete={() => fetchBuilder()}
+                        />
+                        {/* Legacy video URL */}
+                        {lesson.video_url && lesson.video_provider !== 'cloudflare' && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Upload size={14} className="text-muted-foreground" />
+                            <input
+                              type="url"
+                              defaultValue={lesson.video_url || ''}
+                              onBlur={(e) => updateLesson(lesson.id, 'video_url', e.target.value)}
+                              placeholder="URL do video (Vimeo, YouTube)..."
+                              className="flex-1 px-2 py-1 border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-ring text-xs"
+                            />
+                            <span className="text-[10px] text-muted-foreground">{lesson.video_provider}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={() => addLesson(mod.id)}
+                    disabled={saving}
+                    className="w-full py-2 border border-dashed border-border rounded-lg text-sm text-muted-foreground hover:bg-muted/30 transition-colors disabled:opacity-50"
+                  >
+                    <Plus size={14} className="inline mr-1" /> Adicionar Aula
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {modules.length === 0 && (
+          <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-border rounded-xl">
+            <FileText size={48} className="mx-auto mb-4 opacity-20" />
+            <p className="text-lg font-medium mb-1">Nenhum modulo ainda</p>
+            <p className="text-sm">Clique em "Novo Modulo" para comecar a construir o seu curso.</p>
+          </div>
+        )}
+      </div>
+    </SellerLayout>
+  );
+}

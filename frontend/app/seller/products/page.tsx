@@ -1,21 +1,52 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Package, Plus, Search, Edit, Trash2, RefreshCw, Layers } from 'lucide-react';
+import { Package, Plus, Search, Edit, Trash2, RefreshCw, Layers, Download, FileText, GraduationCap } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
-import { productsAPI } from '@/src/lib/api';
+import { productsAPI, storesAPI } from '@/src/lib/api';
 import type { Product } from '@/src/lib/api';
 
 const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
 
+const FORMAT_LABELS: Record<string, string> = {
+  PDF: '📄 PDF', ZIP: '📦 ZIP', MP3: '🎵 MP3', MP4: '🎬 MP4',
+  PNG: '🖼️ PNG', JPG: '🖼️ JPG', DOCX: '📝 DOCX', XLSX: '📊 XLSX',
+  PPTX: '📽️ PPTX', EPUB: '📖 EPUB', MOBI: '📖 MOBI', SVG: '🎨 SVG',
+  PSD: '🎨 PSD', AI: '🎨 AI', OUTRO: '📎 Outro',
+};
+
+const LICENSE_LABELS: Record<string, string> = {
+  personal: '👤 Pessoal',
+  commercial: '🏢 Comercial',
+  extended: '🌐 Extended',
+};
+
 export default function SellerProductsPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [storeType, setStoreType] = useState<string>('physical');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Course stores should use /seller/courses instead
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await storesAPI.myStore();
+        const type = data.product_type || 'physical';
+        setStoreType(type);
+        if (type === 'course') {
+          router.replace('/seller/courses');
+          return;
+        }
+      } catch {}
+    })();
+  }, [router]);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -26,7 +57,11 @@ export default function SellerProductsPage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  useEffect(() => {
+    if (storeType !== 'course') {
+      fetchProducts();
+    }
+  }, [fetchProducts, storeType]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Remover este produto?')) return;
@@ -109,8 +144,14 @@ export default function SellerProductsPage() {
                 <tr className="border-b border-border bg-muted/50">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Produto</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Preço</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Stock</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Vendas</th>
+                  {storeType === 'physical' ? (
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Stock</th>
+                  ) : storeType === 'digital' ? (
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Formato</th>
+                  ) : (
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Info</th>
+                  )}
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">{storeType === 'digital' ? 'Downloads' : 'Vendas'}</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                   <th className="text-right py-3 px-4 font-medium text-muted-foreground">Acções</th>
                 </tr>
@@ -118,24 +159,54 @@ export default function SellerProductsPage() {
               <tbody className="divide-y divide-border">
                 {filtered.map((product) => {
                   const img = imageUrl((product as any).primary_image);
+                  const pData = product as any;
                   return (
                   <tr key={product.id} className="hover:bg-muted/30 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
                           {img ? <img src={img} alt="" className="w-full h-full object-cover" />
-                           : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Package size={16} /></div>}
+                           : <div className="w-full h-full flex items-center justify-center text-muted-foreground">{storeType === 'digital' ? <FileText size={16} /> : <Package size={16} />}</div>}
                         </div>
-                        <span className="font-medium truncate max-w-[200px]">{product.name}</span>
+                        <div className="min-w-0">
+                          <span className="font-medium truncate block max-w-[200px]">{product.name}</span>
+                          {storeType === 'digital' && pData.digital_version && (
+                            <span className="text-[10px] text-muted-foreground">{pData.digital_version}</span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="py-3 px-4">{Number(product.price).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</td>
+                    {storeType === 'physical' ? (
+                      <td className="py-3 px-4">
+                        <span className={Number(product.stock) === 0 ? 'text-red-600 font-medium' : ''}>
+                          {Number(product.stock) === 0 ? 'Sem stock' : product.stock}
+                        </span>
+                      </td>
+                    ) : storeType === 'digital' ? (
+                      <td className="py-3 px-4">
+                        {pData.digital_format ? (
+                          <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                            {FORMAT_LABELS[pData.digital_format] || pData.digital_format}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                        {pData.digital_license && (
+                          <span className="ml-1 px-1 py-0.5 bg-purple-50 text-purple-700 rounded text-[10px]">
+                            {LICENSE_LABELS[pData.digital_license]?.split(' ')[0] || pData.digital_license}
+                          </span>
+                        )}
+                      </td>
+                    ) : (
+                      <td className="py-3 px-4 text-sm text-muted-foreground">—</td>
+                    )}
                     <td className="py-3 px-4">
-                      <span className={Number(product.stock) === 0 ? 'text-red-600 font-medium' : ''}>
-                        {Number(product.stock) === 0 ? 'Sem stock' : product.stock}
-                      </span>
+                      {storeType === 'digital'
+                        ? <span className="flex items-center gap-1 text-sm"><Download size={13} className="text-muted-foreground" />{pData.digital_downloads ?? pData.sales_count}</span>
+                        : product.sales_count
+                      }
                     </td>
-                    <td className="py-3 px-4">{product.sales_count}</td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor[product.status] || 'bg-gray-100 text-gray-700'}`}>
                         {statusLabel[product.status] || product.status}

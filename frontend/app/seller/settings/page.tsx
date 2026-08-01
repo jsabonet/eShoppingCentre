@@ -233,7 +233,7 @@ export default function SellerSettingsPage() {
             )}
             <input ref={bannerInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleBannerChange} />
           </div>
-          <div className="max-w-[1500px] mx-auto px-4 py-6">
+          <div className="max-w-375 mx-auto px-4 py-6">
             <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 ${displayBanner ? '-mt-12' : ''} relative z-10`}>
               <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl border border-border/50 overflow-hidden bg-white shrink-0 relative group">
                 {displayLogo ? (

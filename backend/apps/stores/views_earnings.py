@@ -14,6 +14,8 @@ class StoreStatsView(APIView):
     def get(self, request):
         if not hasattr(request.user, 'store'):
             return Response({
+                'store_name': '',
+                'tagline': '',
                 'today_sales': 0, 'today_revenue': 0, 'total_revenue': 0,
                 'total_products': 0, 'total_orders': 0, 'pending_orders': 0,
                 'store_rating': 0, 'recent_orders': [], 'top_products': [],
@@ -64,7 +66,26 @@ class StoreStatsView(APIView):
             'image': p.images.filter(is_primary=True).first().image.url if p.images.filter(is_primary=True).exists() else None,
         } for p in top]
 
+        # Type-specific stats
+        downloaded_today = 0
+        active_students = 0
+        if store.product_type == 'digital':
+            from apps.products.models_digital import DigitalDownload
+            downloaded_today = DigitalDownload.objects.filter(
+                product__store=store,
+                created_at__gte=today_start,
+            ).count()
+        elif store.product_type == 'course':
+            from apps.courses.models import Enrollment
+            active_students = Enrollment.objects.filter(
+                course__product__store=store,
+                completed=False,
+            ).count()
+
         return Response({
+            # Store identity
+            'store_name': store.name,
+            'tagline': store.tagline or '',
             # Stats cards — common
             'product_type': store.product_type,
             'today_sales': today_orders.count(),
@@ -75,8 +96,8 @@ class StoreStatsView(APIView):
             'pending_orders': orders.filter(status='pending').count(),
             'store_rating': float(store.rating),
             # Type-specific stats
-            'downloaded_today': 0,  # placeholder for digital products
-            'active_students': 0,   # placeholder for courses
+            'downloaded_today': downloaded_today,
+            'active_students': active_students,
             # Lists
             'recent_orders': recent_data,
             'top_products': top_data,

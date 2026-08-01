@@ -62,13 +62,16 @@ class SellerProductSerializer(serializers.ModelSerializer):
     primary_image = serializers.SerializerMethodField()
     variant_count = serializers.SerializerMethodField()
     discount_percentage = serializers.SerializerMethodField()
+    digital_downloads = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = ('id', 'name', 'slug', 'price', 'compare_price', 'discount_percentage',
                   'primary_image', 'product_type', 'status', 'stock', 'sku',
                   'sales_count', 'rating', 'review_count', 'is_on_sale',
-                  'is_featured', 'variant_count', 'created_at')
+                  'is_featured', 'variant_count', 'created_at',
+                  'digital_format', 'digital_license', 'digital_version',
+                  'download_limit', 'download_expiry_days', 'digital_downloads')
 
     def get_primary_image(self, obj):
         img = obj.images.filter(is_primary=True).first()
@@ -85,11 +88,18 @@ class SellerProductSerializer(serializers.ModelSerializer):
             return round((1 - obj.price / obj.compare_price) * 100)
         return None
 
+    def get_digital_downloads(self, obj):
+        if obj.product_type != 'digital':
+            return None
+        from .models_digital import DigitalDownload
+        return DigitalDownload.objects.filter(product=obj).count()
+
 
 class ProductDetailSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     store = serializers.SerializerMethodField()
+    course = serializers.SerializerMethodField()
     category = serializers.SlugRelatedField(
         slug_field='slug',
         queryset=Category.objects.filter(is_active=True),
@@ -116,6 +126,26 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'rating': str(obj.store.rating),
             'total_sales': obj.store.total_sales,
         }
+
+    def get_course(self, obj):
+        if obj.product_type != 'course':
+            return None
+        try:
+            course = obj.course
+            instructor = course.instructor
+            return {
+                'course_id': str(course.id),
+                'instructor_name': instructor.get_full_name() or instructor.email,
+                'level': course.level,
+                'level_display': course.get_level_display() if hasattr(course, 'get_level_display') else course.level,
+                'duration': course.duration,
+                'total_lessons': course.total_lessons,
+                'certificate_enabled': course.certificate_enabled,
+                'preview_video_url': course.preview_video_url,
+                'modules_count': course.modules.count(),
+            }
+        except Exception:
+            return None
 
 
 from django.utils.text import slugify

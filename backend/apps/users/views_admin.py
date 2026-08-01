@@ -85,6 +85,27 @@ class AdminStoreManageView(APIView):
     """Admin: gerir loja (aprovar, rejeitar, suspender, reactivar, actualizar, eliminar)"""
     permission_classes = [permissions.IsAdminUser]
 
+    def get(self, request, pk):
+        """Obter detalhe completo da loja (inclui owner, métricas, logs)."""
+        try:
+            store = Store.objects.select_related('owner__profile').prefetch_related('moderation_logs').get(id=pk)
+        except Store.DoesNotExist:
+            return Response({'detail': 'Loja não encontrada.'}, status=404)
+        from apps.stores.serializers import StoreDetailSerializer
+        return Response(StoreDetailSerializer(store).data)
+
+    def _log_moderation(self, store, action, reason='', previous_status=''):
+        """Create a moderation log entry."""
+        from apps.stores.models import StoreModerationLog
+        StoreModerationLog.objects.create(
+            store=store,
+            admin=self.request.user,
+            action=action,
+            reason=reason,
+            previous_status=previous_status,
+            new_status=store.status,
+        )
+
     def delete(self, request, pk):
         """Eliminar loja permanentemente da base de dados."""
         try:
@@ -94,6 +115,7 @@ class AdminStoreManageView(APIView):
 
         store_name = store.name
         owner_email = store.owner.email
+        self._log_moderation(store, 'closed', 'Eliminada permanentemente por administrador', store.status)
 
         # Preservar nome da loja nos pedidos antes do CASCADE
         store.orders.update(store_name=store.name)
@@ -129,7 +151,9 @@ class AdminStoreManageView(APIView):
             valid_actions = {
                 'approve': 'active', 'reject': 'rejected',
                 'suspend': 'suspended', 'reactivate': 'active', 'close': 'closed',
+                'request_docs': 'awaiting_documents',
                 'delete': None,  # tratado abaixo
+                'clear_documents': None,  # tratado abaixo
             }
             if action not in valid_actions:
                 return Response({'detail': f'Acção inválida. Use: {", ".join(valid_actions.keys())}'}, status=400)
@@ -138,8 +162,33 @@ class AdminStoreManageView(APIView):
             if action == 'delete':
                 return self.delete(request, pk)
 
+            # ─── Clear documents ───
+            if action == 'clear_documents':
+                docs_to_clear = request.data.get('documents', [])
+                doc_fields = ['identity_document', 'tax_document', 'address_proof', 'additional_documents']
+                for doc in docs_to_clear:
+                    if doc in doc_fields:
+                        field = getattr(store, doc)
+                        if field:
+                            field.delete(save=False)
+                        setattr(store, doc, '')
+                store.save()
+                self._log_moderation(store, 'edited', f'Documentos removidos: {", ".join(docs_to_clear)}', store.status)
+                from apps.stores.serializers import StoreDetailSerializer
+                return Response(StoreDetailSerializer(store).data)
+
+            previous_status = store.status
             store.status = valid_actions[action]
+
+            # Guardar motivo de rejeição
+            reason = request.data.get('reason', '')
+            if action == 'reject' and reason:
+                store.rejection_reason = reason
+
             store.save()
+
+            # Registo de moderação
+            self._log_moderation(store, action, reason, previous_status)
 
             # Send email notification to store owner
             owner_email = store.owner.email
@@ -180,12 +229,12 @@ class AdminStoreManageView(APIView):
                         fail_silently=True,
                     )
                 elif action == 'reject':
-                    reason = request.data.get('reason', 'Não especificado')
+                    reason_text = reason or 'Não especificado'
                     send_mail(
                         subject=f'A sua loja "{store.name}" precisa de ajustes',
                         message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
                                 f'A sua loja "{store.name}" não foi aprovada desta vez.\n\n'
-                                f'Motivo: {reason}\n\n'
+                                f'Motivo: {reason_text}\n\n'
                                 f'Por favor, corrija os dados e submeta novamente.\n'
                                 f'Aceda: https://eshoppingcentre.co.mz/seller/register\n\n'
                                 f'Equipa eShoppingCentre',
@@ -193,15 +242,39 @@ class AdminStoreManageView(APIView):
                         recipient_list=[owner_email],
                         fail_silently=True,
                     )
+                elif action == 'request_docs':
+                    reason_text = reason or 'Documentos adicionais necessários'
+                    send_mail(
+                        subject=f'📎 Documentos necessários para a loja "{store.name}"',
+                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
+                                f'A sua loja "{store.name}" está em análise e precisamos de documentos adicionais.\n\n'
+                                f'Motivo: {reason_text}\n\n'
+                                f'Por favor, aceda ao seu painel e envie os documentos solicitados:\n'
+                                f'https://eshoppingcentre.co.mz/seller/settings\n\n'
+                                f'Equipa eShoppingCentre',
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[owner_email],
+                        fail_silently=True,
+                    )
 
-            return Response({'status': store.status, 'name': store.name})
+            from apps.stores.serializers import StoreDetailSerializer
+            return Response(StoreDetailSerializer(store).data)
 
-        # Update store fields
-        editable = ['name', 'description', 'category', 'location', 'phone', 'email', 'shipping_policy', 'return_policy']
+        # ─── Full field update (sem action = edição de campos) ───
+        editable = ['name', 'slug', 'description', 'about', 'tagline', 'category',
+                    'location', 'phone', 'email', 'website', 'shipping_policy',
+                    'return_policy', 'default_affiliate_commission', 'low_stock_threshold',
+                    'theme_color', 'admin_notes']
+        changed = False
         for field in editable:
             if field in request.data:
                 setattr(store, field, request.data[field])
-        store.save()
+                changed = True
+
+        if changed:
+            store.save()
+            self._log_moderation(store, 'edited', 'Campos actualizados por administrador', store.status)
+
         from apps.stores.serializers import StoreDetailSerializer
         return Response(StoreDetailSerializer(store).data)
 

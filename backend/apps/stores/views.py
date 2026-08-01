@@ -71,5 +71,20 @@ class StoreRegisterView(generics.CreateAPIView):
             if k not in self.request.data:
                 setattr(serializer, k, v)  # fallback — will be overridden by validated_data
 
-        serializer.save(owner=self.request.user, status='pending',
-                        **{k: v for k, v in defaults.items() if k not in serializer.validated_data})
+        store = serializer.save(owner=self.request.user, status='pending',
+                                **{k: v for k, v in defaults.items() if k not in serializer.validated_data})
+
+        # ── Sincronizar telefone do vendedor com o da loja ──
+        # O formulário de registo captura um telefone que serve para ambos.
+        user = self.request.user
+        updated = False
+        phone = self.request.data.get('phone', '')
+        if phone and not user.phone:
+            user.phone = phone
+            updated = True
+        email = self.request.data.get('email', '')
+        if email and not user.email:
+            user.email = email
+            updated = True
+        if updated:
+            user.save(update_fields=['phone', 'email'])

@@ -52,6 +52,40 @@ export interface Product {
   salesCount?: number;
   storeName?: string;
   storeSlug?: string;
+  // Digital product fields
+  productType?: 'physical' | 'digital' | 'course';
+  digitalFormat?: string;
+  digitalVersion?: string;
+  digitalLicense?: string;
+  digitalCompatibility?: string;
+  digitalFileSize?: string;
+  downloadLimit?: number;
+  downloadExpiryDays?: number;
+  // Course product fields
+  course?: {
+    course_id: string;
+    instructor_name: string;
+    level: string;
+    level_display: string;
+    duration: string;
+    total_lessons: number;
+    certificate_enabled: boolean;
+    preview_video_url: string;
+    modules_count: number;
+    curriculum?: {
+      id: string;
+      title: string;
+      description: string;
+      sort_order: number;
+      lessons: {
+        id: string;
+        title: string;
+        duration: string;
+        is_free_preview: boolean;
+        sort_order: number;
+      }[];
+    }[];
+  };
 }
 
 export interface Banner {

@@ -29,7 +29,26 @@ class CourseModuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CourseModule
-        fields = ('id', 'title', 'description', 'lessons')
+        fields = ('id', 'title', 'description', 'sort_order', 'lessons')
+
+
+class CourseModuleWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseModule
+        fields = ('id', 'title', 'description', 'sort_order')
+
+
+class CourseLessonWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseLesson
+        fields = ('id', 'title', 'description', 'video_url', 'video_provider',
+                  'duration', 'content', 'is_free_preview', 'sort_order',
+                  'cloudflare_video_uid', 'cloudflare_video_status',
+                  'video_duration_seconds', 'video_thumbnail')
+        extra_kwargs = {
+            'title': {'required': True},
+            'video_url': {'required': False, 'allow_blank': True},
+        }
 
 
 class CourseListSerializer(serializers.ModelSerializer):

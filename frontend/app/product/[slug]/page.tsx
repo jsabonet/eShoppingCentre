@@ -30,11 +30,35 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   let product: any = null;
   let relatedProducts: any[] = [];
+  let courseCurriculum: any[] | undefined = undefined;
 
   try {
     const res = await fetch(`${API_URL}/products/${slug}/`, { next: { revalidate: 60 } });
     if (!res.ok) { notFound(); }
     product = await res.json();
+
+    // For course products, fetch curriculum (modules + lessons)
+    if (product.product_type === 'course' && product.course?.course_id) {
+      try {
+        const currRes = await fetch(`${API_URL}/courses/${product.course.course_id}/builder/`, { next: { revalidate: 120 } });
+        if (currRes.ok) {
+          const currData = await currRes.json();
+          courseCurriculum = (currData.modules || []).map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            description: m.description || '',
+            sort_order: m.sort_order,
+            lessons: (m.lessons || []).map((l: any) => ({
+              id: l.id,
+              title: l.title,
+              duration: l.duration || '',
+              is_free_preview: l.is_free_preview || false,
+              sort_order: l.sort_order,
+            })),
+          }));
+        }
+      } catch {}
+    }
 
     // Related products
     if (product.category_slug) {
@@ -42,7 +66,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       if (relRes.ok) {
         const relData = await relRes.json();
         relatedProducts = relData.results.filter((p: any) => p.slug !== slug)
-          .map((p: any) => ({ id: p.id, slug: p.slug, name: p.name, description: '', price: parseFloat(p.price), image: mediaUrl(p.primary_image), category: product.category_slug || '', rating: parseFloat(p.rating), reviewCount: p.review_count, badge: p.is_on_sale ? 'sale' as const : undefined, inStock: p.stock > 0, originalPrice: p.compare_price ? parseFloat(p.compare_price) : undefined, discount: p.discount_percentage ?? undefined }));
+          .map((p: any) => ({ id: p.id, slug: p.slug, name: p.name, description: '', price: parseFloat(p.price), image: mediaUrl(p.primary_image), category: product.category_slug || '', rating: parseFloat(p.rating), reviewCount: p.review_count, badge: p.is_on_sale ? 'sale' as const : undefined, inStock: p.product_type === 'digital' || p.product_type === 'course' ? true : p.stock > 0, originalPrice: p.compare_price ? parseFloat(p.compare_price) : undefined, discount: p.discount_percentage ?? undefined }));
       }
     }
   } catch { notFound(); }
@@ -56,7 +80,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     images: (product.images || []).map((img: any) => mediaUrl(img.image)),
     category: product.category_slug || '', rating: parseFloat(product.rating), reviewCount: product.review_count || 0,
     badge: product.is_on_sale ? 'sale' as const : undefined,
-    inStock: product.stock > 0 || (product.variants?.length > 0),
+    inStock: product.product_type === 'digital' || product.product_type === 'course' ? true : (product.stock > 0 || (product.variants?.length > 0)),
     originalPrice: product.compare_price ? parseFloat(product.compare_price) : undefined,
     discount: product.discount_percentage ?? undefined,
     brand: product.brand || '',
@@ -74,6 +98,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
     salesCount: product.sales_count || 0,
     storeName: product.store?.name || '',
     storeSlug: product.store?.slug || '',
+    productType: product.product_type || 'physical',
+    digitalFormat: product.digital_format || '',
+    digitalVersion: product.digital_version || '',
+    digitalLicense: product.digital_license || '',
+    digitalCompatibility: product.digital_compatibility || '',
+    digitalFileSize: product.digital_file_size || '',
+    downloadLimit: product.download_limit ?? 3,
+    downloadExpiryDays: product.download_expiry_days ?? 365,
+    course: product.course ? { ...product.course, curriculum: courseCurriculum } : undefined,
     variants: (product.variants || []).map((v: any) => ({
       id: v.id, name: v.name, sku: v.sku || '',
       price: v.price != null ? parseFloat(v.price) : null,

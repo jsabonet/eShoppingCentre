@@ -37,7 +37,9 @@ export default function MobileMenu({ categories }: MobileMenuProps) {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border bg-primary text-primary-foreground">
               <div className="flex items-center gap-3">
-                <img src="https://cdn.b12.io/client_media/iKv1biKD/12049a95-7e70-11f1-8605-0242ac110002-NOVO_LOGO.png" alt="E-Shopping Centre" className="h-6 w-auto brightness-0 invert" />
+                <img src="/icon.png?v=1" alt="E-Shopping Centre" className="h-6 w-auto" />
+                <p className="text-sm font-medium">e-Shopping Centre</p>
+
               </div>
               <button
                 onClick={close}

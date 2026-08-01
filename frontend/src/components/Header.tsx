@@ -39,7 +39,7 @@ export default function Header() {
           <div className="max-w-[1500px] mx-auto px-4">
             <div className="flex items-center gap-4 py-3">
               <Link href="/" className="flex-shrink-0 hover:bg-gray-100 px-1 py-1 rounded">
-                <img src="https://cdn.b12.io/client_media/iKv1biKD/12049a95-7e70-11f1-8605-0242ac110002-NOVO_LOGO.png" alt="E-Shopping Centre" className="h-8 w-auto" />
+                <img src="/icon.png?v=1" alt="E-Shopping Centre" className="h-8 w-auto" />
               </Link>
               <div className="hidden md:flex flex-1 max-w-3xl">
                 <SearchBar />

@@ -171,6 +171,17 @@ export default function SellerRegisterPage() {
       fd.append('product_type', form.productType);
       if (logoFile) fd.append('logo', logoFile);
 
+      // ── Documentos de verificação ──
+      if (isCompany) {
+        // Empresa: NUIT/registo → tax_document, BI representante → identity_document
+        if (frontFile) fd.append('tax_document', frontFile);
+        if (backFile) fd.append('identity_document', backFile);
+      } else {
+        // Particular: frente do doc → identity_document, verso → additional_documents
+        if (frontFile) fd.append('identity_document', frontFile);
+        if (backFile) fd.append('additional_documents', backFile);
+      }
+
       await storesAPI.register(fd);
       setSuccess(true);
     } catch (err: any) {

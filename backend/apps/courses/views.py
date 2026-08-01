@@ -1,10 +1,12 @@
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Course, CourseLesson, Enrollment, LessonProgress
+from django.shortcuts import get_object_or_404
+from .models import Course, CourseModule, CourseLesson, Enrollment, LessonProgress
 from .serializers import (
     CourseListSerializer, CourseDetailSerializer,
     EnrollmentSerializer, CourseLessonDetailSerializer,
+    CourseModuleSerializer, CourseModuleWriteSerializer, CourseLessonWriteSerializer,
 )
 
 
@@ -58,3 +60,187 @@ class CompleteLessonView(APIView):
         except (CourseLesson.DoesNotExist, Enrollment.DoesNotExist):
             return Response({'detail': 'Lição ou matrícula não encontrada.'},
                           status=status.HTTP_404_NOT_FOUND)
+
+
+# ─── Course Builder (Seller) ───
+
+class CourseBuilderView(APIView):
+    """GET /api/v1/courses/{course_id}/builder/ — Retorna estrutura completa do curso."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        if course.product.store.owner != request.user:
+            return Response({'detail': 'Nao autorizado.'}, status=403)
+
+        modules = course.modules.all().prefetch_related('lessons')
+        return Response({
+            'course_id': str(course.id),
+            'course_title': course.product.name,
+            'modules': CourseModuleSerializer(modules, many=True).data,
+        })
+
+
+class ModuleCreateView(generics.CreateAPIView):
+    """POST /api/v1/courses/{course_id}/modules/"""
+    serializer_class = CourseModuleWriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        course = get_object_or_404(Course, id=self.kwargs['course_id'])
+        if course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        last = course.modules.order_by('-sort_order').first()
+        sort_order = (last.sort_order + 1) if last else 0
+        serializer.save(course=course, sort_order=sort_order)
+
+
+class ModuleUpdateView(generics.UpdateAPIView):
+    """PUT /api/v1/courses/modules/{module_id}/"""
+    queryset = CourseModule.objects.all()
+    serializer_class = CourseModuleWriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'module_id'
+
+    def perform_update(self, serializer):
+        if self.get_object().course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        serializer.save()
+
+
+class ModuleDeleteView(generics.DestroyAPIView):
+    """DELETE /api/v1/courses/modules/{module_id}/"""
+    queryset = CourseModule.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'module_id'
+
+    def perform_destroy(self, instance):
+        if instance.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        instance.delete()
+
+
+class ModuleReorderView(APIView):
+    """PATCH /api/v1/courses/{course_id}/modules/reorder/ — Recebe lista de IDs na nova ordem."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        if course.product.store.owner != request.user:
+            return Response({'detail': 'Nao autorizado.'}, status=403)
+
+        ordered_ids = request.data.get('ordered_ids', [])
+        for idx, module_id in enumerate(ordered_ids):
+            CourseModule.objects.filter(id=module_id, course=course).update(sort_order=idx)
+        return Response({'ok': True})
+
+
+class LessonCreateView(generics.CreateAPIView):
+    """POST /api/v1/courses/modules/{module_id}/lessons/"""
+    serializer_class = CourseLessonWriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        module = get_object_or_404(CourseModule, id=self.kwargs['module_id'])
+        if module.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        last = module.lessons.order_by('-sort_order').first()
+        sort_order = (last.sort_order + 1) if last else 0
+        serializer.save(module=module, sort_order=sort_order)
+
+
+class LessonUpdateView(generics.UpdateAPIView):
+    """PUT /api/v1/courses/lessons/{lesson_id}/"""
+    queryset = CourseLesson.objects.all()
+    serializer_class = CourseLessonWriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'lesson_id'
+
+    def perform_update(self, serializer):
+        if self.get_object().module.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        serializer.save()
+
+
+class LessonDeleteView(generics.DestroyAPIView):
+    """DELETE /api/v1/courses/lessons/{lesson_id}/"""
+    queryset = CourseLesson.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'lesson_id'
+
+    def perform_destroy(self, instance):
+        if instance.module.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        instance.delete()
+
+
+class LessonReorderView(APIView):
+    """PATCH /api/v1/courses/modules/{module_id}/lessons/reorder/"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, module_id):
+        module = get_object_or_404(CourseModule, id=module_id)
+        if module.course.product.store.owner != request.user:
+            return Response({'detail': 'Nao autorizado.'}, status=403)
+
+        ordered_ids = request.data.get('ordered_ids', [])
+        for idx, lesson_id in enumerate(ordered_ids):
+            CourseLesson.objects.filter(id=lesson_id, module=module).update(sort_order=idx)
+        return Response({'ok': True})
+
+
+# ─── Enrollment ───
+
+class EnrollView(APIView):
+    """POST /api/v1/courses/{course_id}/enroll/ — Matricula o utilizador apos compra."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        enrollment, created = Enrollment.objects.get_or_create(
+            user=request.user,
+            course=course,
+        )
+        if created:
+            return Response({'detail': 'Matriculado com sucesso.'}, status=201)
+        return Response({'detail': 'Ja esta matriculado.', 'enrollment_id': str(enrollment.id)})
+
+
+class CourseProgressView(APIView):
+    """GET /api/v1/courses/{course_id}/progress/ — Progresso do aluno no curso."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        try:
+            enrollment = Enrollment.objects.get(user=request.user, course=course)
+        except Enrollment.DoesNotExist:
+            return Response({'detail': 'Nao matriculado.'}, status=404)
+
+        lessons = CourseLesson.objects.filter(module__course=course)
+        completed_ids = set(
+            LessonProgress.objects.filter(
+                enrollment=enrollment, completed=True
+            ).values_list('lesson_id', flat=True)
+        )
+
+        total = lessons.count()
+        done = len(completed_ids)
+
+        return Response({
+            'progress': float(enrollment.progress),
+            'completed': enrollment.completed,
+            'total_lessons': total,
+            'completed_lessons': done,
+            'completed_ids': list(completed_ids),
+        })

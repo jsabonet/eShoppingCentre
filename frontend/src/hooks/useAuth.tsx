@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, createContext, useContext, useCallback, type ReactNode } from 'react';
 import { authAPI, usersAPI, type User } from '@/src/lib/api';
 import { signInWithGoogle, signOutFirebase } from '@/src/lib/firebase';
 import { useInactivityTimer } from '@/src/hooks/useInactivityTimer';
@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{
+      value={useMemo(() => ({
         user,
         loading,
         isAuthenticated: !!user,
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register: registerFn,
         logout,
         loginWithGoogle,
-      }}
+      }), [user, loading, login, registerFn, logout, loginWithGoogle])}
     >
       {/* Session expiry warning modal */}
       {user && showWarning && (

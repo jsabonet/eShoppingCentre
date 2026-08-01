@@ -83,6 +83,12 @@ class Product(BaseModel):
     specifications = models.JSONField(default=dict)
     digital_file = models.FileField(upload_to='products/digital/', blank=True)
     digital_file_size = models.CharField(max_length=50, blank=True)
+    digital_format = models.CharField(max_length=20, blank=True, help_text='Formato: PDF, ZIP, MP3, MP4, etc.')
+    digital_version = models.CharField(max_length=50, blank=True, help_text='Versão do produto digital (ex: v1.0)')
+    digital_license = models.CharField(max_length=20, default='personal',
+                                       choices=[('personal', 'Pessoal'), ('commercial', 'Comercial'), ('extended', 'Extended')],
+                                       help_text='Tipo de licença')
+    digital_compatibility = models.CharField(max_length=300, blank=True, help_text='Requisitos de sistema/software')
     download_limit = models.PositiveIntegerField(default=3)
     download_expiry_days = models.PositiveIntegerField(default=365)
 
@@ -98,6 +104,18 @@ class Product(BaseModel):
         if not self.slug and self.name:
             from django.utils.text import slugify
             self.slug = slugify(self.name)
+        # Auto-calculate digital file size
+        if self.digital_file and (not self.digital_file_size or self._state.adding):
+            try:
+                size_bytes = self.digital_file.size
+                if size_bytes >= 1024 * 1024:
+                    self.digital_file_size = f'{size_bytes / (1024 * 1024):.1f} MB'
+                elif size_bytes >= 1024:
+                    self.digital_file_size = f'{size_bytes / 1024:.1f} KB'
+                else:
+                    self.digital_file_size = f'{size_bytes} bytes'
+            except Exception:
+                pass
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -201,3 +219,6 @@ class Coupon(BaseModel):
         now = timezone.now()
         return (self.is_active and self.starts_at <= now <= self.ends_at and
                 (self.max_uses == 0 or self.used_count < self.max_uses))
+
+# Ensure DigitalDownload is registered with Django
+from .models_digital import DigitalDownload  # noqa

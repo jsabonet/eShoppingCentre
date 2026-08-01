@@ -8,20 +8,29 @@ import { Toaster } from "@/src/components/ui/sonner";
 import Header from "@/src/components/Header";
 import Footer from "@/src/components/Footer";
 import PWAInstall from "@/src/components/PWAInstall";
-import LoadingScreen from "@/src/components/LoadingScreen";
 import NavigationLoader from "@/src/components/NavigationLoader";
 
-/**
- * Shows a full-screen loading overlay while auth state is being determined
- * (first visit — token validation against the backend).
- */
+/** Rotas que precisam de auth resolvida antes de renderizar */
+const PROTECTED_PREFIXES = ['/admin', '/seller', '/account', '/checkout', '/my-courses', '/affiliate'];
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { loading } = useAuth();
+  const pathname = usePathname();
+  const isProtected = PROTECTED_PREFIXES.some(p => pathname.startsWith(p));
 
-  if (loading) {
-    return <LoadingScreen message="A verificar sessão..." />;
+  // Protected routes: wait for auth
+  if (isProtected && loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">A verificar sessão...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Public pages: render immediately — auth resolves in background
   return <>{children}</>;
 }
 

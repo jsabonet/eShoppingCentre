@@ -32,12 +32,29 @@ class CourseLesson(BaseModel):
     module = models.ForeignKey(CourseModule, on_delete=models.CASCADE, related_name='lessons')
     title = models.CharField(max_length=500)
     description = models.TextField(blank=True)
-    video_url = models.URLField()
-    video_provider = models.CharField(max_length=50, default='vimeo')
-    duration = models.CharField(max_length=20)
-    content = models.TextField(blank=True)
-    is_free_preview = models.BooleanField(default=False)
     sort_order = models.PositiveIntegerField(default=0)
+    is_free_preview = models.BooleanField(default=False)
+
+    # --- Cloudflare Stream ---
+    video_provider = models.CharField(max_length=20, default='cloudflare',
+                                      choices=[('cloudflare', 'Cloudflare Stream'), ('vimeo', 'Vimeo'), ('youtube', 'YouTube')])
+    cloudflare_video_uid = models.CharField(max_length=100, blank=True,
+                                            help_text='UID do video no Cloudflare Stream')
+    cloudflare_video_status = models.CharField(max_length=20, default='pending',
+                                               choices=[
+                                                   ('pending', 'Aguardando Upload'),
+                                                   ('uploading', 'A Enviar'),
+                                                   ('processing', 'A Processar'),
+                                                   ('ready', 'Pronto'),
+                                                   ('error', 'Erro'),
+                                               ])
+    video_duration_seconds = models.PositiveIntegerField(default=0, help_text='Duracao em segundos')
+    video_thumbnail = models.URLField(blank=True)
+    video_url = models.URLField(blank=True, help_text='URL publica do video (legado: Vimeo/YouTube)')
+    # --- Fim Cloudflare ---
+
+    content = models.TextField(blank=True)
+    watched_duration = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ['sort_order']

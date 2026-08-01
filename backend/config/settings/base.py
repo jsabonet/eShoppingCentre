@@ -172,6 +172,13 @@ STORAGES = {
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Development: prints to console
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@eshoppingcentre.co.mz')
 
+# ─── Cloudflare Stream ───
+CLOUDFLARE_ACCOUNT_ID = config('CLOUDFLARE_ACCOUNT_ID', default='')
+CLOUDFLARE_API_TOKEN = config('CLOUDFLARE_API_TOKEN', default='')
+CLOUDFLARE_STREAM_DOMAIN = config('CLOUDFLARE_STREAM_DOMAIN', default='customer-fr78qh34syouioch.cloudflarestream.com')
+CLOUDFLARE_JWT_SECRET = config('CLOUDFLARE_JWT_SECRET', default='')
+CLOUDFLARE_STREAM_SIGNING_SECRET = config('CLOUDFLARE_STREAM_SIGNING_SECRET', default='')
+
 LANGUAGE_CODE = 'pt'
 TIME_ZONE = 'Africa/Maputo'
 USE_I18N = True

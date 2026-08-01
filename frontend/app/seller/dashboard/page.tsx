@@ -76,13 +76,13 @@ export default function SellerDashboardPage() {
     );
   }
 
-  if (error && !data) {
+  if (!data) {
     return (
       <SellerLayout>
         <div className="p-6 flex-1 flex items-center justify-center">
           <div className="text-center">
             <AlertCircle size={48} className="text-red-400 mx-auto mb-3" />
-            <p className="text-red-600 font-medium mb-2">{error}</p>
+            <p className="text-red-600 font-medium mb-2">{error || 'Erro ao carregar dashboard.'}</p>
             <button onClick={fetchDashboard} className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm hover:bg-accent/90 flex items-center gap-2 mx-auto">
               <RefreshCw size={14} /> Tentar novamente
             </button>
@@ -92,7 +92,7 @@ export default function SellerDashboardPage() {
     );
   }
 
-  const productType = data?.product_type || 'physical';
+  const productType = data.product_type || 'physical';
 
   const baseStats = [
     { label: 'Vendas Hoje', value: fmtNum(data.today_sales), icon: TrendingUp, color: 'bg-green-100 text-green-700', sub: fmtPrice(data.today_revenue) },
@@ -113,7 +113,7 @@ export default function SellerDashboardPage() {
     ],
   };
 
-  const stats = data ? [...baseStats, ...(typeStats[productType] || typeStats.physical)] : [];
+  const stats = [...baseStats, ...(typeStats[productType] || typeStats.physical)];
 
   return (
     <SellerLayout>
@@ -200,11 +200,11 @@ export default function SellerDashboardPage() {
                   : null;
                 return (
                   <div key={product.id} className="p-4 flex items-center gap-4">
-                    <span className="w-6 h-6 rounded-full bg-accent/10 text-accent text-xs font-bold flex items-center justify-center flex-shrink-0">
+                    <span className="w-6 h-6 rounded-full bg-accent/10 text-accent text-xs font-bold flex items-center justify-center shrink-0">
                       {i + 1}
                     </span>
                     {imgUrl && (
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
                         <img src={imgUrl} alt="" className="w-full h-full object-cover" />
                       </div>
                     )}

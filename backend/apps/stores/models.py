@@ -6,6 +6,7 @@ from apps.core.models import BaseModel
 class Store(BaseModel):
     STATUS_CHOICES = [
         ('pending', 'Pendente'),
+        ('awaiting_documents', 'Aguardando Documentos'),
         ('active', 'Activa'),
         ('rejected', 'Rejeitada'),
         ('suspended', 'Suspensa'),
@@ -42,6 +43,18 @@ class Store(BaseModel):
     low_stock_threshold = models.PositiveIntegerField(default=5, help_text='Alertar quando stock <= este valor')
     shipping_policy = models.TextField(blank=True)
     return_policy = models.TextField(blank=True)
+    # ─── Documentos de verificação ───
+    identity_document = models.FileField(upload_to='stores/documents/identity/', blank=True,
+                                         help_text='Documento de identidade (BI/passaporte)')
+    tax_document = models.FileField(upload_to='stores/documents/tax/', blank=True,
+                                    help_text='Comprovativo fiscal (NUIT/licença)')
+    address_proof = models.FileField(upload_to='stores/documents/address/', blank=True,
+                                     help_text='Comprovativo de morada')
+    additional_documents = models.FileField(upload_to='stores/documents/additional/', blank=True,
+                                            help_text='Documentos adicionais (contrato social, etc.)')
+    # ─── Admin ───
+    admin_notes = models.TextField(blank=True, help_text='Notas internas visíveis apenas para administradores')
+    rejection_reason = models.TextField(blank=True, help_text='Motivo da rejeição (preenchido pelo admin)')
 
     class Meta:
         indexes = [
@@ -78,3 +91,30 @@ class Store(BaseModel):
     def tier_display(self):
         labels = {'diamond': '💎 Diamante', 'gold': '🥇 Ouro', 'silver': '🥈 Prata', 'bronze': '🥉 Bronze'}
         return labels.get(self.tier, 'Bronze')
+
+
+class StoreModerationLog(BaseModel):
+    """Registo de todas as acções de moderação sobre uma loja."""
+    ACTION_CHOICES = [
+        ('approved', 'Aprovada'),
+        ('rejected', 'Rejeitada'),
+        ('suspended', 'Suspensa'),
+        ('reactivated', 'Reactivada'),
+        ('closed', 'Fechada'),
+        ('edited', 'Editada'),
+    ]
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='moderation_logs')
+    admin = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, related_name='moderation_actions')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    reason = models.TextField(blank=True, help_text='Motivo da acção (obrigatório para rejeição)')
+    previous_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['store', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.store.name} — {self.get_action_display()} por {self.admin} em {self.created_at:%d/%m/%Y}'

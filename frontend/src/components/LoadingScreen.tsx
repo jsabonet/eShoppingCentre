@@ -29,7 +29,7 @@ export default function LoadingScreen({
       {/* Logo */}
       <div className="mb-8">
         <img
-          src="https://cdn.b12.io/client_media/iKv1biKD/12049a95-7e70-11f1-8605-0242ac110002-NOVO_LOGO.png"
+          src="/icon.png?v=1"
           alt="E-Shopping Centre"
           className="h-10 w-auto mx-auto"
         />

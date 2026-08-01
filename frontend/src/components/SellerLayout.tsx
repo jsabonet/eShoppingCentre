@@ -11,21 +11,47 @@ import {
 import { storesAPI } from '@/src/lib/api';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 
-// Module-level cache — persists across page navigations within the seller area
-let cachedStore: { name: string; slug: string; status: string; productType: string } | null = null;
+// Module-level cache — persists across page navigations within the seller area.
+// Invalidated when auth token changes (user switch).
+let cachedStore: { name: string; slug: string; status: string; productType: string; tokenFingerprint: string } | null = null;
 let cacheChecked = false;
+
+function getTokenFingerprint(): string {
+  if (typeof window === 'undefined') return '';
+  return (localStorage.getItem('access_token') || '').slice(-20);
+}
+
+function clearCacheIfTokenChanged() {
+  const current = getTokenFingerprint();
+  if (cachedStore && cachedStore.tokenFingerprint !== current) {
+    cachedStore = null;
+    cacheChecked = false;
+  }
+}
 
 interface SellerLayoutProps {
   children: React.ReactNode;
 }
 
-const BASE_NAV = [
-  { href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/seller/products', label: 'Produtos', icon: Package },
-  { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart },
-  { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
-  { href: '/seller/settings', label: 'Configurações', icon: Settings },
-];
+// Base navigation varies by store type: course stores use "Cursos" instead of "Produtos"
+function getBaseNav(productType: string) {
+  if (productType === 'course') {
+    return [
+      { href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/seller/courses', label: 'Cursos', icon: GraduationCap },
+      { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart },
+      { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
+      { href: '/seller/settings', label: 'Configurações', icon: Settings },
+    ];
+  }
+  return [
+    { href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/seller/products', label: 'Produtos', icon: Package },
+    { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart },
+    { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
+    { href: '/seller/settings', label: 'Configurações', icon: Settings },
+  ];
+}
 
 const TYPE_NAV: Record<string, { href: string; label: string; icon: any }[]> = {
   physical: [
@@ -35,14 +61,14 @@ const TYPE_NAV: Record<string, { href: string; label: string; icon: any }[]> = {
     { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
   ],
   course: [
-    { href: '/seller/students', label: 'Alunos', icon: GraduationCap },
+    { href: '/seller/students', label: 'Alunos', icon: Users },
     { href: '/seller/certificates', label: 'Certificados', icon: Award },
     { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
   ],
 };
 
 function getNavItems(productType: string) {
-  return [...BASE_NAV, ...(TYPE_NAV[productType] || TYPE_NAV.physical)];
+  return [...getBaseNav(productType), ...(TYPE_NAV[productType] || TYPE_NAV.physical)];
 }
 
 export default function SellerLayout({ children }: SellerLayoutProps) {
@@ -64,11 +90,15 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
       return;
     }
 
+    // Invalidate cache if auth token changed (user switch)
+    clearCacheIfTokenChanged();
+
     // Use cached data if available
     if (cachedStore) {
       setStoreName(cachedStore.name);
       setStoreSlug(cachedStore.slug);
       setStoreStatus(cachedStore.status);
+      setProductType(cachedStore.productType);
       setChecking(false);
       return;
     }
@@ -80,7 +110,11 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
     (async () => {
       try {
         const { data } = await storesAPI.myStore();
-        cachedStore = { name: data.name, slug: data.slug, status: data.status, productType: data.product_type || 'physical' };
+        cachedStore = {
+          name: data.name, slug: data.slug, status: data.status,
+          productType: data.product_type || 'physical',
+          tokenFingerprint: getTokenFingerprint(),
+        };
         setStoreName(data.name);
         setStoreSlug(data.slug);
         setStoreStatus(data.status);
@@ -187,7 +221,7 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             return (
               <Link
                 key={item.href}
@@ -231,7 +265,7 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
             </div>
             <nav className="p-3 space-y-1">
               {navItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                 return (
                   <Link
                     key={item.href}

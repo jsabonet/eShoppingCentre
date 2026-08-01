@@ -4,20 +4,17 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, Package, ShoppingCart, Store, Filter,
-  Edit, BookOpen, Users, LogOut, ChevronLeft, ChevronRight,
+  LayoutDashboard, Store, Filter,
+  Edit, Users, LogOut, ChevronLeft, ChevronRight,
   Menu, X, Settings, Bell
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 
 const adminNavItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin?tab=products', label: 'Produtos', icon: Package },
-  { href: '/admin?tab=orders', label: 'Pedidos', icon: ShoppingCart },
   { href: '/admin?tab=stores', label: 'Lojas', icon: Store },
   { href: '/admin?tab=categories', label: 'Categorias', icon: Filter },
   { href: '/admin?tab=blog', label: 'Blog', icon: Edit },
-  { href: '/admin?tab=courses', label: 'Cursos', icon: BookOpen },
   { href: '/admin?tab=users', label: 'Utilizadores', icon: Users },
 ];
 
@@ -43,6 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             onClose={() => setMobileOpen(false)}
             onLogout={handleLogout}
             user={user}
+            pathname={pathname}
           />
         </div>
       )}
@@ -54,6 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           onClose={() => {}}
           onLogout={handleLogout}
           user={user}
+          pathname={pathname}
         />
       </aside>
 
@@ -70,8 +69,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
               </button>
               <Link href="/admin" className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <LayoutDashboard size={18} className="text-indigo-600" />
-                <span className={collapsed ? 'hidden' : ''}>Painel Admin</span>
+                <span>Painel Admin</span>
               </Link>
             </div>
             <div className="flex items-center gap-3">
@@ -106,11 +104,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 }
 
-function AdminSidebarContent({ collapsed, onClose, onLogout, user }: {
+function AdminSidebarContent({ collapsed, onClose, onLogout, user, pathname }: {
   collapsed: boolean;
   onClose: () => void;
   onLogout: () => void;
   user: any;
+  pathname: string;
 }) {
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col overflow-y-auto">
@@ -118,9 +117,9 @@ function AdminSidebarContent({ collapsed, onClose, onLogout, user }: {
       <div className="flex items-center justify-between px-3 py-3.5 border-b border-slate-700">
         <div className="flex items-center gap-2.5">
           <img
-            src="https://cdn.b12.io/client_media/iKv1biKD/12049a95-7e70-11f1-8605-0242ac110002-NOVO_LOGO.png"
+            src="/icon.png?v=1"
             alt="eShopping"
-            className="w-8 h-8 rounded-lg object-contain bg-white p-0.5"
+            className="w-8 h-8 rounded-lg object-contain"
           />
           {!collapsed && <span className="font-bold text-sm">eShopping</span>}
         </div>
@@ -136,7 +135,9 @@ function AdminSidebarContent({ collapsed, onClose, onLogout, user }: {
           const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
           const currentTab = searchParams?.get('tab') || '';
           const itemTab = item.href.includes('?tab=') ? item.href.split('?tab=')[1] : '';
-          const isActive = (item.href === '/admin' && !currentTab) || (itemTab && currentTab === itemTab);
+          // Also highlight "Lojas" when on /admin/stores/... sub-pages
+          const onStoresSubPage = itemTab === 'stores' && pathname.startsWith('/admin/stores');
+          const isActive = (item.href === '/admin' && !currentTab) || (itemTab && currentTab === itemTab) || onStoresSubPage;
 
           const handleClick = (e: React.MouseEvent) => {
             if (item.href.includes('?tab=')) {

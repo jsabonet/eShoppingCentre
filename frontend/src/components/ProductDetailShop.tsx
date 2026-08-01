@@ -1,10 +1,11 @@
 ﻿"use client";
 
-import { useState, useEffect } from 'react';
-import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play } from 'lucide-react';
+import { useState } from 'react';
+import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play, Download, Monitor, FileText, GraduationCap, BookOpen, Award, Users, ChevronDown, Store } from 'lucide-react';
 import { CartProvider, useCart } from '../contexts/CartContext';
 import ProductCard from './ProductCard';
 import CartDrawer from './CartDrawer';
+import ProductImageGallery from './ProductImageGallery';
 import type { Product } from '../data/marketplace';
 
 interface ProductDetailShopProps {
@@ -48,6 +49,10 @@ function StarRatingLg({ rating }: { rating: number }) {
 
 function ProductDetailContent({ product, categoryName, categorySlug, relatedProducts }: ProductDetailShopProps) {
   const { addToCart } = useCart();
+  const isDigital = product.productType === 'digital';
+  const isCourse = product.productType === 'course';
+  const isPhysical = !product.productType || product.productType === 'physical';
+  const courseData = product.course;
   const variants = product.variants || [];
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
 
@@ -55,19 +60,14 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
   const displayPrice = selectedVariant?.price ?? product.price;
   const displayStock = selectedVariant ? selectedVariant.stock : (product.inStock ? 1 : 0);
 
-  // Build image gallery
+  // Build image gallery — pass all images to ProductImageGallery
   const galleryImages: string[] = product.images && product.images.length > 0
     ? product.images
     : (product.image ? [product.image] : []);
 
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-
-  // Reset image index when product changes
-  useEffect(() => { setSelectedImageIndex(0); }, [product.id]);
-
-  // When variant changes, reset to variant image or first gallery image
+  // Cart thumbnail uses variant image, or first gallery image
   const variantImage = selectedVariant?.image || undefined;
-  const displayImage = variantImage || galleryImages[selectedImageIndex] || undefined;
+  const cartImage = variantImage || galleryImages[0] || product.image || '';
 
   // Group variant attributes for rendering selectors
   const attrKeys = variants.length > 0
@@ -90,32 +90,17 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
       <section id="product-detail" className="py-8 px-4">
         <div className="max-w-[1500px] mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Product Image */}
+            {/* Product Image Gallery */}
             <div className="lg:col-span-5">
               <div className="sticky top-32">
-                <div className="aspect-square bg-card border border-border rounded-lg overflow-hidden mb-4">
-                  {displayImage ? (
-                    <img
-                      src={displayImage}
-                      alt={selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
+                {galleryImages.length > 0 ? (
+                  <ProductImageGallery
+                    gallery={galleryImages}
+                    productName={selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}
+                  />
+                ) : (
+                  <div className="aspect-square bg-card border border-border rounded-lg overflow-hidden">
                     <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-sm">Sem imagem</div>
-                  )}
-                </div>
-                {galleryImages.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2">
-                    {galleryImages.slice(0, 4).map((img, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => { setSelectedImageIndex(i); setSelectedVariantId(null); }}
-                        className={`aspect-square bg-card border-2 ${!variantImage && i === selectedImageIndex ? 'border-accent' : 'border-border'} rounded-md overflow-hidden cursor-pointer hover:border-accent/50 transition-colors`}
-                      >
-                        <img src={img} alt={`${product.name} ${i + 1}`} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
                   </div>
                 )}
               </div>
@@ -157,7 +142,9 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
 
               {/* Description */}
               <div className="mb-6">
-                <h3 className="font-bold mb-2">Sobre este produto</h3>
+                <h3 className="font-bold mb-2">
+                  {isCourse ? 'Sobre este curso' : isDigital ? 'Sobre este produto digital' : 'Sobre este produto'}
+                </h3>
                 <p className="text-muted-foreground leading-relaxed">{product.description}</p>
               </div>
 
@@ -233,18 +220,72 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
 
               {/* Benefits */}
               <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-3 text-sm">
-                  <Truck size={18} className="text-accent" />
-                  <span>Frete grátis para todo Moçambique</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Shield size={18} className="text-accent" />
-                  <span>Garantia de 12 meses</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <RotateCcw size={18} className="text-accent" />
-                  <span>Devolução gratuita em até 30 dias</span>
-                </div>
+                {isCourse && courseData ? (
+                  <>
+                    <div className="flex items-center gap-3 text-sm">
+                      <GraduationCap size={18} className="text-purple-500" />
+                      <span className="font-medium">Instrutor: {courseData.instructor_name}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <BookOpen size={18} className="text-accent" />
+                      <span>{courseData.total_lessons} aulas · {courseData.duration}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <Award size={18} className="text-amber-500" />
+                      <span>{courseData.certificate_enabled ? 'Certificado de conclusão incluído' : 'Sem certificado'}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <Users size={18} className="text-accent" />
+                      <span>Acesso vitalício ao conteúdo</span>
+                    </div>
+                  </>
+                ) : isDigital ? (
+                  <>
+                    <div className="flex items-center gap-3 text-sm">
+                      <Download size={18} className="text-green-500" />
+                      <span className="font-medium text-green-600">Download Imediato</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <Shield size={18} className="text-accent" />
+                      <span>
+                        {product.digitalLicense === 'commercial' ? 'Licença Comercial incluída' :
+                         product.digitalLicense === 'extended' ? 'Licença Extended (revenda)' :
+                         'Licença Pessoal'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <Clock size={18} className="text-accent" />
+                      <span>
+                        {product.downloadExpiryDays && product.downloadExpiryDays > 0
+                          ? `Acesso por ${product.downloadExpiryDays} dias`
+                          : 'Acesso vitalício'}
+                        {' · '}
+                        {product.downloadLimit} download{product.downloadLimit !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {product.digitalCompatibility && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <Monitor size={18} className="text-accent" />
+                        <span className="text-muted-foreground">{product.digitalCompatibility}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 text-sm">
+                      <Truck size={18} className="text-accent" />
+                      <span>Frete grátis para todo Moçambique</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <Shield size={18} className="text-accent" />
+                      <span>Garantia de 12 meses</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <RotateCcw size={18} className="text-accent" />
+                      <span>Devolução gratuita em até 30 dias</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -257,30 +298,76 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                 {selectedVariant && selectedVariant.price !== null && selectedVariant.price !== product.price && (
                   <p className="text-xs text-muted-foreground mb-1">Preço base: MZN {formatPrice(product.price)}</p>
                 )}
-                <p className="text-sm text-green-600 font-medium mb-4">
-                  <Truck size={14} className="inline" /> Frete grátis
-                </p>
-
-                <p className="text-sm mb-2">
-                  {displayStock > 0 ? (
-                    <span className="text-green-600 font-semibold">
-                      {variants.length > 0 ? `${displayStock} em estoque` : 'Em estoque'}
-                    </span>
-                  ) : (
-                    <span className="text-red-600 font-semibold">Fora de estoque</span>
-                  )}
-                </p>
+                {isCourse ? (
+                  <>
+                    <p className="text-sm text-purple-600 font-medium mb-4 flex items-center gap-1">
+                      <GraduationCap size={14} /> Acesso imediato apos inscricao
+                    </p>
+                    {courseData && (
+                      <div className="mb-4 space-y-1.5">
+                        <span className="inline-block px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-medium mr-1.5">
+                          📚 {courseData.total_lessons} aulas
+                        </span>
+                        <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium mr-1.5">
+                          {courseData.level_display || courseData.level}
+                        </span>
+                        {courseData.certificate_enabled && (
+                          <span className="inline-block px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs font-medium">
+                            🏅 Certificado
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : isDigital ? (
+                  <>
+                    <p className="text-sm text-green-600 font-medium mb-4 flex items-center gap-1">
+                      <Download size={14} /> Download imediato após pagamento
+                    </p>
+                    <div className="mb-4 space-y-1.5">
+                      {product.digitalFormat && (
+                        <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium mr-1.5">
+                          📎 {product.digitalFormat}
+                        </span>
+                      )}
+                      {product.digitalVersion && (
+                        <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-medium">
+                          {product.digitalVersion}
+                        </span>
+                      )}
+                      {product.digitalFileSize && (
+                        <p className="text-xs text-muted-foreground">{product.digitalFileSize}</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-green-600 font-medium mb-4">
+                      <Truck size={14} className="inline" /> Frete grátis
+                    </p>
+                    <p className="text-sm mb-2">
+                      {displayStock > 0 ? (
+                        <span className="text-green-600 font-semibold">
+                          {variants.length > 0 ? `${displayStock} em estoque` : 'Em estoque'}
+                        </span>
+                      ) : (
+                        <span className="text-red-600 font-semibold">Fora de estoque</span>
+                      )}
+                    </p>
+                  </>
+                )}
                 {selectedVariant && <p className="text-xs text-muted-foreground mb-4">{selectedVariant.name}</p>}
                 {!selectedVariant && variants.length > 0 && (
                   <p className="text-xs text-amber-600 mb-4">Seleccione as opções acima</p>
                 )}
                 {(!variants.length || selectedVariant) && (
                   <>
-                    <p className="text-sm text-muted-foreground mb-4">Entrega em 3-5 dias úteis</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {isCourse ? 'Acesso vitalicio ao conteudo do curso' : isDigital ? 'Acesso imediato apos confirmacao do pagamento' : 'Entrega em 3-5 dias uteis'}
+                    </p>
                     <button
-                      onClick={() => addToCart({ ...product, price: displayPrice, inStock: displayStock > 0, image: displayImage || '' })}
-                      disabled={displayStock === 0}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => addToCart({ ...product, price: displayPrice, inStock: isDigital || isCourse || displayStock > 0, image: cartImage })}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors mb-2"
                     >
                       <ShoppingCart size={18} /> Adicionar ao Carrinho
                     </button>
@@ -291,12 +378,40 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                   href="/cart"
                   className="block w-full text-center px-4 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-md transition-colors"
                 >
-                  Comprar Agora
+                  {isCourse ? 'Inscrever-me' : isDigital ? 'Comprar e Baixar' : 'Comprar Agora'}
                 </a>
 
+                {/* Store link */}
+                {product.storeName && product.storeSlug && (
+                  <a
+                    href={`/store/${product.storeSlug}`}
+                    className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    <Store size={12} />
+                    Vendido por <span className="font-medium text-foreground">{product.storeName}</span>
+                  </a>
+                )}
+
                 <div className="mt-4 pt-4 border-t border-border text-xs text-muted-foreground space-y-1">
-                  <p>Vendido e entregue por e-Shopping</p>
-                  <p>Parcelamento em até 12x sem juros</p>
+                  {isCourse ? (
+                    <>
+                      <p className="flex items-center gap-1"><GraduationCap size={12} /> Acesso ao curso completo online</p>
+                      {product.storeName && <p>Por <strong>{product.storeName}</strong></p>}
+                      <p>Pagamento seguro via M-Pesa, e-Mola ou Cartao</p>
+                    </>
+                  ) : isDigital ? (
+                    <>
+                      <p className="flex items-center gap-1"><Download size={12} /> Entrega digital — nada de envio fisico</p>
+                      {product.storeName && <p>Por <strong>{product.storeName}</strong></p>}
+                      <p>Pagamento seguro via M-Pesa, e-Mola ou Cartao</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="flex items-center gap-1"><Truck size={12} /> Vendido e entregue{product.storeName ? ` por ${product.storeName}` : ' por e-Shopping'}</p>
+                      <p>Parcelamento em ate 12x sem juros</p>
+                      <p>Pagamento seguro via M-Pesa, e-Mola ou Cartao</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -309,53 +424,136 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
         <div className="max-w-[1500px] mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <h3 className="text-xl font-bold mb-4">Detalhes do Produto</h3>
+              <h3 className="text-xl font-bold mb-4">
+                {isCourse ? 'Detalhes do Curso' : isDigital ? 'Detalhes do Produto Digital' : 'Detalhes do Produto'}
+              </h3>
               <table className="w-full text-sm">
                 <tbody>
                   <tr className="border-b border-border">
                     <td className="py-2 font-medium text-muted-foreground">Categoria</td>
                     <td className="py-2">{categoryName || 'Geral'}</td>
                   </tr>
-                  {product.sku && (
-                    <tr className="border-b border-border">
-                      <td className="py-2 font-medium text-muted-foreground">SKU</td>
-                      <td className="py-2">{product.sku}</td>
-                    </tr>
+                  {isCourse && courseData ? (
+                    <>
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Instrutor</td>
+                        <td className="py-2">{courseData.instructor_name}</td>
+                      </tr>
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Nivel</td>
+                        <td className="py-2">
+                          <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-medium">
+                            {courseData.level_display || courseData.level}
+                          </span>
+                        </td>
+                      </tr>
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Aulas</td>
+                        <td className="py-2">{courseData.total_lessons} aulas</td>
+                      </tr>
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Duracao</td>
+                        <td className="py-2">{courseData.duration}</td>
+                      </tr>
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Modulos</td>
+                        <td className="py-2">{courseData.modules_count} modulos</td>
+                      </tr>
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Certificado</td>
+                        <td className="py-2">
+                          {courseData.certificate_enabled
+                            ? <span className="text-green-600 font-medium flex items-center gap-1"><Award size={14} /> Sim, incluido</span>
+                            : <span className="text-muted-foreground">Nao</span>}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Acesso</td>
+                        <td className="py-2"><span className="text-green-600 font-medium">Vitalicio</span></td>
+                      </tr>
+                    </>
+                  ) : isDigital ? (
+                    <>
+                      {product.digitalFormat && (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">Formato</td>
+                          <td className="py-2"><span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">{product.digitalFormat}</span></td>
+                        </tr>
+                      )}
+                      {product.digitalVersion && (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">Versao</td>
+                          <td className="py-2">{product.digitalVersion}</td>
+                        </tr>
+                      )}
+                      {product.digitalFileSize && (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">Tamanho</td>
+                          <td className="py-2">{product.digitalFileSize}</td>
+                        </tr>
+                      )}
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Licenca</td>
+                        <td className="py-2">
+                          {product.digitalLicense === 'commercial' ? '🏢 Comercial' :
+                           product.digitalLicense === 'extended' ? '🌐 Extended' : '👤 Pessoal'}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Downloads</td>
+                        <td className="py-2">Ate {product.downloadLimit}x{product.downloadExpiryDays && product.downloadExpiryDays > 0 ? ` em ${product.downloadExpiryDays} dias` : ', sem expirar'}</td>
+                      </tr>
+                      {product.digitalCompatibility && (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">Compatibilidade</td>
+                          <td className="py-2">{product.digitalCompatibility}</td>
+                        </tr>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {product.sku && (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">SKU</td>
+                          <td className="py-2">{product.sku}</td>
+                        </tr>
+                      )}
+                      {product.barcode && (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">Cod. Barras</td>
+                          <td className="py-2">{product.barcode}</td>
+                        </tr>
+                      )}
+                      {product.brand && (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">Marca</td>
+                          <td className="py-2">{product.brand}</td>
+                        </tr>
+                      )}
+                      {product.condition && (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">Condicao</td>
+                          <td className="py-2">{{new:'Novo',used:'Usado',refurbished:'Recondicionado'}[product.condition] || product.condition}</td>
+                        </tr>
+                      )}
+                      {(product.weight || product.height || product.width || product.length) && (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">Dimensoes</td>
+                          <td className="py-2">{[product.weight && `${product.weight}kg`, product.height && `${product.height}cm(A)`, product.width && `${product.width}cm(L)`, product.length && `${product.length}cm(C)`].filter(Boolean).join(' × ')}</td>
+                        </tr>
+                      )}
+                      <tr className="border-b border-border">
+                        <td className="py-2 font-medium text-muted-foreground">Disponibilidade</td>
+                        <td className="py-2">{product.inStock ? <span className="text-green-600 font-medium">Em estoque</span> : <span className="text-red-600 font-medium">Fora de estoque</span>}</td>
+                      </tr>
+                      {product.warrantyDays ? (
+                        <tr className="border-b border-border">
+                          <td className="py-2 font-medium text-muted-foreground">Garantia</td>
+                          <td className="py-2">{product.warrantyDays} dias</td>
+                        </tr>
+                      ) : null}
+                    </>
                   )}
-                  {product.barcode && (
-                    <tr className="border-b border-border">
-                      <td className="py-2 font-medium text-muted-foreground">Cod. Barras</td>
-                      <td className="py-2">{product.barcode}</td>
-                    </tr>
-                  )}
-                  {product.brand && (
-                    <tr className="border-b border-border">
-                      <td className="py-2 font-medium text-muted-foreground">Marca</td>
-                      <td className="py-2">{product.brand}</td>
-                    </tr>
-                  )}
-                  {product.condition && (
-                    <tr className="border-b border-border">
-                      <td className="py-2 font-medium text-muted-foreground">Condicao</td>
-                      <td className="py-2">{{new:'Novo',used:'Usado',refurbished:'Recondicionado'}[product.condition] || product.condition}</td>
-                    </tr>
-                  )}
-                  {(product.weight || product.height || product.width || product.length) && (
-                    <tr className="border-b border-border">
-                      <td className="py-2 font-medium text-muted-foreground">Dimensoes</td>
-                      <td className="py-2">{[product.weight && `${product.weight}kg`, product.height && `${product.height}cm(A)`, product.width && `${product.width}cm(L)`, product.length && `${product.length}cm(C)`].filter(Boolean).join(' × ')}</td>
-                    </tr>
-                  )}
-                  <tr className="border-b border-border">
-                    <td className="py-2 font-medium text-muted-foreground">Disponibilidade</td>
-                    <td className="py-2">{product.inStock ? <span className="text-green-600 font-medium">Em estoque</span> : <span className="text-red-600 font-medium">Fora de estoque</span>}</td>
-                  </tr>
-                  {product.warrantyDays ? (
-                    <tr className="border-b border-border">
-                      <td className="py-2 font-medium text-muted-foreground">Garantia</td>
-                      <td className="py-2">{product.warrantyDays} dias</td>
-                    </tr>
-                  ) : null}
                   {product.salesCount != null && (
                     <tr className="border-b border-border">
                       <td className="py-2 font-medium text-muted-foreground">Vendidos</td>
@@ -403,6 +601,71 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
           </div>
         </div>
       </section>
+
+      {/* Course Curriculum — only for course products with modules */}
+      {isCourse && courseData?.curriculum && courseData.curriculum.length > 0 && (
+        <section id="course-curriculum" className="py-8 px-4 bg-card border-t border-border">
+          <div className="max-w-[1500px] mx-auto">
+            <h2 className="text-2xl font-bold mb-2">Conteudo do Curso</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              {courseData.total_lessons} aulas · {courseData.modules_count} modulos · {courseData.duration}
+            </p>
+            <div className="space-y-3">
+              {courseData.curriculum.map((mod, mi) => (
+                <details key={mod.id} className="border border-border rounded-xl bg-background group" open={mi === 0}>
+                  <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors rounded-xl list-none">
+                    <div className="flex items-center gap-3">
+                      <BookOpen size={18} className="text-accent" />
+                      <div>
+                        <h4 className="font-bold text-sm">{mod.title}</h4>
+                        <p className="text-xs text-muted-foreground">{mod.lessons.length} aulas</p>
+                      </div>
+                    </div>
+                    <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+                  </summary>
+                  <div className="px-4 pb-4 space-y-1">
+                    {mod.lessons.map((lesson, li) => (
+                      <div key={lesson.id} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/20 transition-colors">
+                        {lesson.is_free_preview ? (
+                          <Play size={14} className="text-green-500 shrink-0" />
+                        ) : (
+                          <Play size={14} className="text-muted-foreground shrink-0" />
+                        )}
+                        <span className="text-sm flex-1">{lesson.title}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {lesson.is_free_preview && (
+                            <span className="text-green-500 font-medium mr-2">Gratis</span>
+                          )}
+                          {lesson.duration || ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Preview Video — course */}
+      {isCourse && courseData?.preview_video_url && (
+        <section id="course-preview" className="py-8 px-4">
+          <div className="max-w-[1500px] mx-auto">
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+              <Play size={22} className="text-accent" /> Video de Apresentacao
+            </h2>
+            <div className="aspect-video max-w-3xl rounded-xl overflow-hidden bg-black shadow-lg">
+              <iframe
+                src={courseData.preview_video_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                className="w-full h-full"
+                allowFullScreen
+                title="Video de apresentacao do curso"
+              />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* AI Similar Products */}
       {relatedProducts.length > 0 && (
