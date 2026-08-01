@@ -41,6 +41,8 @@ class LessonUploadURLCreateView(APIView):
                 'upload_url': upload_data['upload_url'],
                 'video_uid': upload_data['video_uid'],
             })
+        except ValueError as e:
+            return Response({'detail': str(e)}, status=400)
         except Exception as e:
             return Response({'detail': str(e)}, status=500)
 

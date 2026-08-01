@@ -12,16 +12,25 @@ HEADERS = {'Authorization': f'Bearer {API_TOKEN}'}
 def create_direct_upload(max_duration_seconds=3600):
     """
     Obtem um URL de upload directo do Cloudflare.
-    O frontend usa este URL para enviar o video directamente (TUS protocol).
+    O frontend usa este URL para enviar o video directamente (basic POST upload).
     """
+    if not ACCOUNT_ID or not API_TOKEN or 'precisa-gerar' in API_TOKEN:
+        raise ValueError('Cloudflare Stream nao configurado. Configure CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN no .env')
     response = requests.post(
-        BASE_URL,
+        f'{BASE_URL}/direct_upload',
         headers=HEADERS,
         json={
             'maxDurationSeconds': max_duration_seconds,
         }
     )
     response.raise_for_status()
+    payload = response.json()
+    if not payload.get('success'):
+        message = 'Erro desconhecido ao criar upload URL no Cloudflare Stream.'
+        errors = payload.get('errors') or []
+        if errors:
+            message = '; '.join(error.get('message', str(error)) for error in errors)
+        raise ValueError(message)
     data = response.json()['result']
     return {
         'upload_url': data['uploadURL'],

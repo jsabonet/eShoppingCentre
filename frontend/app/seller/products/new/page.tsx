@@ -456,7 +456,7 @@ export default function NewProductPage() {
                         </div>
                       ) : (
                         <button type="button" onClick={() => mainRef.current?.click()}
-                          className="w-full aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 hover:border-accent hover:bg-accent/[0.02] transition-colors cursor-pointer text-muted-foreground">
+                          className="w-full aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 hover:border-accent hover:bg-accent/2 transition-colors cursor-pointer text-muted-foreground">
                           <Upload size={32} className="opacity-30" />
                           <span className="text-sm font-medium">Clique para adicionar</span>
                           <span className="text-xs opacity-50">PNG, JPG, WebP</span>
@@ -733,7 +733,7 @@ export default function NewProductPage() {
                         </div>
                       ))}
                       <button type="button" onClick={() => thumbRef.current?.click()}
-                        className="border-2 border-dashed border-border rounded-lg aspect-square flex flex-col items-center justify-center gap-0.5 hover:border-accent hover:bg-accent/[0.02] transition-colors cursor-pointer text-muted-foreground">
+                        className="border-2 border-dashed border-border rounded-lg aspect-square flex flex-col items-center justify-center gap-0.5 hover:border-accent hover:bg-accent/2 transition-colors cursor-pointer text-muted-foreground">
                         <Upload size={14} className="opacity-40" /><span className="text-[9px]">Adicionar</span>
                       </button>
                     </div>
@@ -796,7 +796,7 @@ export default function NewProductPage() {
                     { key: 'is_featured', label: 'Destaque na Home', desc: 'Aparece na colecao exclusiva', checked: form.is_featured },
                     { key: 'is_on_sale', label: 'Em Promocao', desc: 'Badge de desconto visivel', checked: form.is_on_sale },
                   ].map((t) => (
-                    <label key={t.key} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${t.checked ? 'border-accent bg-accent/[0.03]' : 'border-border hover:bg-muted/20'}`}>
+                    <label key={t.key} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${t.checked ? 'border-accent bg-accent/3' : 'border-border hover:bg-muted/20'}`}>
                       <input type="checkbox" checked={t.checked} onChange={(e) => updateField(t.key, e.target.checked)}
                         className="accent-accent rounded w-4 h-4 shrink-0" />
                       <div>

@@ -87,6 +87,15 @@ export interface Product {
   affiliate_commission: number;
   status: string;
   created_at: string;
+  course?: {
+    course_id: string;
+    level?: string;
+    duration?: string;
+    total_lessons?: number;
+    certificate_enabled?: boolean;
+    preview_video_url?: string;
+    modules_count?: number;
+  };
 }
 
 export interface ProductDetail extends Product {

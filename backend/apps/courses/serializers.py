@@ -4,6 +4,7 @@ from .models import Course, CourseModule, CourseLesson, Enrollment, LessonProgre
 
 class CourseLessonSerializer(serializers.ModelSerializer):
     completed = serializers.SerializerMethodField()
+    duration = serializers.SerializerMethodField()
 
     class Meta:
         model = CourseLesson
@@ -16,6 +17,18 @@ class CourseLessonSerializer(serializers.ModelSerializer):
             if enrollment:
                 return enrollment.lesson_progress.filter(lesson=obj, completed=True).exists()
         return False
+
+    def get_duration(self, obj):
+        """Converte video_duration_seconds para formato legivel HH:MM:SS ou MM:SS."""
+        secs = obj.video_duration_seconds or 0
+        if secs <= 0:
+            return ''
+        hours = secs // 3600
+        mins = (secs % 3600) // 60
+        secs_rem = secs % 60
+        if hours > 0:
+            return f'{hours}:{mins:02d}:{secs_rem:02d}'
+        return f'{mins}:{secs_rem:02d}'
 
 
 class CourseLessonDetailSerializer(serializers.ModelSerializer):
@@ -42,7 +55,7 @@ class CourseLessonWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = CourseLesson
         fields = ('id', 'title', 'description', 'video_url', 'video_provider',
-                  'duration', 'content', 'is_free_preview', 'sort_order',
+                  'content', 'is_free_preview', 'sort_order',
                   'cloudflare_video_uid', 'cloudflare_video_status',
                   'video_duration_seconds', 'video_thumbnail')
         extra_kwargs = {

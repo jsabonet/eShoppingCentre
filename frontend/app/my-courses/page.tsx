@@ -64,12 +64,9 @@ export default function MyCoursesPage() {
         <span className="text-foreground font-medium">Meus Cursos</span>
       </nav>
 
-      <div className="flex items-center gap-4 mb-8">
-        <div className="p-3 bg-accent/10 rounded-full"><BookOpen size={28} className="text-accent" /></div>
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Meus Cursos</h1>
-          <p className="text-muted-foreground">Continue aprendendo de onde parou</p>
-        </div>
+      <div className="mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold">Meus Cursos</h1>
+        <p className="text-muted-foreground">Continue aprendendo de onde parou</p>
       </div>
 
       {enrollments.length === 0 ? (

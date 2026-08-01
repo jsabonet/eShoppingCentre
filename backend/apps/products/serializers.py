@@ -63,6 +63,7 @@ class SellerProductSerializer(serializers.ModelSerializer):
     variant_count = serializers.SerializerMethodField()
     discount_percentage = serializers.SerializerMethodField()
     digital_downloads = serializers.SerializerMethodField()
+    course = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -71,7 +72,8 @@ class SellerProductSerializer(serializers.ModelSerializer):
                   'sales_count', 'rating', 'review_count', 'is_on_sale',
                   'is_featured', 'variant_count', 'created_at',
                   'digital_format', 'digital_license', 'digital_version',
-                  'download_limit', 'download_expiry_days', 'digital_downloads')
+                  'download_limit', 'download_expiry_days', 'digital_downloads',
+                  'course')
 
     def get_primary_image(self, obj):
         img = obj.images.filter(is_primary=True).first()
@@ -93,6 +95,32 @@ class SellerProductSerializer(serializers.ModelSerializer):
             return None
         from .models_digital import DigitalDownload
         return DigitalDownload.objects.filter(product=obj).count()
+
+    def get_course(self, obj):
+        if obj.product_type != 'course':
+            return None
+        try:
+            from apps.courses.models import Course
+            course, _created = Course.objects.get_or_create(
+                product=obj,
+                defaults={
+                    'instructor': obj.store.owner,
+                    'level': 'beginner',
+                    'duration': '',
+                    'total_lessons': 0,
+                }
+            )
+            return {
+                'course_id': str(course.id),
+                'level': course.level,
+                'duration': course.duration,
+                'total_lessons': course.total_lessons,
+                'certificate_enabled': course.certificate_enabled,
+                'preview_video_url': course.preview_video_url,
+                'modules_count': course.modules.count(),
+            }
+        except Exception:
+            return None
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
@@ -131,7 +159,16 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         if obj.product_type != 'course':
             return None
         try:
-            course = obj.course
+            from apps.courses.models import Course
+            course, _created = Course.objects.get_or_create(
+                product=obj,
+                defaults={
+                    'instructor': obj.store.owner,
+                    'level': 'beginner',
+                    'duration': '',
+                    'total_lessons': 0,
+                }
+            )
             instructor = course.instructor
             return {
                 'course_id': str(course.id),

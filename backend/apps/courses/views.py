@@ -156,12 +156,16 @@ class LessonCreateView(generics.CreateAPIView):
 
 
 class LessonUpdateView(generics.UpdateAPIView):
-    """PUT /api/v1/courses/lessons/{lesson_id}/"""
+    """PUT/PATCH /api/v1/courses/lessons/{lesson_id}/ — Suporta partial updates."""
     queryset = CourseLesson.objects.all()
     serializer_class = CourseLessonWriteSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'id'
     lookup_url_kwarg = 'lesson_id'
+
+    def get_serializer(self, *args, **kwargs):
+        kwargs['partial'] = True
+        return super().get_serializer(*args, **kwargs)
 
     def perform_update(self, serializer):
         if self.get_object().module.course.product.store.owner != self.request.user:
@@ -243,4 +247,102 @@ class CourseProgressView(APIView):
             'total_lessons': total,
             'completed_lessons': done,
             'completed_ids': list(completed_ids),
+        })
+
+
+# ─── Course Update (Seller) ───
+
+class CourseUpdateView(APIView):
+    """PATCH /api/v1/courses/{course_id}/update/ — Editar metadados do curso."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        if course.product.store.owner != request.user:
+            return Response({'detail': 'Nao autorizado.'}, status=403)
+
+        # Campos editaveis no modelo Course
+        course_fields = ['level', 'duration', 'certificate_enabled', 'preview_video_url']
+        for field in course_fields:
+            if field in request.data:
+                setattr(course, field, request.data[field])
+
+        # Campos editaveis no Product (nome, preco, descricao, slug)
+        product = course.product
+        product_fields = ['name', 'price', 'compare_price', 'description', 'short_description', 'slug']
+        for field in product_fields:
+            if field in request.data:
+                setattr(product, field, request.data[field])
+
+        # Update product status if provided
+        if 'status' in request.data:
+            product.status = request.data['status']
+
+        # Update total_lessons count
+        course.total_lessons = CourseLesson.objects.filter(module__course=course).count()
+
+        course.save()
+        product.save()
+
+        return Response({
+            'course_id': str(course.id),
+            'title': product.name,
+            'slug': product.slug,
+            'price': float(product.price),
+            'level': course.level,
+            'duration': course.duration,
+            'total_lessons': course.total_lessons,
+            'certificate_enabled': course.certificate_enabled,
+            'preview_video_url': course.preview_video_url,
+            'status': product.status,
+        })
+
+
+class CourseDeleteView(APIView):
+    """DELETE /api/v1/courses/{course_id}/delete/ — Eliminar curso e produto associado."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        if course.product.store.owner != request.user:
+            return Response({'detail': 'Nao autorizado.'}, status=403)
+
+        product = course.product
+        course_name = product.name
+        # Soft-delete: mark product as deleted instead of hard delete
+        product.status = 'deleted'
+        product.save()
+        return Response({'detail': f'Curso "{course_name}" removido com sucesso.'})
+
+
+# ─── Students (Seller) ───
+
+class CourseStudentListView(APIView):
+    """GET /api/v1/courses/{course_id}/students/ — Lista alunos matriculados."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        if course.product.store.owner != request.user:
+            return Response({'detail': 'Nao autorizado.'}, status=403)
+
+        enrollments = Enrollment.objects.filter(course=course).select_related('user')
+        students = []
+        for enr in enrollments:
+            completed_lessons = enr.lesson_progress.filter(completed=True).count()
+            students.append({
+                'enrollment_id': str(enr.id),
+                'user_id': str(enr.user.id),
+                'name': enr.user.get_full_name() or enr.user.email,
+                'email': enr.user.email,
+                'progress': float(enr.progress),
+                'completed': enr.completed,
+                'completed_lessons': completed_lessons,
+                'enrolled_at': enr.created_at.isoformat(),
+            })
+        return Response({
+            'course_title': course.product.name,
+            'total_students': len(students),
+            'total_lessons': course.total_lessons,
+            'students': students,
         })

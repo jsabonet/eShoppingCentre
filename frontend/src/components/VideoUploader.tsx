@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import * as tus from 'tus-js-client';
 import { Upload, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface VideoUploaderProps {
@@ -25,38 +24,39 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
     setProgress(0);
 
     try {
+      if (file.size > 200 * 1024 * 1024) {
+        throw new Error('Upload directo suporta apenas videos ate 200MB. Para ficheiros maiores, sera necessario activar fluxo resumivel.');
+      }
+
       // 1. Obter URL de upload do backend
       const token = localStorage.getItem('access_token');
       const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/upload-url/`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error('Erro ao obter URL de upload');
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.detail || 'Erro ao obter URL de upload');
+      }
       const { upload_url } = await res.json();
 
-      // 2. Upload via TUS
-      const upload = new tus.Upload(file, {
-        uploadUrl: upload_url,
-        onProgress(bytesUploaded, bytesTotal) {
-          const pct = Math.round((bytesUploaded / (bytesTotal || 1)) * 100);
-          setProgress(pct);
-        },
-        onSuccess() {
-          setStatus('processing');
-          setUploading(false);
-          onUploadComplete();
-        },
-        onError(err) {
-          setError('Erro no upload. Tente novamente.');
-          setUploading(false);
-        },
-        chunkSize: 5 * 1024 * 1024, // 5MB chunks
-        retryDelays: [0, 3000, 5000, 10000], // Retoma automatica
+      // 2. Upload directo via basic POST
+      const body = new FormData();
+      body.append('file', file);
+      setProgress(15);
+      const uploadRes = await fetch(upload_url, {
+        method: 'POST',
+        body,
       });
-
-      upload.start();
+      if (!uploadRes.ok) {
+        throw new Error('Falha no upload do video para o Cloudflare Stream.');
+      }
+      setProgress(100);
+      setStatus('processing');
+      setUploading(false);
+      onUploadComplete();
     } catch (err: any) {
-      setError('Erro ao iniciar upload.');
+      setError(err?.message || 'Erro ao iniciar upload.');
       setUploading(false);
     }
   };

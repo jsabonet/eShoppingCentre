@@ -118,10 +118,10 @@ function AdminSidebarContent({ collapsed, onClose, onLogout, user, pathname }: {
         <div className="flex items-center gap-2.5">
           <img
             src="/icon.png?v=1"
-            alt="eShopping"
+            alt="e-Shopping Centre"
             className="w-8 h-8 rounded-lg object-contain"
           />
-          {!collapsed && <span className="font-bold text-sm">eShopping</span>}
+          {!collapsed && <span className="font-bold text-sm">e-Shopping Centre</span>}
         </div>
         <button onClick={onClose} className="lg:hidden p-1 hover:bg-slate-700 rounded">
           <X size={16} />

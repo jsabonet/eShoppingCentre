@@ -373,11 +373,10 @@ export default function SellerRegisterPage() {
                       desc: 'Conteúdo educativo',
                       icon: (
                         <svg className="mx-auto mb-2" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M6 16L20 8l14 8-14 8L6 16z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
-                          <path d="M12 20v8l8 4 8-4v-8" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
-                          <line x1="20" y1="24" x2="20" y2="32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                          <circle cx="29" cy="9" r="5" stroke="currentColor" strokeWidth="2" fill="none" />
-                          <path d="M27 9h4M29 7v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <rect x="6" y="8" width="28" height="20" rx="3" stroke="currentColor" strokeWidth="2" />
+                          <path d="M16 15l8 5-8 5V15z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
+                          <path d="M10 32l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          <path d="M30 32l-4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         </svg>
                       ),
                     },

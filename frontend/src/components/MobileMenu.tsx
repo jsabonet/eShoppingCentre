@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { Menu, X, ChevronRight, Home, Store, BookOpen, Blog, ShoppingCart, User, LogIn, UserPlus, Headphones, Gift, DollarSign, Store as StoreIcon, Info, HelpCircle, FileText, Shield, LayoutDashboard, LogOut } from 'lucide-react';
+import { Menu, X, ChevronRight, Home, Store, BookOpen, ShoppingCart, User, LogIn, UserPlus, Headphones, Gift, DollarSign, Store as StoreIcon, Info, HelpCircle, FileText, Shield, LayoutDashboard, LogOut } from 'lucide-react';
 import type { Category } from '../data/marketplace';
 import { useAuth } from '@/src/hooks/useAuth';
 
