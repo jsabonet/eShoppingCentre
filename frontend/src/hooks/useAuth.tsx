@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, createContext, useContext, useCallback, type ReactNode } from 'react';
 import { authAPI, usersAPI, type User } from '@/src/lib/api';
-import { signInWithGoogle, signOutFirebase } from '@/src/lib/firebase';
+import { signInWithGoogle, signOutFirebase, completeRedirectSignIn } from '@/src/lib/firebase';
 import { useInactivityTimer } from '@/src/hooks/useInactivityTimer';
 import SessionExpiryWarning from '@/src/components/SessionExpiryWarning';
 
@@ -51,8 +51,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Handle Firebase redirect sign-in on page load
   useEffect(() => {
-    checkAuth();
+    const handleRedirect = async () => {
+      try {
+        const redirectData = await completeRedirectSignIn();
+        if (redirectData) {
+          // Exchange Firebase ID token for backend JWT
+          const { data } = await authAPI.firebaseLogin(redirectData.idToken);
+          localStorage.setItem('access_token', data.access);
+          localStorage.setItem('refresh_token', data.refresh);
+          setUser(data.user);
+        }
+      } catch (err) {
+        console.error('Error handling redirect sign-in:', err);
+      } finally {
+        checkAuth();
+      }
+    };
+    handleRedirect();
   }, [checkAuth]);
 
   const login = async (email: string, password: string) => {

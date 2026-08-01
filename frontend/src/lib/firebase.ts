@@ -6,6 +6,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged,
   type Auth,
@@ -61,7 +63,8 @@ function getGoogleProvider(): GoogleAuthProvider {
 }
 
 /**
- * Sign in with Google popup.
+ * Sign in with Google.
+ * Tries popup first; falls back to redirect if popup is blocked.
  * Returns the Firebase ID token to exchange for backend JWT.
  */
 export async function signInWithGoogle(): Promise<{
@@ -73,17 +76,72 @@ export async function signInWithGoogle(): Promise<{
 }> {
   const auth = getFirebaseAuth();
   const provider = getGoogleProvider();
-  const result = await signInWithPopup(auth, provider);
-  const idToken = await result.user.getIdToken();
 
-  return {
-    idToken,
-    email: result.user.email,
-    displayName: result.user.displayName,
-    photoURL: result.user.photoURL,
-    firebaseUid: result.user.uid,
-  };
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const idToken = await result.user.getIdToken();
+
+    return {
+      idToken,
+      email: result.user.email,
+      displayName: result.user.displayName,
+      photoURL: result.user.photoURL,
+      firebaseUid: result.user.uid,
+    };
+  } catch (error: any) {
+    // If popup is blocked or closed, fall back to redirect
+    if (
+      error?.code === 'auth/popup-blocked' ||
+      error?.code === 'auth/popup-closed-by-user'
+    ) {
+      await signInWithRedirect(auth, provider);
+      // The page will redirect — this promise never resolves.
+      // Return a never-resolving promise to avoid downstream errors.
+      return new Promise(() => {});
+    }
+    throw error;
+  }
 }
+
+/**
+ * Complete sign-in after a redirect.
+ * Call this on page load to handle the return from signInWithRedirect.
+ * Returns null if there is no pending redirect result.
+ */
+export async function completeRedirectSignIn(): Promise<{
+  idToken: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  firebaseUid: string;
+} | null> {
+  const auth = getFirebaseAuth();
+  try {
+    const result = await getRedirectResult(auth);
+    if (!result) return null;
+
+    const idToken = await result.user.getIdToken();
+    return {
+      idToken,
+      email: result.user.email,
+      displayName: result.user.displayName,
+      photoURL: result.user.photoURL,
+      firebaseUid: result.user.uid,
+    };
+  } catch (error: any) {
+    // Ignore errors from getRedirectResult (e.g., no pending redirect)
+    if (error?.code === 'auth/no-current-user') {
+      return null;
+    }
+    console.error('Firebase redirect sign-in error:', error);
+    return null;
+  }
+}
+
+/**
+ * Get the Firebase Auth instance (for use in redirect result handling).
+ */
+export { getFirebaseAuth };
 
 /**
  * Sign out from Firebase and clear local state.
