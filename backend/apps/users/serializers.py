@@ -55,3 +55,33 @@ class FirebaseTokenSerializer(serializers.Serializer):
     firebase_uid = serializers.CharField(read_only=True)
     email = serializers.EmailField(read_only=True)
     is_new_user = serializers.BooleanField(read_only=True)
+
+
+class AdminUserCreateSerializer(serializers.ModelSerializer):
+    """Admin: criar utilizador com password e roles."""
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password2 = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ('email', 'username', 'password', 'password2',
+                  'phone', 'first_name', 'last_name', 'roles',
+                  'is_verified', 'is_staff')
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs.pop('password2'):
+            raise serializers.ValidationError({'password2': 'As passwords não coincidem.'})
+        if not attrs.get('email'):
+            raise serializers.ValidationError({'email': 'Email é obrigatório.'})
+        return attrs
+
+    def create(self, validated_data):
+        roles = validated_data.pop('roles', ['buyer'])
+        is_staff = validated_data.pop('is_staff', False)
+        is_verified = validated_data.pop('is_verified', False)
+        user = User.objects.create_user(**validated_data)
+        user.roles = roles
+        user.is_staff = is_staff
+        user.is_verified = is_verified
+        user.save()
+        return user

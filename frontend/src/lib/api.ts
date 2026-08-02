@@ -573,8 +573,10 @@ export const adminAPI = {
   approvePayout: (id: string) => api.patch(`/admin/payouts/${id}/approve/`),
   // Users
   listUsers: (params?: Record<string, any>) => api.get('/admin/users/', { params }),
+  createUser: (data: any) => api.post('/admin/users/', data),
   getUser: (id: string) => api.get(`/admin/users/${id}/`),
   updateUser: (id: string, data: any) => api.patch(`/admin/users/${id}/`, data),
+  deleteUser: (id: string) => api.delete(`/admin/users/${id}/`),
   // Categories
   listCategories: () => api.get('/admin/categories/'),
   createCategory: (data: FormData | any) => api.post('/admin/categories/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),

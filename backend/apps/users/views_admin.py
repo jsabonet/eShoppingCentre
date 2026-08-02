@@ -10,7 +10,7 @@ from apps.stores.models import Store
 from apps.orders.models import Order
 from apps.wallet.models import WalletTransaction, Wallet
 from apps.affiliates.models import AffiliateProfile
-from .serializers import UserProfileSerializer
+from .serializers import UserProfileSerializer, AdminUserCreateSerializer
 
 UserModel = get_user_model()
 
@@ -287,16 +287,24 @@ class AdminAllOrdersView(generics.ListAPIView):
     permission_classes = [permissions.IsAdminUser]
 
 
-class AdminUserListView(generics.ListAPIView):
-    """Admin: listar todos os utilizadores"""
+class AdminUserListView(generics.ListCreateAPIView):
+    """Admin: listar e criar utilizadores"""
     queryset = UserModel.objects.all().order_by('-date_joined')
-    serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAdminUser]
 
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return AdminUserCreateSerializer
+        return UserProfileSerializer
 
-class AdminUserDetailView(generics.RetrieveUpdateAPIView):
-    """Admin: ver e editar utilizador (roles, status)"""
+
+class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin: ver, editar e eliminar utilizador"""
     queryset = UserModel.objects.all()
-    serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAdminUser]
     lookup_field = 'pk'
+
+    def get_serializer_class(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return UserProfileSerializer
+        return UserProfileSerializer

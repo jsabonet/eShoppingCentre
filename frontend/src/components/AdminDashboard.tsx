@@ -130,6 +130,24 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   // Users state
   const [users, setUsers] = useState<any[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [userForm, setUserForm] = useState({
+    email: '', username: '', first_name: '', last_name: '', phone: '',
+    password: '', password2: '',
+    roles: ['buyer'] as string[], is_verified: false, is_staff: false,
+  });
+  const [userFormError, setUserFormError] = useState('');
+
+  // Role toggle helper
+  const toggleUserRole = (role: string) => {
+    setUserForm(prev => ({
+      ...prev,
+      roles: prev.roles.includes(role)
+        ? prev.roles.filter(r => r !== role)
+        : [...prev.roles, role],
+    }));
+  };
 
   // Dashboard stats
   const [stats, setStats] = useState({
@@ -412,6 +430,86 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
     } catch (err: any) {
       console.error('Erro ao carregar utilizadores:', err?.response?.status, err?.response?.data || err?.message);
     } finally { setUsersLoading(false); }
+  };
+
+  const resetUserForm = () => {
+    setUserForm({ email: '', username: '', first_name: '', last_name: '', phone: '', password: '', password2: '', roles: ['buyer'], is_verified: false, is_staff: false });
+    setEditingUser(null);
+    setShowUserForm(false);
+    setUserFormError('');
+  };
+
+  const handleEditUser = (u: any) => {
+    setEditingUser(u);
+    setUserForm({
+      email: u.email || '',
+      username: u.username || '',
+      first_name: u.first_name || '',
+      last_name: u.last_name || '',
+      phone: u.phone || '',
+      password: '',
+      password2: '',
+      roles: u.roles || ['buyer'],
+      is_verified: u.is_verified || false,
+      is_staff: u.is_staff || false,
+    });
+    setUserFormError('');
+    setShowUserForm(true);
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserFormError('');
+    try {
+      if (editingUser) {
+        const payload: any = {
+          first_name: userForm.first_name,
+          last_name: userForm.last_name,
+          phone: userForm.phone,
+          roles: userForm.roles,
+          is_verified: userForm.is_verified,
+          is_staff: userForm.is_staff,
+        };
+        await adminAPI.updateUser(editingUser.id, payload);
+      } else {
+        if (!userForm.email || !userForm.username || !userForm.password) {
+          setUserFormError('Email, username e password são obrigatórios.');
+          return;
+        }
+        if (userForm.password !== userForm.password2) {
+          setUserFormError('As passwords não coincidem.');
+          return;
+        }
+        await adminAPI.createUser(userForm);
+      }
+      resetUserForm();
+      loadUsers();
+      loadDashboardStats();
+    } catch (err: any) {
+      const msg = err?.response?.data
+        ? Object.values(err.response.data).flat().join('. ')
+        : err?.message || 'Erro ao guardar utilizador.';
+      setUserFormError(msg);
+    }
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    setConfirmModal({
+      open: true,
+      title: 'Eliminar Utilizador',
+      message: 'Tens a certeza que queres eliminar este utilizador? Esta ação é irreversível.',
+      action: 'Eliminar',
+      onConfirm: async () => {
+        try {
+          await adminAPI.deleteUser(userId);
+          loadUsers();
+          loadDashboardStats();
+        } catch (err: any) {
+          console.error('Erro ao eliminar utilizador:', err);
+        }
+        setConfirmModal(null);
+      },
+    });
   };
 
   const resetProductForm = () => {
@@ -948,7 +1046,114 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Gestão de Utilizadores</h2>
+              <button
+                onClick={() => { setEditingUser(null); resetUserForm(); setShowUserForm(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground font-medium rounded-md transition-colors"
+              >
+                <Plus size={16} /> Novo Utilizador
+              </button>
             </div>
+
+            {/* User Form Modal */}
+            {showUserForm && (
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between p-4 border-b">
+                    <h3 className="font-bold">{editingUser ? 'Editar Utilizador' : 'Novo Utilizador'}</h3>
+                    <button onClick={resetUserForm} className="p-1 hover:bg-muted rounded"><X size={20} /></button>
+                  </div>
+                  <form onSubmit={handleSaveUser} className="p-4 space-y-4">
+                    {userFormError && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">{userFormError}</div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Email *</label>
+                        <input type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                          required disabled={!!editingUser}
+                          className="w-full px-3 py-2 border rounded-md disabled:bg-muted" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Username *</label>
+                        <input type="text" value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 border rounded-md" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Nome</label>
+                        <input type="text" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })}
+                          className="w-full px-3 py-2 border rounded-md" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Apelido</label>
+                        <input type="text" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })}
+                          className="w-full px-3 py-2 border rounded-md" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Telefone</label>
+                      <input type="text" value={userForm.phone} onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-md" />
+                    </div>
+                    {!editingUser && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Password *</label>
+                          <input type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                            required className="w-full px-3 py-2 border rounded-md" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Confirmar Password *</label>
+                          <input type="password" value={userForm.password2} onChange={(e) => setUserForm({ ...userForm, password2: e.target.value })}
+                            required className="w-full px-3 py-2 border rounded-md" />
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Roles</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['buyer', 'seller', 'affiliate', 'admin'].map(role => (
+                          <label key={role} className={`px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer border transition-colors ${
+                            userForm.roles.includes(role)
+                              ? 'bg-accent text-accent-foreground border-accent'
+                              : 'bg-white text-muted-foreground border-border hover:border-accent'
+                          }`}>
+                            <input type="checkbox" className="sr-only"
+                              checked={userForm.roles.includes(role)}
+                              onChange={() => toggleUserRole(role)} />
+                            {role}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={userForm.is_verified}
+                          onChange={(e) => setUserForm({ ...userForm, is_verified: e.target.checked })}
+                          className="rounded" />
+                        <span className="text-sm">Verificado</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={userForm.is_staff}
+                          onChange={(e) => setUserForm({ ...userForm, is_staff: e.target.checked })}
+                          className="rounded" />
+                        <span className="text-sm">Staff (acesso admin)</span>
+                      </label>
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <button type="submit"
+                        className="flex-1 px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground font-medium rounded-md transition-colors">
+                        {editingUser ? 'Guardar Alterações' : 'Criar Utilizador'}
+                      </button>
+                      <button type="button" onClick={resetUserForm}
+                        className="px-4 py-2 border rounded-md hover:bg-muted transition-colors">Cancelar</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
 
             {usersLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -970,6 +1175,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Roles</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Verificado</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Registo</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -1004,6 +1210,12 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">
                             {u.date_joined ? new Date(u.date_joined).toLocaleDateString('pt-MZ') : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button onClick={() => handleEditUser(u)}
+                              className="p-1.5 hover:bg-muted rounded-md"><Edit size={16} className="text-muted-foreground" /></button>
+                            <button onClick={() => handleDeleteUser(u.id)}
+                              className="p-1.5 hover:bg-destructive/10 rounded-md"><Trash2 size={16} className="text-destructive" /></button>
                           </td>
                         </tr>
                       ))}
