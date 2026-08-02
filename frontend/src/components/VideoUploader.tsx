@@ -14,6 +14,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<string>(existingVideoStatus || 'pending');
   const [error, setError] = useState('');
+  const [streamUrl, setStreamUrl] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Sincroniza estado interno com props (ex: após fetchBuilder recarregar dados)
@@ -23,12 +24,32 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
     }
   }, [existingVideoStatus]);
 
+  // Carrega o stream token quando o video esta pronto
+  useEffect(() => {
+    if (status === 'ready' && lessonId) {
+      const fetchStream = async () => {
+        try {
+          const token = localStorage.getItem('access_token');
+          const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/stream-token/`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setStreamUrl(`https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}`);
+          }
+        } catch { /* ignora erro de rede */ }
+      };
+      fetchStream();
+    }
+  }, [status, lessonId]);
+
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
   const handleFile = async (file: File) => {
     setUploading(true);
     setError('');
     setProgress(0);
+    setStreamUrl('');
 
     try {
       if (file.size > 200 * 1024 * 1024) {
@@ -112,12 +133,24 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
         </div>
       ) : status === 'ready' ? (
         <div className="space-y-3">
-          <div className="flex items-center justify-center gap-2 text-green-600">
-            <Check size={24} />
-            <span className="font-medium">Video pronto</span>
-          </div>
+          {streamUrl ? (
+            <div className="relative rounded-lg overflow-hidden bg-black">
+              <iframe
+                src={streamUrl}
+                className="w-full aspect-video"
+                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+                title="Preview do video"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 text-green-600">
+              <Check size={24} />
+              <span className="font-medium">Video pronto</span>
+            </div>
+          )}
           <button
-            onClick={() => fileRef.current?.click()}
+            onClick={() => { setStreamUrl(''); fileRef.current?.click(); }}
             className="text-sm text-accent hover:underline"
           >
             Substituir video
