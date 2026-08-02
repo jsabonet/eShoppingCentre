@@ -129,6 +129,12 @@ class StoreDetailSerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
+    def create(self, validated_data):
+        # Remove write_only fields not present on the model
+        validated_data.pop('clear_logo', None)
+        validated_data.pop('clear_banner', None)
+        return super().create(validated_data)
+
     def get_store_products(self, obj):
         """Últimos 20 produtos da loja (admin view)."""
         products = obj.products.filter(~models.Q(status='deleted')).order_by('-created_at')[:20]
