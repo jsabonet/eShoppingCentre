@@ -91,7 +91,7 @@ export default async function Home() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4">
           {categories.length > 0 ? categories.map((cat) => (
             <Link key={cat.slug} href={'/category/' + cat.slug}
-              className="category-card group bg-card border border-border rounded-lg p-4 text-center hover:shadow-md hover:border-accent transition-all">
+              className="category-card group bg-card border border-border rounded-lg p-4 text-center hover:shadow-md transition-all">
               <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted overflow-hidden flex items-center justify-center">
                 {cat.image ? (
                   <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
