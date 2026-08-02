@@ -409,7 +409,9 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
     try {
       const { data } = await adminAPI.listUsers({ page_size: 100 });
       setUsers((data as any).results || []);
-    } catch {} finally { setUsersLoading(false); }
+    } catch (err: any) {
+      console.error('Erro ao carregar utilizadores:', err?.response?.status, err?.response?.data || err?.message);
+    } finally { setUsersLoading(false); }
   };
 
   const resetProductForm = () => {
@@ -936,6 +938,78 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">Gestão de Utilizadores</h2>
+            </div>
+
+            {usersLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+              </div>
+            ) : users.length === 0 ? (
+              <div className="bg-white rounded-lg p-8 shadow-sm border border-border text-center">
+                <Users size={48} className="mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Nenhum utilizador encontrado.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Utilizador</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Email</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Roles</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Verificado</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Registo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {users.map((u: any) => (
+                        <tr key={u.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-sm font-medium text-accent">
+                                {u.first_name?.[0] || u.email?.[0]?.toUpperCase() || '?'}
+                              </div>
+                              <span className="font-medium text-sm">
+                                {u.first_name ? `${u.first_name} ${u.last_name || ''}` : u.username || u.email}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">{u.email}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-1">
+                              {(u.roles || []).map((role: string) => (
+                                <span key={role} className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">
+                                  {role}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {u.is_verified ? (
+                              <CheckCircle size={16} className="text-green-500" />
+                            ) : (
+                              <XCircle size={16} className="text-muted-foreground" />
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {u.date_joined ? new Date(u.date_joined).toLocaleDateString('pt-MZ') : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
