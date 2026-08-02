@@ -101,7 +101,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
 
     try {
       if (file.size > 200 * 1024 * 1024) {
-        throw new Error('Upload directo suporta apenas videos ate 200MB. Para ficheiros maiores, sera necessario activar fluxo resumivel.');
+        throw new Error('Upload directo suporta apenas videos ate 200MB.');
       }
 
       // 1. Obter URL de upload do backend
@@ -115,19 +115,38 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
         throw new Error(data?.detail || 'Erro ao obter URL de upload');
       }
       const { upload_url } = await res.json();
+      setProgress(5);
 
-      // 2. Upload directo via basic POST
-      const body = new FormData();
-      body.append('file', file);
-      setProgress(15);
-      const uploadRes = await fetch(upload_url, {
-        method: 'POST',
-        body,
+      // 2. Upload com progresso real (XMLHttpRequest)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', upload_url);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            // 5% a 95% proporcional ao upload real
+            const pct = Math.round(5 + (e.loaded / e.total) * 90);
+            setProgress(pct);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setProgress(100);
+            resolve();
+          } else {
+            reject(new Error('Falha no upload do video para o Cloudflare Stream.'));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Erro de rede durante o upload.'));
+        xhr.ontimeout = () => reject(new Error('Timeout do upload.'));
+
+        const body = new FormData();
+        body.append('file', file);
+        xhr.send(body);
       });
-      if (!uploadRes.ok) {
-        throw new Error('Falha no upload do video para o Cloudflare Stream.');
-      }
-      setProgress(100);
+
       setStatus('processing');
       setUploading(false);
       onUploadComplete();
