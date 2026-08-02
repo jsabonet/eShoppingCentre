@@ -43,6 +43,54 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
     }
   }, [status, lessonId]);
 
+  // Polling: verifica periodicamente se o video ficou pronto apos upload
+  useEffect(() => {
+    if ((status !== 'uploading' && status !== 'processing') || !lessonId) return;
+
+    let attempts = 0;
+    const maxAttempts = 60; // 5 minutos (5s * 60)
+    const authToken = localStorage.getItem('access_token');
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/video-status/`, {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.ready_to_stream || data.status === 'ready') {
+          setStatus('ready');
+          onUploadComplete(); // refresh o builder
+          return;
+        }
+        if (data.status === 'error') {
+          setStatus('error');
+          setError('Falha no processamento do video.');
+          return;
+        }
+        // Actualiza status intermedio (pending -> processing, etc.)
+        if (data.status && data.status !== status) {
+          setStatus(data.status);
+        }
+      } catch { /* ignora */ }
+    };
+
+    const interval = setInterval(() => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(interval);
+        return;
+      }
+      poll();
+    }, 5000);
+
+    // Primeira poll imediata
+    poll();
+
+    return () => clearInterval(interval);
+  }, [status, lessonId, onUploadComplete]);
+
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
   const handleFile = async (file: File) => {
