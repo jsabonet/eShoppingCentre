@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Upload, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface VideoUploaderProps {
@@ -16,6 +16,10 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
   const [error, setError] = useState('');
   const [streamUrl, setStreamUrl] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Estabiliza o callback para nao disparar re-renders do efeito de polling
+  const onUploadCompleteRef = useRef(onUploadComplete);
+  onUploadCompleteRef.current = onUploadComplete;
 
   // Sincroniza estado interno com props (ex: após fetchBuilder recarregar dados)
   useEffect(() => {
@@ -61,7 +65,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
 
         if (data.ready_to_stream || data.status === 'ready') {
           setStatus('ready');
-          onUploadComplete(); // refresh o builder
+          onUploadCompleteRef.current();
           return;
         }
         if (data.status === 'error') {
@@ -89,7 +93,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
     poll();
 
     return () => clearInterval(interval);
-  }, [status, lessonId, onUploadComplete]);
+  }, [status, lessonId]); // onUploadComplete via ref — nao dispara re-render
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -171,7 +175,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
       setProgress(100);
       setStatus('processing');
       setUploading(false);
-      onUploadComplete();
+      onUploadCompleteRef.current();
     } catch (err: any) {
       const msg = err?.message || 'Erro desconhecido.';
 
