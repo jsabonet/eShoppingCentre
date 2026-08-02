@@ -209,6 +209,3 @@ class StoreDetailSerializer(serializers.ModelSerializer):
         if not data.get('slug'):
             data['slug'] = slugify(data.get('name', ''))
         return data
-
-    def create(self, validated_data):
-        return super().create(validated_data)
