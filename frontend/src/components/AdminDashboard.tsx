@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   LayoutDashboard, Package, ShoppingCart, LogOut, Plus, Edit, Trash2,
   TrendingUp, Users, DollarSign, Eye, X, ChevronLeft, ChevronRight,
@@ -821,8 +822,8 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <button onClick={() => handleEditStore(store)}
-                                  className="p-1.5 hover:bg-muted rounded-md" title="Editar"><Edit size={14} className="text-muted-foreground" /></button>
+                                <Link href={`/admin/stores/${store.id}`}
+                                  className="p-1.5 hover:bg-muted rounded-md inline-block" title="Ver / Editar"><Edit size={14} className="text-muted-foreground" /></Link>
                                 {store.status === 'pending' && (
                                   <>
                                     <button onClick={() => handleStoreAction(store.id, 'approve')}
