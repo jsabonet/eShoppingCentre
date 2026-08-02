@@ -22,6 +22,7 @@ WORKDIR /app
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -38,10 +39,16 @@ COPY . .
 RUN python manage.py collectstatic --noinput
 
 # Create media directory and fix permissions for non-root user
-RUN mkdir -p /app/media /app/credentials && \
-    chown -R django:django /app
+RUN mkdir -p /app/media /app/credentials /home/django && \
+    chown -R django:django /app /home/django
 
-USER django
+# Entrypoint: corrige permissões do volume de media e desce para o user django
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# O entrypoint corre como root para corrigir permissões e depois desce para django
+USER root
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 EXPOSE 8000
 
