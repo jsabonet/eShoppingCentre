@@ -93,7 +93,11 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-  const handleFile = async (file: File) => {
+  const handleFile = async (file: File, retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY_MS = 3000;
+    const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
+
     setUploading(true);
     setError('');
     setProgress(0);
@@ -101,32 +105,48 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
 
     try {
       if (file.size > 200 * 1024 * 1024) {
-        throw new Error('Upload directo suporta apenas videos ate 200MB.');
+        throw new Error('Ficheiro excede 200MB. Comprima ou divida o video.');
       }
 
       // 1. Obter URL de upload do backend
       const token = localStorage.getItem('access_token');
-      const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/upload-url/`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${API_URL}/courses/lessons/${lessonId}/upload-url/`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+      } catch {
+        throw new Error('Falha de rede ao preparar o upload. Verifique a sua ligacao.');
+      }
+
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.detail || 'Erro ao obter URL de upload');
+        throw new Error(data?.detail || `Erro do servidor (${res.status}). Tente novamente.`);
       }
       const { upload_url } = await res.json();
-      setProgress(5);
+      setProgress(3);
 
-      // 2. Upload com progresso real (XMLHttpRequest)
+      // 2. Upload com progresso real e timeout
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', upload_url);
+        xhr.timeout = UPLOAD_TIMEOUT_MS;
+
+        let lastProgress = 0;
+        let stallCount = 0;
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
-            // 5% a 95% proporcional ao upload real
-            const pct = Math.round(5 + (e.loaded / e.total) * 90);
+            const pct = Math.round(3 + (e.loaded / e.total) * 92);
             setProgress(pct);
+            // Detecta estagnacao: sem progresso por 15s = conexao lenta/caiu
+            if (pct === lastProgress) {
+              stallCount++;
+            } else {
+              stallCount = 0;
+              lastProgress = pct;
+            }
           }
         };
 
@@ -135,23 +155,37 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
             setProgress(100);
             resolve();
           } else {
-            reject(new Error('Falha no upload do video para o Cloudflare Stream.'));
+            reject(new Error(`Erro do servidor Cloudflare (${xhr.status}).`));
           }
         };
 
-        xhr.onerror = () => reject(new Error('Erro de rede durante o upload.'));
-        xhr.ontimeout = () => reject(new Error('Timeout do upload.'));
+        xhr.onerror = () => reject(new Error('Falha de rede durante o upload. Verifique a ligacao.'));
+        xhr.ontimeout = () => reject(new Error('Upload excedeu o tempo limite (5 min). O ficheiro pode ser muito grande ou a ligacao estar lenta.'));
+        xhr.onabort = () => reject(new Error('Upload cancelado.'));
 
         const body = new FormData();
         body.append('file', file);
         xhr.send(body);
       });
 
+      setProgress(100);
       setStatus('processing');
       setUploading(false);
       onUploadComplete();
     } catch (err: any) {
-      setError(err?.message || 'Erro ao iniciar upload.');
+      const msg = err?.message || 'Erro desconhecido.';
+
+      // Auto-retry para falhas de rede (nao para erros do servidor)
+      if (retryCount < MAX_RETRIES && (
+        msg.includes('rede') || msg.includes('ligacao') || msg.includes('timeout') || msg.includes('Tempo limite')
+      )) {
+        setError(`Tentativa ${retryCount + 1} falhou. A repetir em ${RETRY_DELAY_MS / 1000}s...`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+        return handleFile(file, retryCount + 1);
+      }
+
+      const prefix = retryCount > 0 ? `[${retryCount + 1}ª tentativa] ` : '';
+      setError(prefix + msg);
       setUploading(false);
     }
   };
