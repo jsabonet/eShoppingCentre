@@ -68,10 +68,24 @@ class StoreDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Store
-        fields = '__all__'
-        read_only_fields = ('id', 'rating', 'total_sales', 'status', 'product_type',
+        fields = ('id', 'name', 'slug', 'description', 'about', 'tagline',
+                  'logo', 'banner', 'theme_color', 'category', 'phone', 'email',
+                  'location', 'website', 'status', 'product_type', 'rating', 'total_sales',
+                  'default_affiliate_commission', 'low_stock_threshold',
+                  'shipping_policy', 'return_policy',
+                  'identity_document', 'tax_document', 'address_proof', 'additional_documents',
+                  'admin_notes', 'rejection_reason',
+                  'owner', 'owner_name', 'owner_email', 'owner_phone',
+                  'owner_verified', 'owner_date_joined',
+                  'total_revenue', 'total_orders', 'total_products',
+                  'moderation_logs', 'has_documents',
+                  'store_products', 'recent_orders', 'monthly_sales',
+                  'clear_logo', 'clear_banner')
+        read_only_fields = ('id', 'rating', 'total_sales', 'status',
                            'owner', 'owner_name', 'owner_email', 'owner_verified',
-                           'owner_date_joined', 'total_revenue', 'total_orders')
+                           'owner_date_joined', 'total_revenue', 'total_orders',
+                           'total_products', 'moderation_logs', 'has_documents',
+                           'store_products', 'recent_orders', 'monthly_sales')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
