@@ -17,7 +17,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-eshopping}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-eshopping} -d ${DB_NAME:-eshoppingcentre}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -46,7 +46,7 @@ services:
       - DJANGO_SETTINGS_MODULE=config.settings.production
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=False
-      - ALLOWED_HOSTS=${DOMAIN},localhost,127.0.0.1
+      - ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN},localhost,127.0.0.1
       - DB_NAME=${DB_NAME:-eshoppingcentre}
       - DB_USER=${DB_USER:-eshopping}
       - DB_PASSWORD=${DB_PASSWORD}
