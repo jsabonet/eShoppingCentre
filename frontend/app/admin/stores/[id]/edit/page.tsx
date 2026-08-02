@@ -509,9 +509,9 @@ export default function AdminStoreEditPage() {
               {store?.identity_document || store?.tax_document || store?.address_proof || store?.additional_documents ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
-                    { key: 'identity_document', label: 'Documento de Identidade', icon: '🪪', color: 'border-primary/20 bg-primary/5 hover:bg-primary/10', hasDoc: store?.identity_document },
-                    { key: 'tax_document', label: 'Comprovativo Fiscal', icon: '🧾', color: 'border-accent/20 bg-accent/5 hover:bg-accent/10', hasDoc: store?.tax_document },
-                    { key: 'address_proof', label: 'Comprovativo de Morada', icon: '📍', color: 'border-primary/20 bg-primary/5 hover:bg-primary/10', hasDoc: store?.address_proof },
+                    { key: 'identity_document', label: 'Doc. Identidade (frente)', icon: '🪪', color: 'border-primary/20 bg-primary/5 hover:bg-primary/10', hasDoc: store?.identity_document },
+                    { key: 'tax_document', label: 'NUIT / Registo Comercial', icon: '🧾', color: 'border-accent/20 bg-accent/5 hover:bg-accent/10', hasDoc: store?.tax_document },
+                    { key: 'address_proof', label: 'Verso do Documento / Morada', icon: '📍', color: 'border-primary/20 bg-primary/5 hover:bg-primary/10', hasDoc: store?.address_proof },
                     { key: 'additional_documents', label: 'Documentos Adicionais', icon: '📎', color: 'border-border bg-muted/30 hover:bg-muted/50', hasDoc: store?.additional_documents },
                   ].map(doc => doc.hasDoc && (
                     <div key={doc.key} className={`flex items-center justify-between p-3.5 rounded-xl border ${doc.color} transition-all duration-200 group`}>

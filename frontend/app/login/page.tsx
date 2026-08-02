@@ -16,6 +16,7 @@ export default function LoginPage() {
   const { login, isAuthenticated, isAdmin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +33,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true);
+    if (!agreeTerms) { setError('Deve aceitar os Termos de Serviço e a Política de Privacidade para continuar.'); setLoading(false); return; }
     try {
       await login(email, password);
       router.push(redirect);
@@ -69,6 +71,16 @@ export default function LoginPage() {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
               className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
+
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)}
+              className="mt-1 accent-accent" required />
+            <span className="text-sm text-muted-foreground">
+              Concordo com os <Link href="/terms" className="text-accent hover:underline">Termos de Serviço</Link> e a{' '}
+              <Link href="/privacy" className="text-accent hover:underline">Política de Privacidade</Link> do eShoppingCentre.
+            </span>
+          </label>
+
           <button type="submit" disabled={loading}
             className="w-full py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
             {loading && <LoadingSpinner size={18} inline />}

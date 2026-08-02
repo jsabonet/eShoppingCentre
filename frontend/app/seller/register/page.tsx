@@ -76,6 +76,7 @@ export default function SellerRegisterPage() {
     representativeName: '',
     companyPhone: '',
     companyEmail: '',
+    repDocType: '', // Tipo de doc do representante: 'bi' | 'passaporte' | 'diire'
     // Product type (single selection)
     productType: '',
     // Policies
@@ -86,13 +87,29 @@ export default function SellerRegisterPage() {
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  // Individual: frente + verso do doc pessoal
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backFile, setBackFile] = useState<File | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
+  // Company: documentos da empresa
+  const [companyNuitFile, setCompanyNuitFile] = useState<File | null>(null);
+  const [companyNuitPreview, setCompanyNuitPreview] = useState<string | null>(null);
+  const [companyAlvaraFile, setCompanyAlvaraFile] = useState<File | null>(null);
+  const [companyAlvaraPreview, setCompanyAlvaraPreview] = useState<string | null>(null);
+  // Company: documentos pessoais do representante
+  const [repFrontFile, setRepFrontFile] = useState<File | null>(null);
+  const [repFrontPreview, setRepFrontPreview] = useState<string | null>(null);
+  const [repBackFile, setRepBackFile] = useState<File | null>(null);
+  const [repBackPreview, setRepBackPreview] = useState<string | null>(null);
+
   const logoRef = useRef<HTMLInputElement>(null);
   const frontRef = useRef<HTMLInputElement>(null);
   const backRef = useRef<HTMLInputElement>(null);
+  const companyNuitRef = useRef<HTMLInputElement>(null);
+  const companyAlvaraRef = useRef<HTMLInputElement>(null);
+  const repFrontRef = useRef<HTMLInputElement>(null);
+  const repBackRef = useRef<HTMLInputElement>(null);
 
   const updateField = (field: string, value: any) => setForm({ ...form, [field]: value });
 
@@ -173,9 +190,12 @@ export default function SellerRegisterPage() {
 
       // ── Documentos de verificação ──
       if (isCompany) {
-        // Empresa: NUIT/registo → tax_document, BI representante → identity_document
-        if (frontFile) fd.append('tax_document', frontFile);
-        if (backFile) fd.append('identity_document', backFile);
+        // Empresa: NUIT/registo → tax_document, Alvará → additional_documents (opcional)
+        if (companyNuitFile) fd.append('tax_document', companyNuitFile);
+        if (companyAlvaraFile) fd.append('additional_documents', companyAlvaraFile);
+        // Representante: frente → identity_document, verso (BI/DIRE) → address_proof
+        if (repFrontFile) fd.append('identity_document', repFrontFile);
+        if (repBackFile) fd.append('address_proof', repBackFile);
       } else {
         // Particular: frente do doc → identity_document, verso → additional_documents
         if (frontFile) fd.append('identity_document', frontFile);
@@ -617,59 +637,207 @@ export default function SellerRegisterPage() {
                   </div>
 
                   {/* Document upload for company */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Documentos da Empresa *</label>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-sm text-blue-800">
-                      <p>📸 Faça upload do <strong>certificado NUIT</strong> ou <strong>documento de registo comercial</strong> da empresa.</p>
+                  <div className="space-y-6">
+                    {/* ── Documentos da Empresa ── */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">📁 Documentos da Empresa *</label>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-sm text-blue-800">
+                        <p>📸 Faça upload do <strong>certificado NUIT</strong> ou <strong>documento de registo comercial</strong> da empresa. O alvará/licença é opcional mas recomendado.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Doc 1 - NUIT / Registo Comercial (obrigatório) */}
+                        <div>
+                          <label className="block text-xs font-medium text-muted-foreground mb-1.5 text-center">
+                            📷 NUIT / REGISTO COMERCIAL *
+                          </label>
+                          <input ref={companyNuitRef} type="file" accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setCompanyNuitFile(file);
+                                const reader = new FileReader();
+                                reader.onloadend = () => setCompanyNuitPreview(reader.result as string);
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="hidden" />
+                          {companyNuitPreview ? (
+                            <div className="relative group rounded-lg overflow-hidden border-2 border-green-300">
+                              <img src={companyNuitPreview} alt="NUIT" className="w-full h-40 object-cover" />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2">
+                                <button type="button" onClick={() => { setCompanyNuitFile(null); setCompanyNuitPreview(null); }}
+                                  className="opacity-0 group-hover:opacity-100 bg-red-500 text-white text-xs px-3 py-1.5 rounded-md transition-opacity">Remover</button>
+                                <button type="button" onClick={() => companyNuitRef.current?.click()}
+                                  className="opacity-0 group-hover:opacity-100 bg-white text-gray-800 text-xs px-3 py-1.5 rounded-md transition-opacity">Alterar</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button type="button" onClick={() => companyNuitRef.current?.click()}
+                              className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer">
+                              <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
+                              <span className="text-sm text-muted-foreground">Fotografar NUIT</span>
+                              <span className="text-xs text-muted-foreground block mt-1">Clique para fazer upload</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Doc 2 - Alvará / Licença (opcional) */}
+                        <div>
+                          <label className="block text-xs font-medium text-muted-foreground mb-1.5 text-center">
+                            📷 ALVARÁ / LICENÇA <span className="text-muted-foreground font-normal">(opcional)</span>
+                          </label>
+                          <input ref={companyAlvaraRef} type="file" accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setCompanyAlvaraFile(file);
+                                const reader = new FileReader();
+                                reader.onloadend = () => setCompanyAlvaraPreview(reader.result as string);
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="hidden" />
+                          {companyAlvaraPreview ? (
+                            <div className="relative group rounded-lg overflow-hidden border-2 border-green-300">
+                              <img src={companyAlvaraPreview} alt="Alvará" className="w-full h-40 object-cover" />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2">
+                                <button type="button" onClick={() => { setCompanyAlvaraFile(null); setCompanyAlvaraPreview(null); }}
+                                  className="opacity-0 group-hover:opacity-100 bg-red-500 text-white text-xs px-3 py-1.5 rounded-md transition-opacity">Remover</button>
+                                <button type="button" onClick={() => companyAlvaraRef.current?.click()}
+                                  className="opacity-0 group-hover:opacity-100 bg-white text-gray-800 text-xs px-3 py-1.5 rounded-md transition-opacity">Alterar</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button type="button" onClick={() => companyAlvaraRef.current?.click()}
+                              className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer">
+                              <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
+                              <span className="text-sm text-muted-foreground">Fotografar alvará</span>
+                              <span className="text-xs text-muted-foreground block mt-1">Clique para fazer upload</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Doc 1 - NUIT/Registo */}
-                      <div>
-                        <label className="block text-xs font-medium text-muted-foreground mb-1.5 text-center">📷 NUIT / REGISTO COMERCIAL</label>
-                        <input ref={frontRef} type="file" accept="image/*" onChange={handleFrontChange} className="hidden" />
-                        {frontPreview ? (
-                          <div className="relative group rounded-lg overflow-hidden border-2 border-green-300">
-                            <img src={frontPreview} alt="Documento" className="w-full h-40 object-cover" />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2">
-                              <button type="button" onClick={() => { setFrontFile(null); setFrontPreview(null); }}
-                                className="opacity-0 group-hover:opacity-100 bg-red-500 text-white text-xs px-3 py-1.5 rounded-md transition-opacity">Remover</button>
-                              <button type="button" onClick={() => frontRef.current?.click()}
-                                className="opacity-0 group-hover:opacity-100 bg-white text-gray-800 text-xs px-3 py-1.5 rounded-md transition-opacity">Alterar</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button type="button" onClick={() => frontRef.current?.click()}
-                            className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer">
-                            <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
-                            <span className="text-sm text-muted-foreground">Fotografar documento</span>
-                            <span className="text-xs text-muted-foreground block mt-1">Clique para fazer upload</span>
-                          </button>
-                        )}
+                    {/* ── Documentos Pessoais do Representante ── */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">🪪 Documento do Representante *</label>
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-sm text-amber-800">
+                        <p>📸 Documento de identificação pessoal do representante da empresa. Imagens nítidas e legíveis.</p>
                       </div>
 
-                      {/* Doc 2 - optional */}
-                      <div>
-                        <label className="block text-xs font-medium text-muted-foreground mb-1.5 text-center">📷 DOC. REPRESENTANTE (BI)</label>
-                        <input ref={backRef} type="file" accept="image/*" onChange={handleBackChange} className="hidden" />
-                        {backPreview ? (
-                          <div className="relative group rounded-lg overflow-hidden border-2 border-green-300">
-                            <img src={backPreview} alt="Doc representante" className="w-full h-40 object-cover" />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2">
-                              <button type="button" onClick={() => { setBackFile(null); setBackPreview(null); }}
-                                className="opacity-0 group-hover:opacity-100 bg-red-500 text-white text-xs px-3 py-1.5 rounded-md transition-opacity">Remover</button>
-                              <button type="button" onClick={() => backRef.current?.click()}
-                                className="opacity-0 group-hover:opacity-100 bg-white text-gray-800 text-xs px-3 py-1.5 rounded-md transition-opacity">Alterar</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button type="button" onClick={() => backRef.current?.click()}
-                            className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer">
-                              <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
-                            <span className="text-sm text-muted-foreground">BI do representante</span>                              <span className="text-xs text-muted-foreground block mt-1">Clique para fazer upload</span>                            <span className="text-xs text-muted-foreground block mt-0.5">(opcional)</span>
-                          </button>
-                        )}
+                      {/* Tipo de documento do representante */}
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Tipo de Documento *</label>
+                        <select
+                          value={form.repDocType}
+                          onChange={(e) => {
+                            updateField('repDocType', e.target.value);
+                            // Limpar imagens ao trocar tipo
+                            setRepFrontFile(null); setRepFrontPreview(null);
+                            setRepBackFile(null); setRepBackPreview(null);
+                          }}
+                          className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                          required
+                        >
+                          <option value="">Selecionar...</option>
+                          <option value="bi">BI (Bilhete de Identidade)</option>
+                          <option value="passaporte">Passaporte</option>
+                          <option value="diire">DIRE</option>
+                        </select>
                       </div>
+
+                      {/* Info contextual */}
+                      {form.repDocType && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-sm text-blue-800">
+                          {form.repDocType === 'bi' ? (
+                            <p>📸 Fotografe a <strong>frente</strong> e o <strong>verso</strong> do Bilhete de Identidade do representante.</p>
+                          ) : form.repDocType === 'passaporte' ? (
+                            <p>📸 Fotografe a <strong>página de identificação</strong> do passaporte — onde estão os dados e foto do representante.</p>
+                          ) : form.repDocType === 'diire' ? (
+                            <p>📸 Fotografe a <strong>frente e verso</strong> do DIRE do representante.</p>
+                          ) : null}
+                        </div>
+                      )}
+
+                      {form.repDocType && (
+                        <div className={`grid gap-4 ${needsVerso(form.repDocType) || form.repDocType === 'diire' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                          {/* FRENTE */}
+                          <div>
+                            <label className="block text-xs font-medium text-muted-foreground mb-1.5 text-center">
+                              {form.repDocType === 'passaporte' ? 'PÁGINA DE IDENTIFICAÇÃO' : 'FRENTE DO DOCUMENTO'}
+                            </label>
+                            <input ref={repFrontRef} type="file" accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setRepFrontFile(file);
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => setRepFrontPreview(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                              className="hidden" />
+                            {repFrontPreview ? (
+                              <div className="relative group rounded-lg overflow-hidden border-2 border-green-300">
+                                <img src={repFrontPreview} alt="Frente" className="w-full h-40 object-cover" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2">
+                                  <button type="button" onClick={() => { setRepFrontFile(null); setRepFrontPreview(null); }}
+                                    className="opacity-0 group-hover:opacity-100 bg-red-500 text-white text-xs px-3 py-1.5 rounded-md transition-opacity">Remover</button>
+                                  <button type="button" onClick={() => repFrontRef.current?.click()}
+                                    className="opacity-0 group-hover:opacity-100 bg-white text-gray-800 text-xs px-3 py-1.5 rounded-md transition-opacity">Alterar</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button type="button" onClick={() => repFrontRef.current?.click()}
+                                className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer">
+                                <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
+                                <span className="text-sm text-muted-foreground">
+                                  {form.repDocType === 'passaporte' ? 'Fotografar página' : 'Fotografar frente'}
+                                </span>
+                                <span className="text-xs text-muted-foreground block mt-1">Clique para fazer upload</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* VERSO - only for BI and DIRE */}
+                          {(needsVerso(form.repDocType) || form.repDocType === 'diire') && (
+                            <div>
+                              <label className="block text-xs font-medium text-muted-foreground mb-1.5 text-center">VERSO DO DOCUMENTO</label>
+                              <input ref={repBackRef} type="file" accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    setRepBackFile(file);
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setRepBackPreview(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                                className="hidden" />
+                              {repBackPreview ? (
+                                <div className="relative group rounded-lg overflow-hidden border-2 border-green-300">
+                                  <img src={repBackPreview} alt="Verso" className="w-full h-40 object-cover" />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2">
+                                    <button type="button" onClick={() => { setRepBackFile(null); setRepBackPreview(null); }}
+                                      className="opacity-0 group-hover:opacity-100 bg-red-500 text-white text-xs px-3 py-1.5 rounded-md transition-opacity">Remover</button>
+                                    <button type="button" onClick={() => repBackRef.current?.click()}
+                                      className="opacity-0 group-hover:opacity-100 bg-white text-gray-800 text-xs px-3 py-1.5 rounded-md transition-opacity">Alterar</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button type="button" onClick={() => repBackRef.current?.click()}
+                                  className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer">
+                                  <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
+                                  <span className="text-sm text-muted-foreground">Fotografar verso</span>
+                                  <span className="text-xs text-muted-foreground block mt-1">Clique para fazer upload</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>
