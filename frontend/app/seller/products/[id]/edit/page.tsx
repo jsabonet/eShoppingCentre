@@ -111,8 +111,12 @@ export default function EditProductPage() {
 
   const [mainImage, setMainImage] = useState<File | null>(null);
   const [mainPreview, setMainPreview] = useState<string | null>(null);
+  const [existingMainImageId, setExistingMainImageId] = useState<string | null>(null);
+  const [removeExistingMainImage, setRemoveExistingMainImage] = useState(false);
   const [thumbnails, setThumbnails] = useState<File[]>([]);
   const [thumbnailPreviews, setThumbnailPreviews] = useState<string[]>([]);
+  const [existingThumbnailIds, setExistingThumbnailIds] = useState<{ id: string; preview: string }[]>([]);
+  const [removeExistingThumbnailIds, setRemoveExistingThumbnailIds] = useState<string[]>([]);
   const [variants, setVariants] = useState<VariantDraft[]>([]);
 
   const mainRef = useRef<HTMLInputElement>(null);
@@ -165,9 +169,13 @@ export default function EditProductPage() {
         // Load existing images
         if (data.images?.length) {
           const primary = data.images.find((img: any) => img.is_primary);
-          if (primary) setMainPreview(mediaUrl(primary.image));
+          if (primary) {
+            setMainPreview(mediaUrl(primary.image));
+            setExistingMainImageId(primary.id);
+          }
           data.images.filter((img: any) => !img.is_primary).forEach((img: any) => {
             setThumbnailPreviews((prev) => [...prev, mediaUrl(img.image)]);
+            setExistingThumbnailIds((prev) => [...prev, { id: img.id, preview: mediaUrl(img.image) }]);
           });
         }
 
@@ -210,9 +218,15 @@ export default function EditProductPage() {
     setThumbnails((prev) => [...prev, ...files]);
   };
 
-  const removeThumbnail = (index: number) => {
-    setThumbnails((prev) => prev.filter((_, i) => i !== index));
-    setThumbnailPreviews((prev) => prev.filter((_, i) => i !== index));
+  const removeThumbnail = (index: number, existingId?: string) => {
+    if (existingId) {
+      setRemoveExistingThumbnailIds((prev) => [...prev, existingId]);
+      setExistingThumbnailIds((prev) => prev.filter((t) => t.id !== existingId));
+      setThumbnailPreviews((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      setThumbnails((prev) => prev.filter((_, i) => i !== index));
+      setThumbnailPreviews((prev) => prev.filter((_, i) => i !== index));
+    }
   };
 
   // ─── Variant helpers ───
@@ -301,6 +315,24 @@ export default function EditProductPage() {
 
       // PATCH update
       await productsAPI.update(id, formData);
+
+      // Delete removed existing main image
+      if (removeExistingMainImage && existingMainImageId) {
+        const token = localStorage.getItem('access_token');
+        await fetch(`${API_URL}/products/${id}/images/${existingMainImageId}/`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      }
+
+      // Delete removed existing thumbnails
+      for (const tid of removeExistingThumbnailIds) {
+        const token = localStorage.getItem('access_token');
+        await fetch(`${API_URL}/products/${id}/images/${tid}/`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      }
 
       // Upload new main image
       if (mainImage) {
@@ -445,7 +477,15 @@ export default function EditProductPage() {
                       {mainPreview ? (
                         <div className="relative group rounded-xl overflow-hidden border aspect-square bg-muted/30">
                           <img src={mainPreview} alt="" className="w-full h-full object-cover" />
-                          <button type="button" onClick={() => { setMainImage(null); setMainPreview(null); }}
+                          <button type="button" onClick={() => {
+                            if (existingMainImageId) {
+                              setRemoveExistingMainImage(true);
+                              setMainPreview(null);
+                            } else {
+                              setMainImage(null);
+                              setMainPreview(null);
+                            }
+                          }}
                             className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><X size={14} /></button>
                           <span className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded">Principal</span>
                         </div>

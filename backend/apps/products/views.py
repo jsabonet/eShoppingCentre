@@ -157,6 +157,18 @@ class ProductImageView(generics.CreateAPIView):
         serializer.save(product=product)
 
 
+class ProductImageDeleteView(generics.DestroyAPIView):
+    """Vendedor pode remover a imagem do seu próprio produto."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        store = self.request.user.store
+        return ProductImage.objects.filter(
+            product_id=self.kwargs['product_id'],
+            product__store=store,
+        )
+
+
 class WishlistListView(generics.ListCreateAPIView):
     serializer_class = WishlistItemSerializer
     permission_classes = [permissions.IsAuthenticated]
