@@ -84,28 +84,30 @@ class LessonVideoStatusView(APIView):
 
 class LessonStreamTokenView(APIView):
     """
-    POST /api/v1/courses/lessons/{lesson_id}/stream-token/
-    Gera token JWT para o player. So alunos matriculados podem aceder.
+    GET /api/v1/courses/lessons/{lesson_id}/stream-token/
+    Gera token JWT para o player. Dono do curso e alunos matriculados podem aceder.
     """
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, lesson_id):
+    def get(self, request, lesson_id):
         lesson = get_object_or_404(CourseLesson, id=lesson_id)
-
         course = lesson.module.course
 
-        # Aulas gratis: qualquer pessoa autenticada pode ver
-        if lesson.is_free_preview:
-            pass
-        else:
-            # Verificar matricula
-            has_access = Enrollment.objects.filter(
-                user=request.user,
-                course=course,
-                completed=False,
-            ).exists()
-            if not has_access:
-                return Response({'detail': 'Nao esta matriculado neste curso.'}, status=403)
+        # Dono do curso sempre pode ver
+        is_owner = course.product.store.owner == request.user
+        if not is_owner:
+            # Aulas gratis: qualquer pessoa autenticada pode ver
+            if lesson.is_free_preview:
+                pass
+            else:
+                # Verificar matricula
+                has_access = Enrollment.objects.filter(
+                    user=request.user,
+                    course=course,
+                    completed=False,
+                ).exists()
+                if not has_access:
+                    return Response({'detail': 'Nao esta matriculado neste curso.'}, status=403)
 
         if not lesson.cloudflare_video_uid:
             return Response({'detail': 'Video ainda nao disponivel.'}, status=404)
