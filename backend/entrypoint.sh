@@ -21,7 +21,12 @@ echo "✅ Permissões corrigidas. A iniciar como django..."
 
 # Desce de privilégio e executa o comando (CMD) como django
 if command -v setpriv >/dev/null 2>&1; then
-  exec setpriv --reuid=django --regid=django --init-groups "$@"
+  exec setpriv --reuid=django --regid=django --init-groups --inh-caps=-all "$@"
+elif command -v gosu >/dev/null 2>&1; then
+  exec gosu django "$@"
+elif command -v su-exec >/dev/null 2>&1; then
+  exec su-exec django "$@"
 else
-  exec su -s /bin/bash django -c "exec $*"
+  # Último recurso: usa su (menos ideal mas funcional)
+  exec su django -c "$*"
 fi

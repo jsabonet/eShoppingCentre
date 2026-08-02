@@ -63,6 +63,8 @@ class StoreDetailSerializer(serializers.ModelSerializer):
     store_products = serializers.SerializerMethodField()
     recent_orders = serializers.SerializerMethodField()
     monthly_sales = serializers.SerializerMethodField()
+    clear_logo = serializers.BooleanField(default=False, write_only=True)
+    clear_banner = serializers.BooleanField(default=False, write_only=True)
 
     class Meta:
         model = Store
@@ -99,6 +101,19 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'address': bool(obj.address_proof),
             'additional': bool(obj.additional_documents),
         }
+
+    def update(self, instance, validated_data):
+        # Handle clear_* flags before saving
+        if validated_data.pop('clear_logo', False):
+            if instance.logo:
+                instance.logo.delete(save=False)
+            instance.logo = None
+        if validated_data.pop('clear_banner', False):
+            if instance.banner:
+                instance.banner.delete(save=False)
+            instance.banner = None
+
+        return super().update(instance, validated_data)
 
     def get_store_products(self, obj):
         """Últimos 20 produtos da loja (admin view)."""
