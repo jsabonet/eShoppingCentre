@@ -8,7 +8,9 @@ class CourseLessonSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CourseLesson
-        fields = ('id', 'title', 'duration', 'is_free_preview', 'completed', 'sort_order')
+        fields = ('id', 'title', 'description', 'duration', 'is_free_preview',
+                  'completed', 'sort_order', 'video_url', 'video_provider',
+                  'content', 'cloudflare_video_uid', 'cloudflare_video_status')
 
     def get_completed(self, obj):
         request = self.context.get('request')

@@ -42,6 +42,7 @@ export default function CourseBuilderPage() {
   const [courseTitle, setCourseTitle] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
   const apiHeaders = () => {
@@ -51,14 +52,18 @@ export default function CourseBuilderPage() {
 
   const fetchBuilder = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const res = await fetch(`${API_URL}/courses/${courseId}/builder/`, { headers: apiHeaders() });
-      if (!res.ok) throw new Error('Erro');
+      if (!res.ok) throw new Error(res.status === 404 ? 'Curso nao encontrado.' : 'Erro ao carregar curso.');
       const data = await res.json();
       setCourseTitle(data.course_title || '');
       setModules(data.modules || []);
       setExpandedModules(new Set((data.modules || []).map((m: ModuleData) => m.id)));
-    } catch { setModules([]); }
+    } catch (err: any) {
+      setError(err.message || 'Erro ao carregar.');
+      setModules([]);
+    }
     finally { setLoading(false); }
   }, [courseId]);
 
@@ -99,7 +104,9 @@ export default function CourseBuilderPage() {
     try {
       await fetch(`${API_URL}/courses/modules/${moduleId}/delete/`, { method: 'DELETE', headers: apiHeaders() });
       fetchBuilder();
-    } catch {}
+    } catch (err: any) {
+      setError('Erro ao remover modulo: ' + (err.message || 'desconhecido'));
+    }
   };
 
   // ─── Lesson CRUD ───
@@ -131,7 +138,9 @@ export default function CourseBuilderPage() {
     try {
       await fetch(`${API_URL}/courses/lessons/${lessonId}/delete/`, { method: 'DELETE', headers: apiHeaders() });
       fetchBuilder();
-    } catch {}
+    } catch (err: any) {
+      setError('Erro ao remover aula: ' + (err.message || 'desconhecido'));
+    }
   };
 
   const toggleFreePreview = async (lesson: LessonData) => {
@@ -174,10 +183,14 @@ export default function CourseBuilderPage() {
           </button>
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
+        )}
+
         {/* Modules */}
         <div className="space-y-4">
           {modules.map((mod) => (
-            <div key={mod.id} className="border border-border rounded-xl bg-card overflow-hidden">
+            <div key={`${mod.id}-${mod.lessons.length}`} className="border border-border rounded-xl bg-card overflow-hidden">
               {/* Module Header */}
               <div className="flex items-center gap-3 p-4 hover:bg-muted/20 transition-colors">
                 <button onClick={() => toggleModule(mod.id)} className="p-0.5">
@@ -206,6 +219,7 @@ export default function CourseBuilderPage() {
                         <GripVertical size={14} className="text-muted-foreground" />
                         <Play size={14} className="text-muted-foreground" />
                         <input
+                          key={`lesson-title-${lesson.id}-${lesson.title}`}
                           type="text"
                           defaultValue={lesson.title}
                           onBlur={(e) => { if (e.target.value.trim() && e.target.value !== lesson.title) updateLesson(lesson.id, 'title', e.target.value.trim()); }}
