@@ -89,16 +89,6 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
     }
   };
 
-  const statusDisplay = {
-    pending: { label: 'Sem video', icon: Upload, color: 'text-muted-foreground' },
-    uploading: { label: 'A enviar...', icon: Loader2, color: 'text-blue-600' },
-    processing: { label: 'A processar...', icon: Loader2, color: 'text-amber-600' },
-    ready: { label: 'Pronto', icon: Check, color: 'text-green-600' },
-    error: { label: 'Erro', icon: AlertCircle, color: 'text-red-600' },
-  }[status] || { label: status, icon: AlertCircle, color: 'text-muted-foreground' };
-
-  const StatusIcon = statusDisplay.icon;
-
   return (
     <div className="border-2 border-dashed border-border rounded-xl p-6 text-center">
       <input
@@ -109,32 +99,50 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
       />
 
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-center gap-2">
+          <AlertCircle size={16} /> {error}
+          <button onClick={() => { setError(''); setStatus('pending'); }}
+            className="ml-2 text-xs text-red-500 hover:underline">Tentar novamente</button>
+        </div>
+      )}
+
       {uploading ? (
-        <div className="space-y-3">
-          <div className="flex items-center justify-center gap-2 text-blue-600">
-            <Loader2 size={24} className="animate-spin" />
-            <span className="font-medium">A enviar video...</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
+        /* ─── Upload em progresso ─── */
+        <div className="space-y-4">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
+            <Loader2 size={16} className="animate-spin" /> A enviar video
+          </span>
+          <div className="relative h-3 bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full bg-accent rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
+              className="absolute inset-y-0 left-0 bg-accent rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${Math.max(progress, 2)}%` }}
             />
           </div>
-          <p className="text-sm text-muted-foreground">{progress}%</p>
+          <p className="text-sm text-muted-foreground font-mono tabular-nums">{progress}%</p>
         </div>
       ) : status === 'processing' ? (
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={40} className="animate-spin text-amber-500" />
-          <p className="font-medium text-amber-600">Video enviado. A processar...</p>
+        /* ─── Cloudflare a processar ─── */
+        <div className="space-y-4">
+          <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-amber-50">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+            </span>
+            <span className="text-amber-700 text-sm font-medium">A processar video no Cloudflare</span>
+          </div>
+          <div className="h-2 bg-amber-100 rounded-full overflow-hidden">
+            <div className="h-full w-1/2 bg-amber-400 rounded-full animate-pulse" />
+          </div>
           <p className="text-sm text-muted-foreground">
-            Isto pode demorar alguns minutos. Pode continuar a editar o curso.
+            O video esta a ser codificado. Pode continuar a editar o curso — <button onClick={onUploadComplete} className="text-accent hover:underline font-medium">verificar estado</button>
           </p>
         </div>
       ) : status === 'ready' ? (
+        /* ─── Video pronto ─── */
         <div className="space-y-3">
           {streamUrl ? (
-            <div className="relative rounded-lg overflow-hidden bg-black">
+            <div className="relative rounded-lg overflow-hidden bg-black shadow-md">
               <iframe
                 src={streamUrl}
                 className="w-full aspect-video"
@@ -144,37 +152,36 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
               />
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-2 text-green-600">
-              <Check size={24} />
-              <span className="font-medium">Video pronto</span>
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+                <Check size={28} className="text-green-600" />
+              </div>
+              <span className="font-medium text-green-700">Video pronto</span>
             </div>
           )}
           <button
-            onClick={() => { setStreamUrl(''); fileRef.current?.click(); }}
-            className="text-sm text-accent hover:underline"
+            onClick={() => { setStreamUrl(''); setStatus('pending'); fileRef.current?.click(); }}
+            className="text-sm text-accent hover:underline font-medium"
           >
             Substituir video
           </button>
         </div>
       ) : (
+        /* ─── Estado inicial: upload area ─── */
         <button
           onClick={() => fileRef.current?.click()}
           className="flex flex-col items-center gap-3 w-full py-8 hover:bg-muted/30 transition-colors rounded-lg"
         >
-          <Upload size={40} className="text-muted-foreground" />
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+            <Upload size={28} className="text-muted-foreground" />
+          </div>
           <div>
             <p className="font-medium">Arraste o video ou clique aqui</p>
             <p className="text-sm text-muted-foreground mt-1">
-              MP4, MOV, AVI, WebM — ate 4GB
+              MP4, MOV, AVI, WebM — ate 200MB
             </p>
           </div>
         </button>
-      )}
-
-      {error && (
-        <p className="mt-3 text-sm text-red-600 flex items-center justify-center gap-1">
-          <AlertCircle size={14} /> {error}
-        </p>
       )}
     </div>
   );
