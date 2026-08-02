@@ -66,6 +66,8 @@ export default function SellerSettingsPage() {
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [currentLogo, setCurrentLogo] = useState<string | null>(null);
   const [currentBanner, setCurrentBanner] = useState<string | null>(null);
+  const [logoToClear, setLogoToClear] = useState(false);
+  const [bannerToClear, setBannerToClear] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -107,6 +109,7 @@ export default function SellerSettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setLogoFile(file);
+    setLogoToClear(false);
     const reader = new FileReader();
     reader.onloadend = () => setLogoPreview(reader.result as string);
     reader.readAsDataURL(file);
@@ -116,13 +119,14 @@ export default function SellerSettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setBannerFile(file);
+    setBannerToClear(false);
     const reader = new FileReader();
     reader.onloadend = () => setBannerPreview(reader.result as string);
     reader.readAsDataURL(file);
   };
 
-  const clearLogo = () => { setLogoFile(null); setLogoPreview(null); setCurrentLogo(null); };
-  const clearBanner = () => { setBannerFile(null); setBannerPreview(null); setCurrentBanner(null); };
+  const clearLogo = () => { setLogoFile(null); setLogoPreview(null); setCurrentLogo(null); setLogoToClear(true); };
+  const clearBanner = () => { setBannerFile(null); setBannerPreview(null); setCurrentBanner(null); setBannerToClear(true); };
 
   // ─── Submit ───
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -147,6 +151,8 @@ export default function SellerSettingsPage() {
 
       if (logoFile) fd.append('logo', logoFile);
       if (bannerFile) fd.append('banner', bannerFile);
+      if (logoToClear) fd.append('clear_logo', 'true');
+      if (bannerToClear) fd.append('clear_banner', 'true');
 
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
       await axios.patch(`${API_URL}/stores/me/`, fd, {
@@ -167,6 +173,8 @@ export default function SellerSettingsPage() {
       }
 
       setMessage({ type: 'success', text: 'Configurações guardadas com sucesso!' });
+      setLogoToClear(false);
+      setBannerToClear(false);
     } catch (err: any) {
       const detail = err.response?.data;
       const msg = typeof detail === 'object' ? Object.values(detail).flat().join('. ') : 'Erro ao guardar.';

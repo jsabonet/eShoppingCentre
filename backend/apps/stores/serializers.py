@@ -8,16 +8,32 @@ class StoreSerializer(serializers.ModelSerializer):
     tier = serializers.CharField(read_only=True)
     tier_display = serializers.CharField(read_only=True)
     total_products = serializers.SerializerMethodField()
+    clear_logo = serializers.BooleanField(default=False, write_only=True)
+    clear_banner = serializers.BooleanField(default=False, write_only=True)
 
     class Meta:
         model = Store
         fields = ('id', 'name', 'slug', 'description', 'tagline', 'logo', 'banner',
                   'theme_color', 'category', 'rating', 'total_sales', 'total_products',
-                  'location', 'status', 'product_type', 'tier', 'tier_display')
+                  'location', 'status', 'product_type', 'tier', 'tier_display',
+                  'clear_logo', 'clear_banner')
         read_only_fields = ('id', 'rating', 'total_sales', 'status', 'product_type', 'tier', 'tier_display')
 
     def get_total_products(self, obj):
         return obj.products.exclude(status='deleted').count()
+
+    def update(self, instance, validated_data):
+        # Handle clear_* flags before saving
+        if validated_data.pop('clear_logo', False):
+            if instance.logo:
+                instance.logo.delete(save=False)
+            instance.logo = None
+        if validated_data.pop('clear_banner', False):
+            if instance.banner:
+                instance.banner.delete(save=False)
+            instance.banner = None
+
+        return super().update(instance, validated_data)
 
 
 class StoreModerationLogSerializer(serializers.ModelSerializer):
