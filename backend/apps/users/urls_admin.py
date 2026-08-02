@@ -16,5 +16,5 @@ urlpatterns = [
     path('payouts/pending/', PendingPayoutsView.as_view(), name='admin_pending_payouts'),
     path('payouts/<uuid:pk>/approve/', ApprovePayoutView.as_view(), name='admin_approve_payout'),
     path('users/', AdminUserListView.as_view(), name='admin_user_list'),
-    path('users/<uuid:pk>/', AdminUserDetailView.as_view(), name='admin_user_detail'),
+    path('users/<pk>/', AdminUserDetailView.as_view(), name='admin_user_detail'),
 ]
