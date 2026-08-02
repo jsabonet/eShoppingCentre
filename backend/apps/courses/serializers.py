@@ -22,7 +22,7 @@ class CourseLessonSerializer(serializers.ModelSerializer):
 
     def get_duration(self, obj):
         """Converte video_duration_seconds para formato legivel HH:MM:SS ou MM:SS."""
-        secs = obj.video_duration_seconds or 0
+        secs = int(obj.video_duration_seconds or 0)
         if secs <= 0:
             return ''
         hours = secs // 3600
