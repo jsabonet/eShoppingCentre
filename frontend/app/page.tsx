@@ -1,4 +1,5 @@
 ﻿import BannerSlider from '@/src/components/BannerSlider';
+import HomepageShop from '@/src/components/HomepageShop';
 import Link from 'next/link';
 import { Truck, Shield, CreditCard, Headphones } from 'lucide-react';
 
@@ -10,16 +11,51 @@ const banners = [
   { id: '3', image: 'https://cdn.b12.io/client_media/iKv1biKD/573f0734-7e6e-11f1-8673-0242ac110002-PN8pzNbMQkB30y18CiMkY.jpg', title: 'Transforme seu Lar', subtitle: 'Tudo para casa e jardim com frete grátis', cta: 'Explorar', link: '/category/casa-jardim' },
 ];
 
-interface APICategory { id: string; name: string; slug: string; description: string; image: string | null; product_count: number; }
+interface APICategory { id: string; name: string; slug: string; description: string; image: string | null; }
+interface APIProduct { id: string; name: string; slug: string; price: string; compare_price: string | null; discount_percentage: number | null; primary_image: string | null; product_type: string; rating: string; review_count: number; sales_count: number; is_on_sale: boolean; stock: number; store_name: string; store_slug: string; created_at: string; }
+
+function apiProductToCard(p: APIProduct) {
+  return {
+    id: p.id, slug: p.slug, name: p.name, description: '', price: parseFloat(p.price),
+    image: p.primary_image || 'https://cdn.b12.io/client_media/iKv1biKD/5aa3154d-7e6e-11f1-82d2-0242ac110002-9e8FSvH-aRUq9K6kB6vgg.jpg',
+    category: '', rating: parseFloat(p.rating), reviewCount: p.review_count,
+    badge: (p.is_on_sale ? 'sale' : undefined) as 'sale' | 'new' | undefined,
+    inStock: p.stock > 0,
+    originalPrice: p.compare_price ? parseFloat(p.compare_price) : undefined,
+    discount: p.discount_percentage ?? undefined,
+  };
+}
 
 export default async function Home() {
   let categories: APICategory[] = [];
+  let featuredProducts: APIProduct[] = [];
+  let saleProducts: APIProduct[] = [];
+  let categoryProducts: Record<string, APIProduct[]> = {};
 
   try {
-    const catsRes = await fetch(`${API_URL}/categories/`, { next: { revalidate: 60 } });
+    const [catsRes, featuredRes, saleRes] = await Promise.all([
+      fetch(`${API_URL}/categories/`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/products/?is_featured=true&page_size=10`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/products/?is_on_sale=true&page_size=10`, { next: { revalidate: 60 } }),
+    ]);
     const catsJson = await catsRes.json();
     categories = Array.isArray(catsJson) ? catsJson : (catsJson.results || []);
+    featuredProducts = featuredRes.ok ? (await featuredRes.json()).results : [];
+    saleProducts = saleRes.ok ? (await saleRes.json()).results : [];
   } catch { console.error('API offline, using empty data'); }
+
+  const shopSections = [
+    {
+      id: 'ofertas', title: 'Ofertas do Dia', titleIcon: '⚡',
+      products: saleProducts.slice(0, 10).map(apiProductToCard),
+      viewAllLink: '/#ofertas', viewAllLabel: 'Ver todas →', bgClass: 'bg-accent/5',
+    },
+    {
+      id: 'destaques', title: 'Produtos em Destaque',
+      products: (featuredProducts.length > 0 ? featuredProducts : saleProducts).slice(0, 10).map(apiProductToCard),
+      viewAllLink: '/#destaques', viewAllLabel: 'Ver mais →', bgClass: '',
+    },
+  ];
 
   return (
     <main>
@@ -64,7 +100,6 @@ export default async function Home() {
                 )}
               </div>
               <h3 className="font-semibold text-sm">{cat.name}</h3>
-              <p className="text-xs text-muted-foreground mt-1">{cat.product_count} produtos</p>
             </Link>
           )) : (
             <div className="col-span-full text-center py-8 text-muted-foreground">
@@ -74,6 +109,7 @@ export default async function Home() {
         </div>
       </section>
 
+      <HomepageShop sections={shopSections} />
     </main>
   );
 }
