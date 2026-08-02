@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface VideoUploaderProps {
@@ -15,6 +15,13 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
   const [status, setStatus] = useState<string>(existingVideoStatus || 'pending');
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Sincroniza estado interno com props (ex: após fetchBuilder recarregar dados)
+  useEffect(() => {
+    if (existingVideoStatus) {
+      setStatus(existingVideoStatus);
+    }
+  }, [existingVideoStatus]);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 

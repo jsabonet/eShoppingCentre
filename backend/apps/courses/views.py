@@ -74,6 +74,25 @@ class CourseBuilderView(APIView):
             return Response({'detail': 'Nao autorizado.'}, status=403)
 
         modules = course.modules.all().prefetch_related('lessons')
+
+        # Actualizar status de videos Cloudflare que ainda nao estao ready/error
+        from .services.cloudflare_stream import get_video_status as cf_status
+        for module in modules:
+            for lesson in module.lessons.all():
+                if lesson.cloudflare_video_uid and lesson.cloudflare_video_status not in ('ready', 'error'):
+                    try:
+                        status_data = cf_status(lesson.cloudflare_video_uid)
+                        if status_data.get('ready_to_stream'):
+                            lesson.cloudflare_video_status = 'ready'
+                            lesson.video_duration_seconds = status_data.get('duration', 0)
+                            lesson.video_thumbnail = status_data.get('thumbnail', '')
+                            lesson.save()
+                        elif status_data.get('status') == 'error':
+                            lesson.cloudflare_video_status = 'error'
+                            lesson.save()
+                    except Exception:
+                        pass  # Ignorar erros de rede ao verificar Cloudflare
+
         return Response({
             'course_id': str(course.id),
             'course_title': course.product.name,
