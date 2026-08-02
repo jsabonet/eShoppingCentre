@@ -1227,6 +1227,39 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
           </div>
         )}
 
+        {/* Confirm Action Modal */}
+        {confirmModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`p-2 rounded-full ${confirmModal.action === 'red' ? 'bg-red-100' : confirmModal.action === 'green' ? 'bg-green-100' : 'bg-orange-100'}`}>
+                    <AlertCircle size={24} className={confirmModal.action === 'red' ? 'text-red-600' : confirmModal.action === 'green' ? 'text-green-600' : 'text-orange-600'} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">{confirmModal.title}</h3>
+                    <p className="text-sm text-muted-foreground">{confirmModal.message}</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 justify-end">
+                  <button onClick={() => setConfirmModal(null)}
+                    className="px-4 py-2 border rounded-md hover:bg-muted transition-colors text-sm">
+                    Cancelar
+                  </button>
+                  <button onClick={confirmModal.onConfirm}
+                    className={`px-4 py-2 rounded-md text-sm font-medium text-white transition-colors ${
+                      confirmModal.action === 'red' ? 'bg-red-600 hover:bg-red-700' :
+                      confirmModal.action === 'green' ? 'bg-green-600 hover:bg-green-700' :
+                      'bg-orange-600 hover:bg-orange-700'
+                    }`}>
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
     </div>
   );
 }
