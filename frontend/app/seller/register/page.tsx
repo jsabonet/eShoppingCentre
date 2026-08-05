@@ -35,7 +35,6 @@ const CATEGORIES_BY_TYPE: Record<string, { value: string; label: string }[]> = {
     { value: 'musica', label: '🎵 Música & Áudio' },
     { value: 'templates', label: '📋 Templates & Recursos' },
     { value: 'arte-digital', label: '🖼️ Arte Digital & NFTs' },
-    { value: 'cursos-gravados', label: '📹 Cursos Gravados' },
     { value: 'planilhas', label: '📊 Planilhas & Ferramentas' },
   ],
   course: [
@@ -77,8 +76,9 @@ export default function SellerRegisterPage() {
     companyPhone: '',
     companyEmail: '',
     repDocType: '', // Tipo de doc do representante: 'bi' | 'passaporte' | 'diire'
-    // Product type (single selection)
+    // Product type (single selection — 'physical' | 'digital' | 'course')
     productType: '',
+    digitalSubtype: 'products' as 'products' | 'courses', // sub-selecção dentro de Produtos Digitais
     // Policies
     shippingPolicy: '',
     returnPolicy: '',
@@ -167,7 +167,7 @@ export default function SellerRegisterPage() {
     if (step < 3) { setStep(step + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (!form.agreeTerms) { setError('Deve aceitar os Termos e Condições para continuar.'); return; }
     if (!form.productType) {
-      setError('Seleccione o tipo de produto que vai vender (físico, digital ou curso).');
+      setError('Seleccione o tipo de produto que vai vender (físico ou digital).');
       setStep(1);
       return;
     }
@@ -359,7 +359,7 @@ export default function SellerRegisterPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">Tipo de Produto que vai vender *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {([
                     {
                       value: 'physical' as const,
@@ -377,7 +377,7 @@ export default function SellerRegisterPage() {
                     {
                       value: 'digital' as const,
                       label: 'Produtos Digitais',
-                      desc: 'Download imediato',
+                      desc: 'Ebooks, software, cursos & mais',
                       icon: (
                         <svg className="mx-auto mb-2" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M12 6h10l10 10v16a2 2 0 01-2 2H12a2 2 0 01-2-2V8a2 2 0 012-2z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
@@ -387,29 +387,22 @@ export default function SellerRegisterPage() {
                         </svg>
                       ),
                     },
-                    {
-                      value: 'course' as const,
-                      label: 'Cursos Online',
-                      desc: 'Conteúdo educativo',
-                      icon: (
-                        <svg className="mx-auto mb-2" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <rect x="6" y="8" width="28" height="20" rx="3" stroke="currentColor" strokeWidth="2" />
-                          <path d="M16 15l8 5-8 5V15z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
-                          <path d="M10 32l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                          <path d="M30 32l-4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        </svg>
-                      ),
-                    },
                   ]).map((t) => (
                     <button
                       key={t.value}
                       type="button"
-                      onClick={() => setForm((prev) => ({ ...prev, productType: t.value, category: '' }))}
+                      onClick={() => setForm((prev) => ({ ...prev, productType: t.value, category: '', digitalSubtype: 'products' }))}
                       className={`p-4 border-2 rounded-lg text-center transition-colors ${
-                        form.productType === t.value ? 'border-accent bg-accent/5' : 'border-border hover:border-accent'
+                        (t.value === 'physical' && form.productType === 'physical') ||
+                        (t.value === 'digital' && (form.productType === 'digital' || form.productType === 'course'))
+                          ? 'border-accent bg-accent/5' : 'border-border hover:border-accent'
                       }`}
                     >
-                      <span className={`${form.productType === t.value ? 'text-accent' : 'text-muted-foreground'}`}>
+                      <span className={`${
+                        (t.value === 'physical' && form.productType === 'physical') ||
+                        (t.value === 'digital' && (form.productType === 'digital' || form.productType === 'course'))
+                          ? 'text-accent' : 'text-muted-foreground'
+                      }`}>
                         {t.icon}
                       </span>
                       <span className="text-sm font-medium">{t.label}</span>
@@ -417,6 +410,69 @@ export default function SellerRegisterPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Sub-selecção dentro de Produtos Digitais */}
+                {(form.productType === 'digital' || form.productType === 'course') && (
+                  <div className="mt-4">
+                    <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                      Especifique o tipo de conteúdo digital
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {([
+                        {
+                          subtype: 'products' as const,
+                          productTypeValue: 'digital' as const,
+                          label: 'Ficheiros Digitais',
+                          desc: 'PDFs, ebooks, software, música, templates',
+                          icon: (
+                            <svg className="mx-auto" width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <rect x="10" y="4" width="20" height="32" rx="3" stroke="currentColor" strokeWidth="2" />
+                              <line x1="14" y1="12" x2="26" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              <line x1="14" y1="17" x2="26" y2="17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              <line x1="14" y1="22" x2="22" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              <path d="M14 28l4 4 8-8" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          subtype: 'courses' as const,
+                          productTypeValue: 'course' as const,
+                          label: 'Cursos Online',
+                          desc: 'Aulas, módulos, certificados',
+                          icon: (
+                            <svg className="mx-auto" width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <rect x="6" y="10" width="28" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
+                              <path d="M16 16l8 5-8 5V16z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
+                              <rect x="10" y="32" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                              <rect x="24" y="32" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                            </svg>
+                          ),
+                        },
+                      ]).map((sub) => (
+                        <button
+                          key={sub.subtype}
+                          type="button"
+                          onClick={() => setForm((prev) => ({
+                            ...prev,
+                            digitalSubtype: sub.subtype,
+                            productType: sub.productTypeValue,
+                            category: '',
+                          }))}
+                          className={`p-3 border-2 rounded-lg text-center transition-colors ${
+                            form.digitalSubtype === sub.subtype
+                              ? 'border-accent bg-accent/5' : 'border-border hover:border-accent'
+                          }`}
+                        >
+                          <div className={`flex justify-center ${form.digitalSubtype === sub.subtype ? 'text-accent' : 'text-muted-foreground'}`}>
+                            {sub.icon}
+                          </div>
+                          <span className="block text-xs font-medium mt-1.5">{sub.label}</span>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{sub.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {form.productType && (

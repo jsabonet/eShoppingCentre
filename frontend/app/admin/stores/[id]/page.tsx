@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Edit, Building2, FileText, Clock, Package, ShoppingCart,
-  Store as StoreIcon, TrendingUp, Users, CheckCircle, XCircle, ChevronRight, AlertCircle, Loader2
+  Store as StoreIcon, TrendingUp, Users, CheckCircle, XCircle, ChevronRight, AlertCircle, Loader2, Eye, X, Download
 } from 'lucide-react';
 import AdminLayout from '@/src/components/admin/AdminLayout';
 import { adminAPI } from '@/src/lib/api';
@@ -34,6 +34,7 @@ export default function AdminStoreDetailPage() {
   const [store, setStore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; label: string } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -230,10 +231,37 @@ export default function AdminStoreDetailPage() {
                 <h3 className="font-bold mb-3 flex items-center gap-2"><FileText size={16} /> Documentos de Verificação</h3>
                 {store.identity_document || store.tax_document || store.address_proof || store.additional_documents ? (
                   <div className="space-y-2">
-                    {store.identity_document && <a href={mediaUrl(store.identity_document) || '#'} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-muted/20 rounded-lg hover:bg-muted/40 text-sm"><FileText size={16} className="text-blue-500" /> Doc. Identidade (frente)</a>}
-                    {store.tax_document && <a href={mediaUrl(store.tax_document) || '#'} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-muted/20 rounded-lg hover:bg-muted/40 text-sm"><FileText size={16} className="text-green-500" /> NUIT / Registo Comercial</a>}
-                    {store.address_proof && <a href={mediaUrl(store.address_proof) || '#'} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-muted/20 rounded-lg hover:bg-muted/40 text-sm"><FileText size={16} className="text-orange-500" /> Verso do Documento / Morada</a>}
-                    {store.additional_documents && <a href={mediaUrl(store.additional_documents) || '#'} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-muted/20 rounded-lg hover:bg-muted/40 text-sm"><FileText size={16} className="text-gray-500" /> Documentos Adicionais</a>}
+                    {[
+                      { key: 'identity_document', label: 'Doc. Identidade (frente)', color: 'text-blue-500', bg: 'bg-blue-50' },
+                      { key: 'tax_document', label: 'NUIT / Registo Comercial', color: 'text-green-500', bg: 'bg-green-50' },
+                      { key: 'address_proof', label: 'Verso do Documento / Morada', color: 'text-orange-500', bg: 'bg-orange-50' },
+                      { key: 'additional_documents', label: 'Documentos Adicionais', color: 'text-gray-500', bg: 'bg-gray-50' },
+                    ].map(({ key, label, color, bg }) => {
+                      const docUrl = store[key];
+                      if (!docUrl) return null;
+                      const fullUrl = mediaUrl(docUrl) || '#';
+                      return (
+                        <div key={key} className="flex items-center gap-2">
+                          <button
+                            onClick={() => setPreviewDoc({ url: fullUrl, label })}
+                            className={`flex-1 flex items-center gap-2 p-2.5 rounded-lg hover:opacity-80 transition-opacity text-sm text-left ${bg}`}
+                          >
+                            <Eye size={16} className={color} />
+                            <span className="font-medium truncate">{label}</span>
+                          </button>
+                          <a
+                            href={fullUrl}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2.5 rounded-lg border border-border hover:bg-muted transition-colors shrink-0"
+                            title="Download"
+                          >
+                            <Download size={14} className="text-muted-foreground" />
+                          </a>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : <p className="text-sm text-muted-foreground">Nenhum documento enviado.</p>}
               </div>
@@ -293,6 +321,54 @@ export default function AdminStoreDetailPage() {
           </div>
         </div>
       ) : null}
+
+      {/* ── Modal de Preview de Documentos ── */}
+      {previewDoc && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setPreviewDoc(null)}
+        >
+          <div
+            className="relative bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <FileText size={16} className="text-accent" />
+                {previewDoc.label}
+              </h4>
+              <div className="flex items-center gap-1">
+                <a
+                  href={previewDoc.url}
+                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg hover:bg-muted transition-colors"
+                  title="Download"
+                >
+                  <Download size={16} className="text-muted-foreground" />
+                </a>
+                <button
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-2 rounded-lg hover:bg-muted transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            {/* Image */}
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-muted/30 p-4">
+              <img
+                src={previewDoc.url}
+                alt={previewDoc.label}
+                className="max-w-full max-h-[75vh] object-contain rounded shadow-md"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     </AdminLayout>
   );
 }
