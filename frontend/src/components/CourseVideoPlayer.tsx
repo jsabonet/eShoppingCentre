@@ -25,13 +25,12 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-  // Timestamp-based progress — calculates elapsed from start, no counter needed
+  // Timestamp-based progress — starts when video is ready
   useEffect(() => {
     if (!videoReady || loading) return;
     initialOffset.current = startTime;
     startTimestamp.current = Date.now();
 
-    // Single lightweight interval just to report progress for save/UI
     timerRef.current = setInterval(() => {
       if (document.hidden) return;
       const elapsed = initialOffset.current + Math.floor((Date.now() - startTimestamp.current) / 1000);
@@ -39,11 +38,12 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
     }, 3000);
 
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [videoReady, loading, startTime, lessonId]);
+  }, [videoReady, loading]); // only restart timer when video ready state changes
 
   const fetchToken = useCallback(async () => {
     setLoading(true); setError(''); setVideoReady(false);
-    initialOffset.current = startTime;
+    const resumeAt = startTime; // capture once, not as dependency
+    initialOffset.current = resumeAt;
     startTimestamp.current = 0;
     try {
       const tok = localStorage.getItem('access_token');
@@ -57,7 +57,7 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
       }
       const data = await res.json();
       if (data.token && data.video_uid) {
-        const tp = startTime > 0 ? `&startTime=${startTime}s` : '';
+        const tp = resumeAt > 0 ? `&startTime=${resumeAt}s` : '';
         const ifr = document.createElement('iframe');
         ifr.src = `https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}&controls=true&preload=true&autoplay=true${tp}`;
         ifr.className = 'absolute inset-0 w-full h-full border-0';
@@ -69,7 +69,7 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
         setLoading(false);
       } else { throw new Error(data.detail || 'Video ainda nao disponivel.'); }
     } catch (err: any) { setError(err.message || 'Erro ao carregar o video.'); setLoading(false); }
-  }, [lessonId, startTime, API_URL]);
+  }, [lessonId, API_URL]); // ONLY recreate when lesson changes!
 
   useEffect(() => { fetchToken(); }, [fetchToken]);
 
