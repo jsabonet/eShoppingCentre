@@ -18,36 +18,58 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
   const [videoReady, setVideoReady] = useState(false);
   const progressRef = useRef(0);
   const endedRef = useRef(false);
+  // Stable callback refs to avoid effect re-creation
+  const onProgressRef = useRef(onProgress);
+  const onEndedRef = useRef(onEnded);
+  onProgressRef.current = onProgress;
+  onEndedRef.current = onEnded;
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
   // Listen for Cloudflare Stream postMessage events
   useEffect(() => {
     const handler = (e: MessageEvent) => {
+      // Log all postMessage for debugging
+      if (e.data && typeof e.data === 'object' && (e.data.source || e.data.type || '').toString().toLowerCase().includes('cloudflare')) {
+        console.log('[CourseVideoPlayer] postMessage:', JSON.stringify(e.data).slice(0, 200));
+      }
       if (!e.data || typeof e.data !== 'object') return;
-      // Cloudflare Stream uses source: 'cloudflare' or 'cloudflare-stream'
-      const source = e.data.source || e.data.type || '';
-      if (!source.toLowerCase().includes('cloudflare')) return;
+      const source = (e.data.source || e.data.type || '').toString().toLowerCase();
+      if (!source.includes('cloudflare')) return;
       const payload = e.data;
       switch (payload.event) {
         case 'timeupdate':
           if (payload.time > 0) {
             progressRef.current = Math.floor(payload.time);
-            onProgress?.(progressRef.current);
+            console.log('[CourseVideoPlayer] timeupdate:', progressRef.current, 's');
+            onProgressRef.current?.(progressRef.current);
           }
           break;
         case 'ended':
         case 'videoEnded':
           if (!endedRef.current) {
             endedRef.current = true;
-            onEnded?.();
+            console.log('[CourseVideoPlayer] video ended - triggering onEnded');
+            onEndedRef.current?.();
           }
           break;
+        case 'play':
+          console.log('[CourseVideoPlayer] play event');
+          break;
+        case 'pause':
+          console.log('[CourseVideoPlayer] pause event');
+          break;
+        default:
+          console.log('[CourseVideoPlayer] unknown event:', payload.event);
       }
     };
     window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [onProgress, onEnded]);
+    console.log('[CourseVideoPlayer] postMessage listener registered for lesson:', lessonId);
+    return () => {
+      window.removeEventListener('message', handler);
+      console.log('[CourseVideoPlayer] postMessage listener removed');
+    };
+  }, [lessonId]); // Only re-attach when lesson changes
 
   // Reset ended flag when lesson changes
   useEffect(() => {
