@@ -17,11 +17,51 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "eShoppingCentre",
-  description: "A sua plataforma global de e-commerce",
-  icons: {
-    icon: "/icon.png",
+  title: {
+    default: 'eShoppingCentre — Marketplace em Moçambique',
+    template: '%s | eShoppingCentre',
   },
+  description:
+    'A sua plataforma global de e-commerce. Compre e venda produtos físicos, digitais e cursos online em Moçambique.',
+  keywords: [
+    'ecommerce',
+    'moçambique',
+    'marketplace',
+    'compras online',
+    'loja online',
+    'produtos digitais',
+    'cursos online',
+    'eShoppingCentre',
+  ],
+  authors: [{ name: 'eShoppingCentre' }],
+  creator: 'eShoppingCentre',
+  publisher: 'eShoppingCentre',
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: 'website',
+    locale: 'pt_MZ',
+    siteName: 'eShoppingCentre',
+    title: 'eShoppingCentre — Marketplace em Moçambique',
+    description: 'Compre e venda produtos físicos, digitais e cursos online.',
+    images: [{ url: '/icon.png', width: 512, height: 512 }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'eShoppingCentre',
+    description: 'Marketplace em Moçambique',
+    images: ['/icon.png'],
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48' },
+      { url: '/favicon-96x96.png', type: 'image/png', sizes: '96x96' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  manifest: '/manifest.json',
+  category: 'shopping',
 };
 
 export default function RootLayout({

@@ -1,7 +1,7 @@
 {
   "name": "eShoppingCentre",
   "short_name": "eShopping",
-  "description": "Centro de Compras Online — Marketplace com milhões de produtos em Moçambique",
+  "description": "Marketplace em Moçambique",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
