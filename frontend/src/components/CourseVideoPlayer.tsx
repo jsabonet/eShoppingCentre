@@ -104,4 +104,3 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
     </div>
   );
 }
-}
