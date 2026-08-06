@@ -24,7 +24,10 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
   // Listen for Cloudflare Stream postMessage events
   useEffect(() => {
     const handler = (e: MessageEvent) => {
-      if (!e.data || e.data.source !== 'cloudflare-stream') return;
+      if (!e.data || typeof e.data !== 'object') return;
+      // Cloudflare Stream uses source: 'cloudflare' or 'cloudflare-stream'
+      const source = e.data.source || e.data.type || '';
+      if (!source.toLowerCase().includes('cloudflare')) return;
       const payload = e.data;
       switch (payload.event) {
         case 'timeupdate':
