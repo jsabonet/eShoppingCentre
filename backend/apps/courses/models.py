@@ -10,6 +10,8 @@ class Course(BaseModel):
     total_lessons = models.PositiveIntegerField(default=0)
     certificate_enabled = models.BooleanField(default=True)
     preview_video_url = models.URLField(blank=True)
+    access_duration_days = models.PositiveIntegerField(null=True, blank=True,
+        help_text='Dias de acesso apos matricula. Null = acesso vitalicio.')
 
     def __str__(self):
         return self.product.name
@@ -63,6 +65,31 @@ class CourseLesson(BaseModel):
         return self.title
 
 
+class LessonAttachment(BaseModel):
+    lesson = models.ForeignKey(CourseLesson, on_delete=models.CASCADE, related_name='attachments')
+    title = models.CharField(max_length=300)
+    file = models.FileField(upload_to='courses/attachments/%Y/%m/')
+    file_size = models.PositiveIntegerField(default=0, help_text='Tamanho em bytes')
+    file_type = models.CharField(max_length=100, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+    def __str__(self):
+        return f'{self.lesson.title} - {self.title}'
+
+    def save(self, *args, **kwargs):
+        if self.file and not self.file_size:
+            try:
+                self.file_size = self.file.size
+            except Exception:
+                pass
+        if self.file and not self.file_type:
+            self.file_type = self.file.name.rsplit('.', 1)[-1].lower() if '.' in self.file.name else ''
+        super().save(*args, **kwargs)
+
+
 class Enrollment(BaseModel):
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='enrollments')
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments')
@@ -70,9 +97,18 @@ class Enrollment(BaseModel):
     progress = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     completed = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
+    access_expires_at = models.DateTimeField(null=True, blank=True,
+        help_text='Data de expiracao do acesso. Null = vitalicio.')
 
     class Meta:
         unique_together = [['user', 'course']]
+
+    @property
+    def has_access(self):
+        if self.access_expires_at is None:
+            return True
+        from django.utils import timezone
+        return timezone.now() < self.access_expires_at
 
     def __str__(self):
         return f'{self.user.email} - {self.course.product.name}'

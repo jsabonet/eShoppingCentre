@@ -110,14 +110,15 @@ class LessonStreamTokenView(APIView):
             if lesson.is_free_preview:
                 pass
             else:
-                # Verificar matricula
-                has_access = Enrollment.objects.filter(
+                # Verificar matricula e acesso
+                enrollment = Enrollment.objects.filter(
                     user=request.user,
                     course=course,
-                    completed=False,
-                ).exists()
-                if not has_access:
+                ).first()
+                if not enrollment:
                     return Response({'detail': 'Nao esta matriculado neste curso.'}, status=403)
+                if not enrollment.has_access:
+                    return Response({'detail': 'O seu acesso a este curso expirou.'}, status=403)
 
         if not lesson.cloudflare_video_uid:
             return Response({'detail': 'Video ainda nao disponivel.'}, status=404)

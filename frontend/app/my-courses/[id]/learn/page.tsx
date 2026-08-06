@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, PlayCircle, CheckCircle, ChevronDown, ChevronUp,
-  Menu, X, BookOpen, Loader2
+  Menu, X, BookOpen, Loader2, AlertTriangle, FileText, Download, Paperclip
 } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import CourseVideoPlayer from '@/src/components/CourseVideoPlayer';
@@ -39,11 +39,13 @@ export default function CourseLearnPage() {
   const [modules, setModules] = useState<ModuleData[]>([]);
   const [courseTitle, setCourseTitle] = useState('');
   const [loading, setLoading] = useState(true);
+  const [accessExpired, setAccessExpired] = useState(false);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [watchedMap, setWatchedMap] = useState<Record<string, number>>({});
   const [completing, setCompleting] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+  const [attachments, setAttachments] = useState<{ id: string; title: string; file_url: string; file_name: string; file_size: number; file_type: string; }[]>([]);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const apiHeaders = () => {
@@ -81,8 +83,15 @@ export default function CourseLearnPage() {
         if (!currentLessonId && mods.length > 0 && mods[0].lessons.length > 0) {
           setCurrentLessonId(mods[0].lessons[0].id);
         }
-      } else if (res.status === 403 || res.status === 404) {
-        // Not enrolled or course not found
+      } else if (res.status === 403) {
+        const body = await res.json().catch(() => ({}));
+        if ((body as any).detail?.includes('expirou')) {
+          setAccessExpired(true);
+          setModules([]);
+        } else {
+          setModules([]);
+        }
+      } else if (res.status === 404) {
         setModules([]);
       } else if (res.status === 401) {
         window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
@@ -116,6 +125,13 @@ export default function CourseLearnPage() {
   const totalLessons = modules.reduce((sum, m) => sum + m.lessons.length, 0);
   const completedCount = completedIds.size;
 
+  const formatFileSize = (bytes: number): string => {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   // Converte duração "MM:SS" ou "H:MM:SS" para segundos
   const parseDurationSeconds = (dur: string): number => {
     if (!dur) return 1;
@@ -132,6 +148,11 @@ export default function CourseLearnPage() {
   const goToLesson = (lessonId: string) => {
     setCurrentLessonId(lessonId);
     setSidebarOpen(false);
+    // Fetch attachments for this lesson
+    fetch(`${API_URL}/courses/lessons/${lessonId}/attachments/`, { headers: apiHeaders() })
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setAttachments(data || []))
+      .catch(() => setAttachments([]));
     // Expand module containing this lesson
     for (const mod of modules) {
       if (mod.lessons.some(l => l.id === lessonId)) {
@@ -282,6 +303,21 @@ export default function CourseLearnPage() {
     );
   }
 
+  if (accessExpired) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center p-8 max-w-md">
+          <AlertTriangle size={48} className="mx-auto mb-4 text-amber-500" />
+          <h1 className="text-xl font-bold mb-2">Acesso Expirado</h1>
+          <p className="text-muted-foreground mb-6">O periodo de acesso a este curso terminou.</p>
+          <Link href="/my-courses" className="px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium">
+            Voltar aos Meus Cursos
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const isCompleted = currentLessonId ? completedIds.has(currentLessonId) : false;
 
   return (
@@ -350,6 +386,36 @@ export default function CourseLearnPage() {
             </div>
           )}
         </div>
+
+        {/* Description & Attachments */}
+        {currentLesson && (currentLesson.description || attachments.length > 0) && (
+          <div className="bg-card border-t border-border px-4 py-4 space-y-3">
+            {currentLesson.description && (
+              <div>
+                <h3 className="text-sm font-bold mb-1">Descricao</h3>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{currentLesson.description}</p>
+              </div>
+            )}
+            {attachments.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold mb-1 flex items-center gap-1.5">
+                  <Paperclip size={14} /> Anexos ({attachments.length})
+                </h3>
+                <div className="space-y-1">
+                  {attachments.map(att => (
+                    <a key={att.id} href={att.file_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-muted/50 transition-colors border border-border">
+                      <FileText size={16} className="text-accent shrink-0" />
+                      <span className="flex-1 truncate">{att.file_name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">{formatFileSize(att.file_size)}</span>
+                      <Download size={14} className="text-muted-foreground shrink-0" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bottom Navigation */}
         <div className="bg-card border-t border-border px-4 py-3">

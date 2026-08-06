@@ -102,6 +102,7 @@ export default function NewProductPage() {
     digitalCompatibility: '',    // OS/software requirements
     // Type-specific — Course
     instructorName: '', courseLevel: 'iniciante', courseDuration: '', courseLessons: '',
+    accessDurationDays: '',  // vazio = vitalício
   });
 
   const [mainImage, setMainImage] = useState<File | null>(null);
@@ -267,6 +268,9 @@ export default function NewProductPage() {
         formData.append('course_level', form.courseLevel);
         formData.append('course_duration', form.courseDuration);
         formData.append('total_lessons', form.courseLessons);
+        if (form.accessDurationDays) {
+          formData.append('access_duration_days', form.accessDurationDays);
+        }
       }
 
       // Images are NOT sent with product creation — the backend ignores them (images field is read_only).
@@ -704,6 +708,13 @@ export default function NewProductPage() {
                   <Field label="Duracao"><input type="text" value={form.courseDuration} onChange={(e) => updateField('courseDuration', e.target.value)} placeholder="Ex: 20h" className="w-full h-11 px-4 rounded-xl border border-border bg-card placeholder:text-muted-foreground transition-all duration-200 hover:border-accent/30 focus:border-accent focus:ring-4 focus:ring-ring/20 focus:outline-none" /></Field>
                   <Field label="Numero de Aulas"><input type="number" value={form.courseLessons} onChange={(e) => updateField('courseLessons', e.target.value)} className="w-full h-11 px-4 rounded-xl border border-border bg-card placeholder:text-muted-foreground transition-all duration-200 hover:border-accent/30 focus:border-accent focus:ring-4 focus:ring-ring/20 focus:outline-none" /></Field>
                 </div>
+                <div className="mt-4">
+                  <Field label="Vitalidade (dias de acesso)" hint="Deixe vazio para acesso vitalicio.">
+                    <input type="number" value={form.accessDurationDays} onChange={(e) => updateField('accessDurationDays', e.target.value)}
+                      placeholder="Ex: 30, 90, 365" min="1"
+                      className="w-full h-11 px-4 rounded-xl border border-border bg-card placeholder:text-muted-foreground transition-all duration-200 hover:border-accent/30 focus:border-accent focus:ring-4 focus:ring-ring/20 focus:outline-none" />
+                  </Field>
+                </div>
               </>
             )}
 
@@ -846,6 +857,7 @@ export default function NewProductPage() {
                       <p className="text-sm"><span className="text-muted-foreground">Nivel:</span> {{iniciante:'Iniciante',intermedio:'Intermedio',avancado:'Avancado'}[form.courseLevel]}</p>
                       {form.courseDuration && <p className="text-sm"><span className="text-muted-foreground">Duracao:</span> {form.courseDuration}</p>}
                       {form.courseLessons && <p className="text-sm"><span className="text-muted-foreground">Aulas:</span> {form.courseLessons}</p>}
+                      <p className="text-sm"><span className="text-muted-foreground">Acesso:</span> {form.accessDurationDays ? `${form.accessDurationDays} dias` : 'Vitalicio'}</p>
                     </>
                   )}
                   <p className="text-sm"><span className="text-muted-foreground">Comissao Afiliados:</span> {form.commission}%</p>

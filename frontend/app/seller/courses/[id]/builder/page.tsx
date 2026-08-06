@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Plus, GripVertical, Eye, EyeOff, Trash2, ChevronDown, ChevronRight,
-  Save, ArrowLeft, Play, FileText, Upload
+  Save, ArrowLeft, Play, FileText, Upload, Paperclip, Download, X
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -25,6 +25,17 @@ interface LessonData {
   sort_order: number;
   cloudflare_video_uid?: string;
   cloudflare_video_status?: string;
+  attachments?: AttachmentData[];
+}
+
+interface AttachmentData {
+  id: string;
+  title: string;
+  file_url: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  sort_order: number;
 }
 
 interface ModuleData {
@@ -60,6 +71,12 @@ export default function CourseBuilderPage() {
       setCourseTitle(data.course_title || '');
       setModules(data.modules || []);
       setExpandedModules(new Set((data.modules || []).map((m: ModuleData) => m.id)));
+
+      // Fetch attachments for all lessons
+      const allLessons: LessonData[] = (data.modules || []).flatMap((m: ModuleData) => m.lessons);
+      for (const lesson of allLessons) {
+        fetchAttachmentsSilent(lesson.id);
+      }
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar.');
       setModules([]);
@@ -153,6 +170,68 @@ export default function CourseBuilderPage() {
     await updateLesson(lesson.id, 'is_free_preview', newVal);
   };
 
+  // ─── Attachments ───
+  const [attachmentsMap, setAttachmentsMap] = useState<Record<string, AttachmentData[]>>({});
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+
+  const fetchAttachments = async (lessonId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/attachments/`, { headers: apiHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setAttachmentsMap(prev => ({ ...prev, [lessonId]: data }));
+        setModules(prev => prev.map(m => ({
+          ...m,
+          lessons: m.lessons.map(l => l.id === lessonId ? { ...l, attachments: data } : l),
+        })));
+      }
+    } catch {}
+  };
+
+  // Silent fetch — only update attachments map, not modules (avoids re-render loops)
+  const fetchAttachmentsSilent = async (lessonId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/attachments/`, { headers: apiHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setAttachmentsMap(prev => ({ ...prev, [lessonId]: data }));
+      }
+    } catch {}
+  };
+
+  const uploadAttachment = async (lessonId: string, file: File) => {
+    setUploadingFor(lessonId);
+    try {
+      const token = localStorage.getItem('access_token');
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
+      const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/attachments/upload/`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      });
+      if (res.ok) fetchAttachments(lessonId);
+    } catch (err: any) {
+      setError('Erro ao enviar anexo: ' + (err.message || 'desconhecido'));
+    } finally { setUploadingFor(null); }
+  };
+
+  const deleteAttachment = async (attachmentId: string, lessonId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/courses/lessons/attachments/${attachmentId}/`, {
+        method: 'DELETE', headers: apiHeaders(),
+      });
+      if (res.ok) fetchAttachments(lessonId);
+    } catch {}
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   if (loading) {
     return (
       <SellerLayout>
@@ -242,6 +321,15 @@ export default function CourseBuilderPage() {
 
                       {/* Video upload & management */}
                       <div className="ml-7">
+                        {/* Description */}
+                        <textarea
+                          defaultValue={lesson.description || ''}
+                          onBlur={(e) => { if (e.target.value !== lesson.description) updateLesson(lesson.id, 'description', e.target.value); }}
+                          placeholder="Descricao da aula (opcional)..."
+                          className="w-full px-2 py-1.5 border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-ring text-xs resize-none mb-2"
+                          rows={2}
+                        />
+
                         <VideoUploader
                           lessonId={lesson.id}
                           existingVideoStatus={lesson.cloudflare_video_status}
@@ -261,6 +349,38 @@ export default function CourseBuilderPage() {
                             <span className="text-[10px] text-muted-foreground">{lesson.video_provider}</span>
                           </div>
                         )}
+                        {/* Attachments */}
+                        <div className="mt-3 border-t border-border pt-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                              <Paperclip size={11} /> Anexos
+                            </span>
+                            <label className="cursor-pointer text-[10px] text-accent hover:underline flex items-center gap-1">
+                              <Plus size={11} /> Adicionar
+                              <input type="file" className="hidden"
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAttachment(lesson.id, f); }}
+                                disabled={uploadingFor === lesson.id} />
+                            </label>
+                          </div>
+                          {uploadingFor === lesson.id && (
+                            <p className="text-[10px] text-muted-foreground">A enviar...</p>
+                          )}
+                          {(attachmentsMap[lesson.id] || []).length > 0 && (
+                            <div className="space-y-1 mt-1">
+                              {(attachmentsMap[lesson.id] || []).map(att => (
+                                <div key={att.id} className="flex items-center gap-2 text-[11px] bg-muted/30 rounded px-2 py-1.5">
+                                  <FileText size={11} className="text-accent shrink-0" />
+                                  <span className="flex-1 truncate">{att.file_name}</span>
+                                  <span className="text-muted-foreground shrink-0">{formatFileSize(att.file_size)}</span>
+                                  <button onClick={() => deleteAttachment(att.id, lesson.id)}
+                                    className="p-0.5 text-muted-foreground hover:text-red-500 transition-colors shrink-0">
+                                    <X size={11} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

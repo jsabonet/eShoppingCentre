@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { BookOpen, Clock, PlayCircle, Award, ChevronRight } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, Award, ChevronRight, AlertCircle } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -18,6 +18,8 @@ interface EnrollmentData {
   completed: boolean;
   completed_at: string | null;
   created_at: string;
+  access_expires_at: string | null;
+  access_duration_days: number | null;
 }
 
 function timeAgo(iso: string): string {
@@ -122,6 +124,12 @@ export default function MyCoursesPage() {
                     {enr.completed ? 'Rever' : 'Continuar'} <PlayCircle size={14} />
                   </span>
                 </div>
+                {enr.access_expires_at && (
+                  <div className="mt-2 text-xs flex items-center gap-1 text-amber-600">
+                    <AlertCircle size={12} />
+                    Expira em {new Date(enr.access_expires_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                )}
               </div>
             </Link>
           ))}

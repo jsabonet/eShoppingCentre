@@ -28,6 +28,10 @@ urlpatterns = [
     path('modules/<uuid:module_id>/lessons/reorder/', views.LessonReorderView.as_view(), name='lesson_reorder'),
     path('lessons/<uuid:lesson_id>/', views.LessonUpdateView.as_view(), name='lesson_update'),
     path('lessons/<uuid:lesson_id>/delete/', views.LessonDeleteView.as_view(), name='lesson_delete'),
+    # Attachments
+    path('lessons/<uuid:lesson_id>/attachments/', views.LessonAttachmentListView.as_view(), name='lesson_attachments_list'),
+    path('lessons/<uuid:lesson_id>/attachments/upload/', views.LessonAttachmentUploadView.as_view(), name='lesson_attachment_upload'),
+    path('lessons/attachments/<uuid:attachment_id>/', views.LessonAttachmentDeleteView.as_view(), name='lesson_attachment_delete'),
     # Complete lesson
     path('me/lessons/<uuid:lesson_id>/complete/', views.CompleteLessonView.as_view(), name='complete_lesson'),
     path('me/lessons/<uuid:lesson_id>/watch-progress/', views.WatchProgressView.as_view(), name='watch_progress'),

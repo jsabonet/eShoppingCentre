@@ -77,8 +77,20 @@ class ProductListView(generics.ListCreateAPIView):
                     'level': self.request.data.get('course_level', 'beginner'),
                     'duration': self.request.data.get('course_duration', ''),
                     'total_lessons': int(self.request.data.get('total_lessons', 0)),
+                    'access_duration_days': self._parse_access_duration(),
                 }
             )
+
+    def _parse_access_duration(self):
+        """Extrai access_duration_days do request. None = vitalício."""
+        val = self.request.data.get('access_duration_days', None)
+        if val is None or val == '' or val == 'null':
+            return None
+        try:
+            num = int(val)
+            return num if num > 0 else None
+        except (ValueError, TypeError):
+            return None
 
 
 class ProductSearchView(generics.ListAPIView):
@@ -135,6 +147,25 @@ class ProductUpdateView(generics.RetrieveUpdateAPIView):
 
     def get_queryset(self):
         return self.request.user.store.products.all()
+
+    def perform_update(self, serializer):
+        product = serializer.save()
+        if product.product_type == 'course' and hasattr(product, 'course'):
+            course = product.course
+            updates = {}
+            if 'course_level' in self.request.data:
+                updates['level'] = self.request.data['course_level']
+            if 'course_duration' in self.request.data:
+                updates['duration'] = self.request.data['course_duration']
+            if 'total_lessons' in self.request.data:
+                updates['total_lessons'] = int(self.request.data['total_lessons'])
+            if 'access_duration_days' in self.request.data:
+                dur = self._parse_access_duration()
+                updates['access_duration_days'] = dur
+            if updates:
+                for k, v in updates.items():
+                    setattr(course, k, v)
+                course.save()
 
 
 class ProductDeleteView(generics.DestroyAPIView):

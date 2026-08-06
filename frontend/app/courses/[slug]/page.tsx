@@ -48,6 +48,7 @@ interface CourseDetail {
   preview_video_url: string;
   modules: ModuleData[];
   product: string;
+  access_duration_days: number | null;
 }
 
 export default function CourseDetailPage() {
@@ -107,11 +108,14 @@ export default function CourseDetailPage() {
 
   const totalLessons = course.modules.reduce((sum, m) => sum + m.lessons.length, 0);
   const fmtPrice = (p: string) => `${Number(p).toLocaleString('pt-MZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MZN`;
+  const accessLabel = course.access_duration_days
+    ? `Acesso por ${course.access_duration_days} dias`
+    : 'Acesso vitalício';
   const features = [
     course.duration || `${totalLessons} aulas`,
     `${totalLessons} aulas em ${course.modules.length} módulos`,
     course.certificate_enabled ? 'Certificado de conclusão' : null,
-    'Acesso vitalício',
+    accessLabel,
     'Suporte via WhatsApp',
   ].filter(Boolean);
 

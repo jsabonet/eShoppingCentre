@@ -107,6 +107,7 @@ export default function EditProductPage() {
     // Type-specific
     digitalFile: null as File | null,
     instructorName: '', courseLevel: 'iniciante', courseDuration: '', courseLessons: '',
+    accessDurationDays: '',  // vazio = vitalício
   });
 
   const [mainImage, setMainImage] = useState<File | null>(null);
@@ -164,6 +165,7 @@ export default function EditProductPage() {
           courseLevel: d.course_level || 'iniciante',
           courseDuration: d.course_duration || '',
           courseLessons: d.total_lessons ? String(d.total_lessons) : '',
+          accessDurationDays: d.course_access_duration_days != null ? String(d.course_access_duration_days) : '',
         });
 
         // Load existing images
@@ -311,6 +313,9 @@ export default function EditProductPage() {
         formData.append('stock', '999'); formData.append('instructor_name', form.instructorName);
         formData.append('course_level', form.courseLevel); formData.append('course_duration', form.courseDuration);
         formData.append('total_lessons', form.courseLessons);
+        if (form.accessDurationDays) {
+          formData.append('access_duration_days', form.accessDurationDays);
+        }
       }
 
       // PATCH update
@@ -652,6 +657,13 @@ export default function EditProductPage() {
                   <Field label="Nivel" required><select value={form.courseLevel} onChange={(e) => updateField('courseLevel', e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm"><option value="iniciante">Iniciante</option><option value="intermedio">Intermedio</option><option value="avancado">Avancado</option></select></Field>
                   <Field label="Duracao"><input type="text" value={form.courseDuration} onChange={(e) => updateField('courseDuration', e.target.value)} placeholder="Ex: 20h" className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" /></Field>
                   <Field label="Numero de Aulas"><input type="number" value={form.courseLessons} onChange={(e) => updateField('courseLessons', e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" /></Field>
+                </div>
+                <div className="mt-4">
+                  <Field label="Vitalidade (dias de acesso)" hint="Deixe vazio para acesso vitalicio.">
+                    <input type="number" value={form.accessDurationDays} onChange={(e) => updateField('accessDurationDays', e.target.value)}
+                      placeholder="Ex: 30, 90, 365" min="1"
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+                  </Field>
                 </div>
               </>
             )}

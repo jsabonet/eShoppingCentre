@@ -11,7 +11,8 @@ class CourseModuleInline(admin.TabularInline):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ('product', 'instructor', 'level', 'total_lessons')
+    list_display = ('product', 'instructor', 'level', 'total_lessons', 'access_duration_days')
+    fields = ('product', 'instructor', 'level', 'duration', 'total_lessons', 'certificate_enabled', 'preview_video_url', 'access_duration_days')
     inlines = [CourseModuleInline]
 
 @admin.register(Enrollment)

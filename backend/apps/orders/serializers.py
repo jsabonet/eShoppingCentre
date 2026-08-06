@@ -174,10 +174,18 @@ class CreateOrderSerializer(serializers.Serializer):
 
             elif product.product_type == 'course' and hasattr(product, 'course'):
                 from apps.courses.models import Enrollment
+                from django.utils import timezone
+                from datetime import timedelta
+
+                course = product.course
+                defaults = {'order': order}
+                if course.access_duration_days:
+                    defaults['access_expires_at'] = timezone.now() + timedelta(days=course.access_duration_days)
+
                 Enrollment.objects.get_or_create(
                     user=order.buyer,
-                    course=product.course,
-                    defaults={'order': order},
+                    course=course,
+                    defaults=defaults,
                 )
 
     def _get_product_image(self, product):

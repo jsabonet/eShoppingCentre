@@ -92,7 +92,8 @@ class CourseListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
         fields = ('id', 'slug', 'title', 'instructor_name', 'level', 'duration',
-                  'total_lessons', 'image', 'price', 'compare_price', 'rating', 'students_count')
+                  'total_lessons', 'image', 'price', 'compare_price', 'rating',
+                  'students_count', 'access_duration_days')
 
     def get_image(self, obj):
         img = obj.product.images.filter(is_primary=True).first()
@@ -136,12 +137,14 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     course_slug = serializers.CharField(source='course.product.slug', read_only=True)
     course_id = serializers.UUIDField(source='course.id', read_only=True)
     total_lessons = serializers.IntegerField(source='course.total_lessons', read_only=True)
+    access_duration_days = serializers.IntegerField(source='course.access_duration_days', read_only=True)
     image = serializers.SerializerMethodField()
 
     class Meta:
         model = Enrollment
         fields = ('id', 'course_id', 'course_title', 'course_slug', 'total_lessons',
-                  'image', 'progress', 'completed', 'completed_at', 'created_at')
+                  'image', 'progress', 'completed', 'completed_at', 'created_at',
+                  'access_expires_at', 'access_duration_days')
 
     def get_image(self, obj):
         img = obj.course.product.images.filter(is_primary=True).first()

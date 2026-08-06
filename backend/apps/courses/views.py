@@ -2,7 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from .models import Course, CourseModule, CourseLesson, Enrollment, LessonProgress
+from .models import Course, CourseModule, CourseLesson, Enrollment, LessonProgress, LessonAttachment
 from .serializers import (
     CourseListSerializer, CourseDetailSerializer,
     EnrollmentSerializer, CourseLessonDetailSerializer,
@@ -133,6 +133,10 @@ class CourseLearnView(APIView):
             enrollment = Enrollment.objects.get(user=request.user, course=course)
         except Enrollment.DoesNotExist:
             return Response({'detail': 'Nao matriculado neste curso.'}, status=403)
+
+        # Verificar se o acesso expirou
+        if not enrollment.has_access:
+            return Response({'detail': 'O seu acesso a este curso expirou.'}, status=403)
 
         modules = course.modules.all().prefetch_related('lessons')
 
@@ -423,3 +427,70 @@ class CourseStudentListView(APIView):
             'total_lessons': course.total_lessons,
             'students': students,
         })
+
+
+# ─── Lesson Attachments ───
+
+class LessonAttachmentListView(APIView):
+    """GET /api/v1/courses/lessons/{lesson_id}/attachments/"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, lesson_id):
+        lesson = get_object_or_404(CourseLesson, id=lesson_id)
+        attachments = lesson.attachments.all().order_by('sort_order')
+        data = [{
+            'id': str(a.id),
+            'title': a.title,
+            'file_url': request.build_absolute_uri(a.file.url) if a.file else None,
+            'file_name': a.file.name.rsplit('/', 1)[-1] if a.file else '',
+            'file_size': a.file_size,
+            'file_type': a.file_type,
+            'sort_order': a.sort_order,
+        } for a in attachments]
+        return Response(data)
+
+
+class LessonAttachmentUploadView(APIView):
+    """POST /api/v1/courses/lessons/{lesson_id}/attachments/"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, lesson_id):
+        lesson = get_object_or_404(CourseLesson, id=lesson_id)
+        if lesson.module.course.product.store.owner != request.user:
+            return Response({'detail': 'Nao autorizado.'}, status=403)
+
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'detail': 'Ficheiro obrigatorio.'}, status=400)
+
+        title = request.data.get('title', file.name.rsplit('.', 1)[0])
+        last = lesson.attachments.order_by('-sort_order').first()
+        sort_order = (last.sort_order + 1) if last else 0
+
+        attachment = LessonAttachment.objects.create(
+            lesson=lesson,
+            title=title,
+            file=file,
+            sort_order=sort_order,
+        )
+        return Response({
+            'id': str(attachment.id),
+            'title': attachment.title,
+            'file_url': request.build_absolute_uri(attachment.file.url),
+            'file_name': attachment.file.name.rsplit('/', 1)[-1],
+            'file_size': attachment.file_size,
+            'file_type': attachment.file_type,
+            'sort_order': attachment.sort_order,
+        }, status=201)
+
+
+class LessonAttachmentDeleteView(APIView):
+    """DELETE /api/v1/courses/lessons/attachments/{attachment_id}/"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, attachment_id):
+        attachment = get_object_or_404(LessonAttachment, id=attachment_id)
+        if attachment.lesson.module.course.product.store.owner != request.user:
+            return Response({'detail': 'Nao autorizado.'}, status=403)
+        attachment.delete()
+        return Response({'detail': 'Anexo removido.'})
