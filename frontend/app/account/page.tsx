@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, Heart, Download, MapPin, ShoppingBag, ChevronRight } from 'lucide-react';
+import { Package, Heart, Download, MapPin, ShoppingBag, ChevronRight, BookOpen } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import AccountLayout from '@/src/components/AccountLayout';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -16,6 +16,7 @@ export default function AccountPage() {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
+  const [courseCount, setCourseCount] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -29,10 +30,13 @@ export default function AccountPage() {
 
   const loadData = async () => {
     try {
-      const [ordersRes, wishlistRes, addressesRes] = await Promise.allSettled([
+      const [ordersRes, wishlistRes, addressesRes, coursesRes] = await Promise.allSettled([
         ordersAPI.myOrders({ page_size: 5 }),
         usersAPI.myWishlist(),
         usersAPI.myAddresses(),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/courses/me/enrollments/`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+        }).then(r => r.ok ? r.json() : Promise.reject(r)),
       ]);
 
       if (ordersRes.status === 'fulfilled') {
@@ -46,6 +50,10 @@ export default function AccountPage() {
       if (addressesRes.status === 'fulfilled') {
         const data = addressesRes.value.data as any;
         setAddressCount(Array.isArray(data) ? data.length : data.count || data.results?.length || 0);
+      }
+      if (coursesRes.status === 'fulfilled') {
+        const data = coursesRes.value as any;
+        setCourseCount(Array.isArray(data) ? data.length : data.results?.length || data.count || 0);
       }
     } catch {} finally {
       setOrdersLoading(false);
@@ -88,7 +96,7 @@ export default function AccountPage() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
           <Link href="/account/orders" className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-shadow">
             <Package size={24} className="text-accent mb-2" />
             <p className="text-2xl font-bold">{orders.length}</p>
@@ -98,6 +106,11 @@ export default function AccountPage() {
             <Heart size={24} className="text-red-500 mb-2" />
             <p className="text-2xl font-bold">{wishlistCount}</p>
             <p className="text-sm text-muted-foreground">Favoritos</p>
+          </Link>
+          <Link href="/my-courses" className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-shadow">
+            <BookOpen size={24} className="text-purple-500 mb-2" />
+            <p className="text-2xl font-bold">{courseCount}</p>
+            <p className="text-sm text-muted-foreground">Meus Cursos</p>
           </Link>
           <Link href="/account/downloads" className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-shadow">
             <Download size={24} className="text-blue-500 mb-2" />

@@ -138,6 +138,10 @@ export default function MobileMenu({ categories }: MobileMenuProps) {
                 className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted rounded-lg transition-colors">
                 <User size={18} className="text-muted-foreground" /> Painel
               </a>
+              <a href="/my-courses" onClick={close}
+                className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted rounded-lg transition-colors">
+                <BookOpen size={18} className="text-muted-foreground" /> Meus Cursos
+              </a>
               <a href="/account/orders" onClick={close}
                 className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted rounded-lg transition-colors">
                 <ShoppingCart size={18} className="text-muted-foreground" /> Encomendas

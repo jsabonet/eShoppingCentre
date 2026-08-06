@@ -49,7 +49,7 @@ export default function Header() {
                   <Link href="/stores" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Lojas</Link>
                   <Link href="/courses" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Cursos</Link>
                   <Link href="/blog" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Blog</Link>
-                  <Link href="/contact" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Atendimento</Link>
+                  {/* <Link href="/contact" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Atendimento</Link> */}
                   <span className="text-gray-300 mx-1">|</span>
                   {isAuthenticated ? (
                     <>
