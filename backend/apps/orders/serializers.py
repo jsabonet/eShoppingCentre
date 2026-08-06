@@ -56,6 +56,7 @@ class CreateOrderSerializer(serializers.Serializer):
     buyer_notes = serializers.CharField(required=False, allow_blank=True)
 
     def validate_items(self, items):
+        user = self.context['request'].user
         for item in items:
             try:
                 product = Product.objects.get(id=item['product_id'], status='active')
@@ -63,6 +64,13 @@ class CreateOrderSerializer(serializers.Serializer):
                     raise serializers.ValidationError(
                         f'Stock insuficiente para {product.name}. Disponível: {product.stock}'
                     )
+                # Impedir compra duplicada de cursos
+                if product.product_type == 'course' and hasattr(product, 'course'):
+                    from apps.courses.models import Enrollment
+                    if Enrollment.objects.filter(user=user, course=product.course).exists():
+                        raise serializers.ValidationError(
+                            f'Já está inscrito no curso "{product.name}".'
+                        )
             except Product.DoesNotExist:
                 raise serializers.ValidationError(f'Produto {item["product_id"]} não encontrado.')
         return items
@@ -143,7 +151,34 @@ class CreateOrderSerializer(serializers.Serializer):
                 total_price=item['total_price'],
             )
 
+        # ── Processar entregas digitais e matrículas imediatamente ──
+        if order.payment_status == 'completed':
+            self._process_delivery(order)
+
         return order
+
+    def _process_delivery(self, order):
+        """Liberta downloads digitais e matricula em cursos após pagamento confirmado."""
+        for item in order.items.all():
+            product = item.product
+            if not product:
+                continue
+
+            if product.product_type == 'digital' and order.status in ('confirmed', 'processing'):
+                from apps.products.models import DigitalDownload
+                DigitalDownload.objects.get_or_create(
+                    user=order.buyer,
+                    product=product,
+                    order=order,
+                )
+
+            elif product.product_type == 'course' and hasattr(product, 'course'):
+                from apps.courses.models import Enrollment
+                Enrollment.objects.get_or_create(
+                    user=order.buyer,
+                    course=product.course,
+                    defaults={'order': order},
+                )
 
     def _get_product_image(self, product):
         img = product.images.filter(is_primary=True).first()
