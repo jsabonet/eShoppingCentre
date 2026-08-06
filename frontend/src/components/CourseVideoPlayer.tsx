@@ -22,7 +22,6 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
       try {
         const token = localStorage.getItem('access_token');
         const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/stream-token/`, {
-          method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
         });
         const data = await res.json();
