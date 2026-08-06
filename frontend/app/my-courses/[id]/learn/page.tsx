@@ -44,19 +44,19 @@ export default function CourseLearnPage() {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
 
-  // Fetch course structure
+  // Fetch course structure + progress from single endpoint
   const fetchCourse = useCallback(async () => {
     try {
-      const [builderRes, progressRes] = await Promise.all([
-        fetch(`${API_URL}/courses/${courseId}/builder/`, { headers: apiHeaders() }),
-        fetch(`${API_URL}/courses/${courseId}/progress/`, { headers: apiHeaders() }),
-      ]);
+      const res = await fetch(`${API_URL}/courses/${courseId}/learn/`, { headers: apiHeaders() });
 
-      if (builderRes.ok) {
-        const data = await builderRes.json();
+      if (res.ok) {
+        const data = await res.json();
         setCourseTitle(data.course_title || '');
         const mods: ModuleData[] = data.modules || [];
         setModules(mods);
+
+        // Progress
+        setCompletedIds(new Set(data.completed_ids || []));
 
         // Expand first module, first lesson auto-selected
         const expanded: Record<string, boolean> = {};
@@ -67,11 +67,9 @@ export default function CourseLearnPage() {
         if (!currentLessonId && mods.length > 0 && mods[0].lessons.length > 0) {
           setCurrentLessonId(mods[0].lessons[0].id);
         }
-      }
-
-      if (progressRes.ok) {
-        const progData = await progressRes.json();
-        setCompletedIds(new Set(progData.completed_ids || []));
+      } else if (res.status === 403 || res.status === 404) {
+        // Not enrolled or course not found
+        setModules([]);
       }
     } catch {} finally { setLoading(false); }
   }, [courseId, currentLessonId]);

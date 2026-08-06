@@ -100,6 +100,41 @@ class CourseBuilderView(APIView):
         })
 
 
+class CourseLearnView(APIView):
+    """GET /api/v1/courses/{course_id}/learn/ — Estrutura do curso para alunos matriculados."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        try:
+            enrollment = Enrollment.objects.get(user=request.user, course=course)
+        except Enrollment.DoesNotExist:
+            return Response({'detail': 'Nao matriculado neste curso.'}, status=403)
+
+        modules = course.modules.all().prefetch_related('lessons')
+
+        # Marcar aulas concluidas para o aluno
+        completed_ids = set(
+            LessonProgress.objects.filter(
+                enrollment=enrollment, completed=True
+            ).values_list('lesson_id', flat=True)
+        )
+
+        modules_data = CourseModuleSerializer(
+            modules, many=True,
+            context={'request': request, 'enrollment': enrollment}
+        ).data
+
+        return Response({
+            'course_id': str(course.id),
+            'course_title': course.product.name,
+            'modules': modules_data,
+            'progress': float(enrollment.progress),
+            'completed': enrollment.completed,
+            'completed_ids': list(completed_ids),
+        })
+
+
 class ModuleCreateView(generics.CreateAPIView):
     """POST /api/v1/courses/{course_id}/modules/"""
     serializer_class = CourseModuleWriteSerializer
