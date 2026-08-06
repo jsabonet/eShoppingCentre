@@ -6,20 +6,22 @@ import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 interface CourseVideoPlayerProps {
   lessonId: string;
   startTime?: number;
+  durationSeconds?: number; // duracao total em segundos para auto-complete
   onProgress?: (seconds: number) => void;
   onEnded?: () => void;
 }
 
-export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress, onEnded }: CourseVideoPlayerProps) {
+export default function CourseVideoPlayer({ lessonId, startTime = 0, durationSeconds = 0, onProgress, onEnded }: CourseVideoPlayerProps) {
   const playerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [videoReady, setVideoReady] = useState(false);
-  const startTimestamp = useRef(0); // Date.now() when video started
-  const initialOffset = useRef(startTime); // seconds already watched
+  const startTimestamp = useRef(0);
+  const initialOffset = useRef(startTime);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onProgressRef = useRef(onProgress);
   const onEndedRef = useRef(onEnded);
+  const endedFiredRef = useRef(false);
   onProgressRef.current = onProgress;
   onEndedRef.current = onEnded;
 
@@ -30,11 +32,17 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
     if (!videoReady || loading) return;
     initialOffset.current = startTime;
     startTimestamp.current = Date.now();
+    endedFiredRef.current = false;
 
     timerRef.current = setInterval(() => {
       if (document.hidden) return;
       const elapsed = initialOffset.current + Math.floor((Date.now() - startTimestamp.current) / 1000);
       onProgressRef.current?.(elapsed);
+      // Auto-complete: fire onEnded when elapsed >= duration
+      if (durationSeconds > 0 && elapsed >= durationSeconds && !endedFiredRef.current) {
+        endedFiredRef.current = true;
+        onEndedRef.current?.();
+      }
     }, 3000);
 
     return () => { if (timerRef.current) clearInterval(timerRef.current); };

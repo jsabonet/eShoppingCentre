@@ -319,6 +319,7 @@ export default function CourseLearnPage() {
                 key={currentLesson.id}
                 lessonId={currentLesson.id}
                 startTime={watchedMap[currentLesson.id] || 0}
+                durationSeconds={parseDurationSeconds(currentLesson.duration)}
                 onProgress={handleVideoProgress}
                 onEnded={handleVideoEnded}
               />
