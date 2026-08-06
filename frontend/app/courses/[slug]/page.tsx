@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, notFound } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRight, Clock, Star, Users, BookOpen, PlayCircle, CheckCircle, ShoppingCart, Loader2 } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import { useCart } from '@/src/contexts/CartContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -50,16 +51,17 @@ interface CourseDetail {
 }
 
 export default function CourseDetailPage() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug: paramsSlug } = useParams<{ slug: string }>();
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFoundErr, setNotFoundErr] = useState(false);
+  const { addToCart } = useCart();
 
   useEffect(() => {
-    if (!slug) return;
+    if (!paramsSlug) return;
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/courses/${slug}/`);
+        const res = await fetch(`${API_URL}/courses/${paramsSlug}/`);
         if (res.status === 404) { setNotFoundErr(true); return; }
         if (res.ok) {
           const data = await res.json();
@@ -67,7 +69,7 @@ export default function CourseDetailPage() {
         }
       } catch {} finally { setLoading(false); }
     })();
-  }, [slug]);
+  }, [paramsSlug]);
 
   if (loading) {
     return (
@@ -101,10 +103,21 @@ export default function CourseDetailPage() {
   ].filter(Boolean);
 
   const handleBuy = () => {
-    // Add course product to cart and redirect to checkout
-    if (course.product) {
-      window.location.href = `/checkout?product=${course.product}`;
-    }
+    if (!course) return;
+    addToCart({
+      id: course.product,
+      name: course.title,
+      slug: paramsSlug,
+      description: course.description || '',
+      price: Number(course.price),
+      image: course.image || '',
+      category: '',
+      rating: Number(course.rating) || 0,
+      reviewCount: 0,
+      inStock: true,
+      productType: 'course' as const,
+    } as any);
+    window.location.href = '/checkout';
   };
 
   return (

@@ -125,6 +125,7 @@ class CreateOrderSerializer(serializers.Serializer):
             affiliate=affiliate,
             affiliate_commission=affiliate_commission,
             payment_method=validated_data['payment_method'],
+            payment_status='completed' if validated_data['payment_method'] == 'test' else 'pending',
             shipping_address=validated_data['shipping_address'],
             buyer_notes=validated_data.get('buyer_notes', ''),
         )

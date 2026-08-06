@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Truck, Shield, CreditCard, MapPin, CheckCircle } from 'lucide-react';
+import { Truck, Shield, CreditCard, MapPin, CheckCircle, Loader2, FlaskConical } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
+import { useAuth } from '@/src/hooks/useAuth';
 
 function formatPrice(price: number): string {
   return price.toFixed(2).replace('.', ',');
@@ -16,6 +17,22 @@ const PROVINCES = [
 ];
 
 const PAYMENT_METHODS = [
+  {
+    value: 'test',
+    label: '🧪 Modo Teste (Grátis)',
+    desc: 'Checkout simulado — pagamento automático para testes',
+    icon: '🧪',
+    instructions: {
+      title: 'Modo de Teste:',
+      steps: [
+        'Este método simula um pagamento concluído.',
+        'Nenhum pagamento real é processado.',
+        'A encomenda será criada como paga automaticamente.',
+        'Ideal para testar fluxos de compra, cursos e downloads.',
+        'Disponível apenas em ambiente de desenvolvimento.',
+      ],
+    },
+  },
   {
     value: 'mpesa',
     label: 'M-Pesa',
@@ -101,9 +118,12 @@ const PAYMENT_METHODS = [
 export default function CheckoutContent() {
   const router = useRouter();
   const { items, totalPrice, clearCart } = useCart();
+  const { isAuthenticated } = useAuth();
   const [confirmed, setConfirmed] = useState(false);
-  const [orderNumber, setOrderNumber] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('mpesa');
+  const [orderData, setOrderData] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState('test');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   // Form state
   const [form, setForm] = useState({
@@ -132,50 +152,120 @@ export default function CheckoutContent() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic validation
     if (!form.fullName || !form.phone || !form.email || !form.address || !form.city || !form.province) {
       alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
 
-    const num = '#ESC-' + Math.floor(100000 + Math.random() * 900000);
-    setOrderNumber(num);
-    setConfirmed(true);
-    clearCart();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setSubmitting(true);
+    setError('');
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const token = localStorage.getItem('access_token');
+
+    try {
+      const body = {
+        items: items.map(it => ({
+          product_id: it.product.id,
+          quantity: it.quantity,
+        })),
+        shipping_address: {
+          full_name: form.fullName,
+          phone: form.phone,
+          email: form.email,
+          address: form.address,
+          city: form.city,
+          province: form.province,
+          notes: form.notes,
+        },
+        payment_method: paymentMethod,
+        buyer_notes: form.notes,
+      };
+
+      const res = await fetch(`${API_URL}/orders/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(typeof errData === 'object' ? Object.values(errData).flat().join('. ') : 'Erro ao criar encomenda.');
+      }
+
+      const data = await res.json();
+      setOrderData(data);
+      setConfirmed(true);
+      clearCart();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      setError(err.message || 'Erro ao processar encomenda.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Confirmation screen
-  if (confirmed) {
+  if (confirmed && orderData) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center">
         <CheckCircle className="mx-auto text-green-600 mb-6" size={80} />
         <h2 className="text-3xl font-bold mb-4">Pedido Confirmado!</h2>
         <p className="text-lg text-muted-foreground mb-6">
-          Obrigado pela sua compra. Você receberá um email com os detalhes do pedido e instruções de pagamento.
+          {paymentMethod === 'test'
+            ? '🧪 Modo Teste — a sua encomenda foi criada com pagamento automático.'
+            : 'Obrigado pela sua compra. Receberá um email com os detalhes.'}
         </p>
         <div className="bg-card border border-border rounded-lg p-6 mb-6">
           <p className="font-semibold mb-2">Número do Pedido:</p>
-          <p className="text-2xl font-bold text-accent">{orderNumber}</p>
+          <p className="text-2xl font-bold text-accent">{orderData.order_number}</p>
+          <p className="text-sm text-muted-foreground mt-2">Estado: {orderData.status}</p>
+          {orderData.payment_status === 'completed' && (
+            <span className="inline-block mt-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+              ✅ Pago
+            </span>
+          )}
         </div>
         <div className="bg-muted rounded-lg p-6 mb-6 text-left">
           <h3 className="font-semibold mb-3">Próximos Passos:</h3>
           <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-            <li>Verifique seu email para confirmação do pedido</li>
-            <li>Siga as instruções de pagamento recebidas</li>
-            <li>Após confirmação do pagamento, enviaremos seu produto</li>
-            <li>Você receberá código de rastreamento por email</li>
+            {paymentMethod === 'test' ? (
+              <>
+                <li>A encomenda foi processada automaticamente</li>
+                <li>Produtos digitais e cursos já estão disponíveis</li>
+                <li>Pode ver os seus cursos em <Link href="/my-courses" className="text-accent hover:underline">Meus Cursos</Link></li>
+                <li>Downloads disponíveis em <Link href="/account/downloads" className="text-accent hover:underline">Minha Conta → Downloads</Link></li>
+              </>
+            ) : (
+              <>
+                <li>Verifique seu email para confirmação do pedido</li>
+                <li>Siga as instruções de pagamento recebidas</li>
+                <li>Após confirmação do pagamento, enviaremos seu produto</li>
+                <li>Receberá código de rastreamento por email</li>
+              </>
+            )}
           </ol>
         </div>
-        <Link
-          href="/"
-          className="inline-block px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors"
-        >
-          Continuar Comprando
-        </Link>
+        <div className="flex gap-3 justify-center">
+          <Link
+            href="/account/orders"
+            className="inline-block px-6 py-3 border border-border hover:bg-muted font-semibold rounded-md transition-colors"
+          >
+            Ver Encomendas
+          </Link>
+          <Link
+            href="/"
+            className="inline-block px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors"
+          >
+            Continuar Comprando
+          </Link>
+        </div>
       </div>
     );
   }
@@ -391,10 +481,17 @@ export default function CheckoutContent() {
 
             <button
               type="submit"
-              className="w-full mt-6 px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors"
+              disabled={submitting}
+              className="w-full mt-6 px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              Confirmar Pedido
+              {submitting ? <><Loader2 size={18} className="animate-spin" /> A processar...</> : 'Confirmar Pedido'}
             </button>
+
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {error}
+              </div>
+            )}
 
             <div className="mt-4 pt-4 border-t border-border space-y-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
