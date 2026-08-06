@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   User, ShoppingBag, MapPin, Download, Heart, LogOut, ChevronRight,
-  Package, Settings, Store, Gift, Menu, X, LayoutDashboard
+  Package, Settings, Store, Gift, Menu, X, LayoutDashboard, BookOpen
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 
@@ -17,6 +17,7 @@ const navItems = [
   { href: '/account', label: 'Visão Geral', icon: User },
   { href: '/account/profile', label: 'Meu Perfil', icon: Settings },
   { href: '/account/orders', label: 'Minhas Encomendas', icon: Package },
+  { href: '/my-courses', label: 'Meus Cursos', icon: BookOpen },
   { href: '/account/addresses', label: 'Endereços', icon: MapPin },
   { href: '/account/downloads', label: 'Downloads', icon: Download },
   { href: '/account/wishlist', label: 'Lista de Desejos', icon: Heart },

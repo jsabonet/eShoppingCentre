@@ -1,24 +1,59 @@
-import type { Metadata } from 'next';
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Clock, Star, Users, BookOpen } from 'lucide-react';
+import LoadingSpinner from '@/src/components/LoadingSpinner';
 
-export const metadata: Metadata = {
-  title: 'Cursos Online | eShoppingCentre',
-  description: 'Aprenda com os melhores cursos online. Desenvolvimento, marketing, design e muito mais.',
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+interface CourseData {
+  id: string;
+  slug: string;
+  title: string;
+  instructor_name: string;
+  level: string;
+  duration: string;
+  total_lessons: number;
+  image: string | null;
+  price: string;
+  compare_price: string | null;
+  rating: string;
+  students_count: number;
+}
+
+const LEVEL_LABELS: Record<string, string> = {
+  beginner: 'Iniciante',
+  intermediate: 'Intermediário',
+  advanced: 'Avançado',
 };
 
-const courses = [
-  { slug: 'python-para-iniciantes', title: 'Python para Iniciantes', instructor: 'Dr. Carlos Macamo', image: 'https://cdn.b12.io/client_media/iKv1biKD/5b14c4b0-7e6e-11f1-b1e8-0242ac110002-oyS3W01yYqyLQZ3o0OyFG.jpg', price: '2.499 MZN', originalPrice: '4.999 MZN', rating: 4.8, students: 1234, duration: '20h', lessons: 48, level: 'Iniciante' },
-  { slug: 'marketing-digital-completo', title: 'Marketing Digital Completo', instructor: 'Ana Mondlane', image: 'https://cdn.b12.io/client_media/iKv1biKD/573d35e0-7e6e-11f1-a56d-0242ac110002-m84D8GY8ROKweXe5v3qi3.jpg', price: '3.499 MZN', originalPrice: null, rating: 4.6, students: 856, duration: '15h', lessons: 34, level: 'Intermediário' },
-  { slug: 'fotografia-profissional', title: 'Fotografia Profissional com Smartphone', instructor: 'Pedro Chissano', image: 'https://cdn.b12.io/client_media/iKv1biKD/5aa3154d-7e6e-11f1-82d2-0242ac110002-9e8FSvH-aRUq9K6kB6vgg.jpg', price: '1.999 MZN', originalPrice: '2.999 MZN', rating: 4.9, students: 2103, duration: '10h', lessons: 25, level: 'Iniciante' },
-  { slug: 'excel-avancado', title: 'Excel Avançado para Negócios', instructor: 'Maria Santos', image: 'https://cdn.b12.io/client_media/iKv1biKD/5b46db3a-7e6e-11f1-98fb-0242ac110002-yUsdDCiNGkUXvIXwHDkP9.jpg', price: '2.999 MZN', originalPrice: null, rating: 4.7, students: 1567, duration: '12h', lessons: 30, level: 'Avançado' },
-  { slug: 'empreendedorismo-digital', title: 'Empreendedorismo Digital', instructor: 'João Silva', image: 'https://cdn.b12.io/client_media/iKv1biKD/5783f32a-7e6e-11f1-a05c-0242ac110002-gL5f6HGZjVLK9tX7ZtneG.jpg', price: '4.999 MZN', originalPrice: '6.999 MZN', rating: 4.5, students: 678, duration: '25h', lessons: 60, level: 'Intermediário' },
-  { slug: 'design-grafico-canva', title: 'Design Gráfico com Canva', instructor: 'Lúcia Sitoe', image: 'https://cdn.b12.io/client_media/iKv1biKD/5aaa7a70-7e6e-11f1-9018-0242ac110002-4Rd8xIvDAA18urOueGtC6.jpg', price: '1.499 MZN', originalPrice: '2.499 MZN', rating: 4.8, students: 3456, duration: '8h', lessons: 20, level: 'Iniciante' },
-];
-
 const levels = ['Todos', 'Iniciante', 'Intermediário', 'Avançado'];
+const levelKeys = ['', 'beginner', 'intermediate', 'advanced'];
 
 export default function CoursesPage() {
+  const [courses, setCourses] = useState<CourseData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeLevel, setActiveLevel] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/courses/`);
+        if (res.ok) {
+          const data = await res.json();
+          setCourses(data.results || data || []);
+        }
+      } catch {} finally { setLoading(false); }
+    })();
+  }, []);
+
+  const filtered = activeLevel === 0
+    ? courses
+    : courses.filter(c => c.level === levelKeys[activeLevel]);
+
+  const fmtPrice = (p: string) => `${Number(p).toLocaleString('pt-MZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MZN`;
+
   return (
     <>
       <div className="bg-card border-b border-border">
@@ -41,41 +76,60 @@ export default function CoursesPage() {
             </div>
           </div>
           <div className="flex gap-2 overflow-x-auto">
-            {levels.map((level) => (
-              <button key={level} className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                level === 'Todos' ? 'bg-accent text-accent-foreground' : 'bg-card border border-border hover:bg-muted'
-              }`}>{level}</button>
+            {levels.map((level, i) => (
+              <button key={level} onClick={() => setActiveLevel(i)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  i === activeLevel ? 'bg-accent text-accent-foreground' : 'bg-card border border-border hover:bg-muted'
+                }`}>{level}</button>
             ))}
           </div>
         </div>
       </div>
 
       <section className="max-w-[1500px] mx-auto px-4 py-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course) => (
-            <Link key={course.slug} href={`/courses/${course.slug}`}
-              className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all">
-              <div className="h-48 overflow-hidden relative">
-                <img src={course.image} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                <span className="absolute top-3 left-3 px-2 py-1 bg-white/90 rounded-md text-xs font-medium">{course.level}</span>
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold mb-1 group-hover:text-accent transition-colors line-clamp-1">{course.title}</h3>
-                <p className="text-sm text-muted-foreground mb-3">{course.instructor}</p>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                  <span className="flex items-center gap-1"><Star size={14} className="text-accent fill-accent" />{course.rating}</span>
-                  <span className="flex items-center gap-1"><Users size={14} />{course.students}</span>
-                  <span className="flex items-center gap-1"><Clock size={14} />{course.duration}</span>
+        {loading ? (
+          <div className="flex justify-center py-20"><LoadingSpinner size={32} message="A carregar cursos..." /></div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-20 text-muted-foreground">
+            <BookOpen size={48} className="mx-auto mb-4 opacity-20" />
+            <p className="text-lg font-medium">Nenhum curso encontrado</p>
+            <p className="text-sm">Tente outro filtro ou volte mais tarde.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filtered.map((course) => (
+              <Link key={course.id} href={`/courses/${course.slug}`}
+                className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all">
+                <div className="h-48 overflow-hidden relative bg-gradient-to-br from-accent/20 to-accent/5">
+                  {course.image ? (
+                    <img src={course.image} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <BookOpen size={48} className="absolute inset-0 m-auto text-accent/20" />
+                  )}
+                  <span className="absolute top-3 left-3 px-2 py-1 bg-white/90 rounded-md text-xs font-medium">
+                    {LEVEL_LABELS[course.level] || course.level}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mb-3">{course.lessons} aulas</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-accent">{course.price}</span>
-                  {course.originalPrice && <span className="text-sm text-muted-foreground line-through">{course.originalPrice}</span>}
+                <div className="p-4">
+                  <h3 className="font-bold mb-1 group-hover:text-accent transition-colors line-clamp-1">{course.title}</h3>
+                  <p className="text-sm text-muted-foreground mb-3">Por {course.instructor_name}</p>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+                    <span className="flex items-center gap-1"><Star size={14} className="text-accent fill-accent" />{Number(course.rating).toFixed(1)}</span>
+                    <span className="flex items-center gap-1"><Users size={14} />{course.students_count}</span>
+                    <span className="flex items-center gap-1"><Clock size={14} />{course.duration}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">{course.total_lessons} aulas</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold text-accent">{fmtPrice(course.price)}</span>
+                    {course.compare_price && Number(course.compare_price) > Number(course.price) && (
+                      <span className="text-sm text-muted-foreground line-through">{fmtPrice(course.compare_price)}</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
     </>
   );
