@@ -68,7 +68,7 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
 
   if (error) {
     return (
-      <div className="aspect-video bg-gradient-to-b from-gray-900 to-black flex items-center justify-center">
+      <div className="aspect-video w-full max-w-5xl mx-auto bg-gradient-to-b from-gray-900 to-black flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center px-6">
           <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
             <AlertCircle size={28} className="text-red-400" />
@@ -89,7 +89,7 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
   }
 
   return (
-    <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
+    <div className="relative w-full h-full">
       {/* Loading overlay */}
       {loading && (
         <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black flex items-center justify-center z-10">
