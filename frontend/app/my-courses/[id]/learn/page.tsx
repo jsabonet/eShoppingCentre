@@ -230,7 +230,7 @@ export default function CourseLearnPage() {
         </div>
 
         {/* Video / Content Area */}
-        <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden">
+        <div className="flex-1 bg-black flex items-center justify-center relative">
           {currentLesson ? (
             currentLesson.cloudflare_video_uid ? (
               <CourseVideoPlayer lessonId={currentLesson.id} />

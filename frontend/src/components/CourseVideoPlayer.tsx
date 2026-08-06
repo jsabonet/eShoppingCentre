@@ -68,7 +68,7 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
 
   if (error) {
     return (
-      <div className="aspect-video bg-gradient-to-b from-gray-900 to-black rounded-lg flex items-center justify-center">
+      <div className="aspect-video bg-gradient-to-b from-gray-900 to-black flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center px-6">
           <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
             <AlertCircle size={28} className="text-red-400" />
@@ -92,7 +92,7 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
     <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
       {/* Loading overlay */}
       {loading && (
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black rounded-lg flex items-center justify-center z-10">
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black flex items-center justify-center z-10">
           <div className="flex flex-col items-center gap-3">
             <Loader2 size={36} className="animate-spin text-white/60" />
             <p className="text-white/50 text-sm">A preparar o vídeo...</p>
@@ -103,7 +103,7 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
       {/* Player container */}
       <div
         ref={playerRef}
-        className={`absolute inset-0 rounded-lg overflow-hidden bg-black transition-opacity duration-500 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 bg-black transition-opacity duration-500 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
       />
     </div>
   );
