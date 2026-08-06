@@ -44,6 +44,9 @@ export default function MyCoursesPage() {
       if (res.ok) {
         const data = await res.json();
         setEnrollments(data.results || data || []);
+      } else if (res.status === 401) {
+        window.location.href = '/login?redirect=/my-courses';
+        return;
       }
     } catch {} finally { setLoading(false); }
   }, []);

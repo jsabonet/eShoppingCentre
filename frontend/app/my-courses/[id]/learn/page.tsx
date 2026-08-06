@@ -74,6 +74,9 @@ export default function CourseLearnPage() {
       } else if (res.status === 403 || res.status === 404) {
         // Not enrolled or course not found
         setModules([]);
+      } else if (res.status === 401) {
+        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+        return;
       }
     } catch {} finally { setLoading(false); }
   }, [courseId, currentLessonId]);

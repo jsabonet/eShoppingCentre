@@ -28,6 +28,10 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
       });
 
       if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+          return;
+        }
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || `Erro ${res.status}`);
       }

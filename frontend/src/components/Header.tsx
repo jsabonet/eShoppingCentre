@@ -50,6 +50,7 @@ export default function Header() {
                   <Link href="/courses" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Cursos</Link>
                   <Link href="/blog" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Blog</Link>
                   {/* <Link href="/contact" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Atendimento</Link> */}
+
                   <span className="text-gray-300 mx-1">|</span>
                   {isAuthenticated ? (
                     <>
@@ -87,15 +88,7 @@ export default function Header() {
                   {cat.name}
                 </Link>
               ))}
-              <Link href="/stores" className="hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap text-white">Lojas</Link>
-              <Link href="/courses" className="hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap text-white">Cursos</Link>
               <Link href="/#ofertas" className="font-bold hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap text-white">Ofertas do Dia</Link>
-              {isAdmin && (
-                <Link href="/admin" className="hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap transition-colors text-white/70 text-xs">Admin</Link>
-              )}
-              <Link href="/affiliate/register" className="font-bold hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap text-white">Seja Afiliado</Link>
-              <Link href="/blog" className="hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap text-white">Blog</Link>
-              <Link href="/contact" className="hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap text-white">Atendimento</Link>
             </nav>
           </div>
         </div>
