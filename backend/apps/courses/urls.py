@@ -30,6 +30,7 @@ urlpatterns = [
     path('lessons/<uuid:lesson_id>/delete/', views.LessonDeleteView.as_view(), name='lesson_delete'),
     # Complete lesson
     path('me/lessons/<uuid:lesson_id>/complete/', views.CompleteLessonView.as_view(), name='complete_lesson'),
+    path('me/lessons/<uuid:lesson_id>/watch-progress/', views.WatchProgressView.as_view(), name='watch_progress'),
     # My enrollments
     path('me/enrollments/', views.MyEnrollmentsView.as_view(), name='my_enrollments'),
     # ─── Cloudflare Stream ───

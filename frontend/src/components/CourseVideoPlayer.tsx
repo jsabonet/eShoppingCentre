@@ -1,25 +1,62 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { AlertCircle, Loader2, RefreshCw, Play, Maximize, Volume2, VolumeX } from 'lucide-react';
+import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
 interface CourseVideoPlayerProps {
   lessonId: string;
-  isFreePreview?: boolean;
+  startTime?: number; // segundos para retomar
+  onProgress?: (seconds: number) => void;
+  onEnded?: () => void;
 }
 
-export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVideoPlayerProps) {
+export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress, onEnded }: CourseVideoPlayerProps) {
   const playerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [videoReady, setVideoReady] = useState(false);
+  const progressRef = useRef(0);
+  const endedRef = useRef(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+  // Listen for Cloudflare Stream postMessage events
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (!e.data || e.data.source !== 'cloudflare-stream') return;
+      const payload = e.data;
+      switch (payload.event) {
+        case 'timeupdate':
+          if (payload.time > 0) {
+            progressRef.current = Math.floor(payload.time);
+            onProgress?.(progressRef.current);
+          }
+          break;
+        case 'ended':
+        case 'videoEnded':
+          if (!endedRef.current) {
+            endedRef.current = true;
+            onEnded?.();
+          }
+          break;
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onProgress, onEnded]);
+
+  // Reset ended flag when lesson changes
+  useEffect(() => {
+    endedRef.current = false;
+    progressRef.current = 0;
+  }, [lessonId]);
 
   const fetchToken = useCallback(async () => {
     setLoading(true);
     setError('');
     setVideoReady(false);
+    endedRef.current = false;
 
     try {
       const token = localStorage.getItem('access_token');
@@ -39,14 +76,15 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
       const data = await res.json();
 
       if (data.token && data.video_uid) {
-        // Embed do Cloudflare Stream com parâmetros optimizados
+        const timeParam = startTime > 0 ? `&startTime=${startTime}s` : '';
         const iframe = document.createElement('iframe');
-        iframe.src = `https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}&controls=true&muted=false&preload=true&loop=false&autoplay=false`;
+        iframe.src = `https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}&controls=true&muted=false&preload=true&loop=false&autoplay=true${timeParam}`;
         iframe.className = 'absolute inset-0 w-full h-full border-0';
         iframe.allow = 'autoplay; fullscreen; picture-in-picture';
         iframe.allowFullscreen = true;
         iframe.title = 'Video da aula';
         iframe.onload = () => setVideoReady(true);
+        iframeRef.current = iframe;
 
         if (playerRef.current) {
           playerRef.current.innerHTML = '';
@@ -60,7 +98,7 @@ export default function CourseVideoPlayer({ lessonId, isFreePreview }: CourseVid
       setError(err.message || 'Erro ao carregar o video.');
       setLoading(false);
     }
-  }, [lessonId, API_URL]);
+  }, [lessonId, startTime, API_URL]);
 
   useEffect(() => {
     fetchToken();

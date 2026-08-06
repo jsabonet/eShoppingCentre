@@ -62,6 +62,29 @@ class CompleteLessonView(APIView):
                           status=status.HTTP_404_NOT_FOUND)
 
 
+class WatchProgressView(APIView):
+    """PATCH /api/v1/courses/me/lessons/{lesson_id}/watch-progress/ — Guarda tempo de visualização."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, lesson_id):
+        try:
+            lesson = CourseLesson.objects.get(id=lesson_id)
+            enrollment = Enrollment.objects.get(
+                user=request.user,
+                course=lesson.module.course,
+            )
+            watched = request.data.get('watched_seconds', 0)
+            progress, _ = LessonProgress.objects.get_or_create(
+                enrollment=enrollment, lesson=lesson
+            )
+            if watched > progress.watched_duration:
+                progress.watched_duration = watched
+                progress.save()
+            return Response({'watched_duration': progress.watched_duration})
+        except (CourseLesson.DoesNotExist, Enrollment.DoesNotExist):
+            return Response({'detail': 'Lição ou matrícula não encontrada.'}, status=404)
+
+
 # ─── Course Builder (Seller) ───
 
 class CourseBuilderView(APIView):

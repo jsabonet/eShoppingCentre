@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -24,6 +24,7 @@ interface LessonData {
   is_free_preview: boolean;
   sort_order: number;
   completed?: boolean;
+  watched_duration?: number;
 }
 
 interface ModuleData {
@@ -40,8 +41,10 @@ export default function CourseLearnPage() {
   const [loading, setLoading] = useState(true);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [watchedMap, setWatchedMap] = useState<Record<string, number>>({});
   const [completing, setCompleting] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const apiHeaders = () => {
     const token = localStorage.getItem('access_token');
@@ -62,6 +65,13 @@ export default function CourseLearnPage() {
         // Progress
         setCompletedIds(new Set(data.completed_ids || []));
 
+        // Watched durations
+        const wMap: Record<string, number> = {};
+        mods.forEach(m => m.lessons.forEach(l => {
+          if (l.watched_duration) wMap[l.id] = l.watched_duration;
+        }));
+        setWatchedMap(wMap);
+
         // Expand first module, first lesson auto-selected
         const expanded: Record<string, boolean> = {};
         mods.forEach((m, i) => { expanded[m.id] = i === 0; });
@@ -81,6 +91,20 @@ export default function CourseLearnPage() {
     } catch {} finally { setLoading(false); }
   }, [courseId, currentLessonId]);
 
+  // Save progress on page leave
+  useEffect(() => {
+    const saveBeforeUnload = () => {
+      if (currentLessonId && watchedMap[currentLessonId]) {
+        navigator.sendBeacon(
+          `${API_URL}/courses/me/lessons/${currentLessonId}/watch-progress/`,
+          JSON.stringify({ watched_seconds: watchedMap[currentLessonId] })
+        );
+      }
+    };
+    window.addEventListener('beforeunload', saveBeforeUnload);
+    return () => window.removeEventListener('beforeunload', saveBeforeUnload);
+  }, [currentLessonId, watchedMap]);
+
   useEffect(() => { fetchCourse(); }, [fetchCourse]);
 
   const toggleModule = (id: string) => {
@@ -91,6 +115,15 @@ export default function CourseLearnPage() {
 
   const totalLessons = modules.reduce((sum, m) => sum + m.lessons.length, 0);
   const completedCount = completedIds.size;
+
+  // Converte duração "MM:SS" ou "H:MM:SS" para segundos
+  const parseDurationSeconds = (dur: string): number => {
+    if (!dur) return 1;
+    const parts = dur.split(':').map(Number);
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return Number(dur) || 1;
+  };
 
   // Flatten all lessons for prev/next navigation
   const allLessons = modules.flatMap(m => m.lessons);
@@ -116,10 +149,51 @@ export default function CourseLearnPage() {
     if (currentIndex < allLessons.length - 1) goToLesson(allLessons[currentIndex + 1].id);
   };
 
+  const saveWatchProgress = useCallback(async (lessonId: string, seconds: number) => {
+    try {
+      await fetch(`${API_URL}/courses/me/lessons/${lessonId}/watch-progress/`, {
+        method: 'PATCH',
+        headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ watched_seconds: seconds }),
+      });
+    } catch {}
+  }, [API_URL]);
+
+  const handleVideoProgress = useCallback((seconds: number) => {
+    if (!currentLessonId) return;
+    setWatchedMap(prev => ({ ...prev, [currentLessonId]: seconds }));
+    // Debounce save to backend every 5s
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveWatchProgress(currentLessonId, seconds);
+    }, 5000);
+  }, [currentLessonId, saveWatchProgress]);
+
+  const handleVideoEnded = useCallback(async () => {
+    if (!currentLessonId || completing) return;
+    setCompleting(true);
+    try {
+      // Save final position
+      await saveWatchProgress(currentLessonId, watchedMap[currentLessonId] || 0);
+      // Mark complete
+      const res = await fetch(`${API_URL}/courses/me/lessons/${currentLessonId}/complete/`, {
+        method: 'PATCH', headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        setCompletedIds(prev => new Set([...prev, currentLessonId]));
+        // Auto-advance after short delay
+        if (currentIndex < allLessons.length - 1) {
+          setTimeout(() => goToLesson(allLessons[currentIndex + 1].id), 1500);
+        }
+      }
+    } catch {} finally { setCompleting(false); }
+  }, [currentLessonId, completing, currentIndex, allLessons, watchedMap, saveWatchProgress]);
+
   const markComplete = async () => {
     if (!currentLessonId || completing) return;
     setCompleting(true);
     try {
+      await saveWatchProgress(currentLessonId, watchedMap[currentLessonId] || 0);
       const res = await fetch(`${API_URL}/courses/me/lessons/${currentLessonId}/complete/`, {
         method: 'PATCH', headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
       });
@@ -177,6 +251,15 @@ export default function CourseLearnPage() {
                         <span className={`truncate block ${isCompleted ? 'text-muted-foreground' : isCurrent ? 'font-medium' : ''}`}>
                           {lesson.title}
                         </span>
+                        {/* Progress bar per lesson */}
+                        {isCurrent && !isCompleted && (watchedMap[lesson.id] || 0) > 0 && lesson.duration && (
+                          <div className="w-full h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
+                            <div
+                              className="h-full bg-accent/60 rounded-full transition-all duration-1000"
+                              style={{ width: `${Math.min(100, ((watchedMap[lesson.id] || 0) / parseDurationSeconds(lesson.duration)) * 100)}%` }}
+                            />
+                          </div>
+                        )}
                       </div>
                       {lesson.duration && (
                         <span className="text-xs text-muted-foreground flex-shrink-0">{lesson.duration}</span>
@@ -233,7 +316,13 @@ export default function CourseLearnPage() {
         <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
           {currentLesson ? (
             currentLesson.cloudflare_video_uid ? (
-              <CourseVideoPlayer lessonId={currentLesson.id} />
+              <CourseVideoPlayer
+                key={currentLesson.id}
+                lessonId={currentLesson.id}
+                startTime={watchedMap[currentLesson.id] || 0}
+                onProgress={handleVideoProgress}
+                onEnded={handleVideoEnded}
+              />
             ) : currentLesson.video_url ? (
               <iframe
                 src={currentLesson.video_url
