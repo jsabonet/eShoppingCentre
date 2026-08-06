@@ -55,6 +55,7 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFoundErr, setNotFoundErr] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -66,6 +67,18 @@ export default function CourseDetailPage() {
         if (res.ok) {
           const data = await res.json();
           setCourse(data);
+          // Check if user is enrolled
+          const token = localStorage.getItem('access_token');
+          if (token && data.id) {
+            const enrRes = await fetch(`${API_URL}/courses/me/enrollments/`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (enrRes.ok) {
+              const enrData = await enrRes.json();
+              const enrollments = enrData.results || enrData || [];
+              setIsEnrolled(enrollments.some((e: any) => e.course_id === data.id));
+            }
+          }
         }
       } catch {} finally { setLoading(false); }
     })();
@@ -175,9 +188,24 @@ export default function CourseDetailPage() {
                     )}
                   </div>
                   <button onClick={handleBuy}
-                    className="w-full px-4 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 mb-3">
-                    <ShoppingCart size={18} /> Comprar Agora
+                    disabled={isEnrolled}
+                    className={`w-full px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 mb-3 ${
+                      isEnrolled
+                        ? 'bg-green-100 text-green-700 cursor-not-allowed'
+                        : 'bg-accent text-accent-foreground hover:bg-accent/90'
+                    }`}>
+                    {isEnrolled ? (
+                      <><CheckCircle size={18} /> Já inscrito</>
+                    ) : (
+                      <><ShoppingCart size={18} /> Comprar Agora</>
+                    )}
                   </button>
+                  {isEnrolled && (
+                    <Link href="/my-courses"
+                      className="block w-full text-center px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors mb-3">
+                      Ir para Meus Cursos
+                    </Link>
+                  )}
                   <div className="space-y-2 text-sm">
                     {features.map((f, i) => (
                       <div key={i} className="flex items-center gap-2"><CheckCircle size={16} className="text-green-600" /> {f}</div>

@@ -1,7 +1,9 @@
 from rest_framework import permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from django.shortcuts import get_object_or_404
+from django.core.cache import cache
 from .models import CourseLesson, Enrollment
 from .services.cloudflare_stream import (
     create_direct_upload,
@@ -10,6 +12,12 @@ from .services.cloudflare_stream import (
     generate_stream_token,
     get_stream_url,
 )
+
+
+class StreamTokenThrottle(UserRateThrottle):
+    """Limite: 30 tokens por minuto por utilizador."""
+    rate = '30/minute'
+    scope = 'stream_token'
 
 
 class LessonUploadURLCreateView(APIView):
@@ -86,8 +94,10 @@ class LessonStreamTokenView(APIView):
     """
     GET /api/v1/courses/lessons/{lesson_id}/stream-token/
     Gera token JWT para o player. Dono do curso e alunos matriculados podem aceder.
+    Rate limit: 30 tokens/min por utilizador.
     """
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [StreamTokenThrottle]
 
     def get(self, request, lesson_id):
         lesson = get_object_or_404(CourseLesson, id=lesson_id)
