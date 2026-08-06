@@ -81,7 +81,7 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
       if (data.token && data.video_uid) {
         const timeParam = startTime > 0 ? `&startTime=${startTime}s` : '';
         const iframe = document.createElement('iframe');
-        iframe.src = `https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}&controls=true&muted=false&preload=true&loop=false&autoplay=true${timeParam}`;
+        iframe.src = `https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}&controls=true&preload=true&autoplay=true${timeParam}`;
         iframe.className = 'absolute inset-0 w-full h-full border-0';
         iframe.allow = 'autoplay; fullscreen; picture-in-picture';
         iframe.allowFullscreen = true;
