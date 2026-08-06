@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     shortcut: '/favicon.ico',
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
-  manifest: '/manifest.json',
+  // manifest: '/manifest.json',  // PWA desabilitada temporariamente
   category: 'shopping',
 };
 
