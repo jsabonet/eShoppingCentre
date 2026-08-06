@@ -116,6 +116,7 @@ class CreateOrderSerializer(serializers.Serializer):
         first_store = list(store_orders.values())[0]
         platform_fee = (first_store['store_total'] * 8) / 100
 
+        is_test = validated_data['payment_method'] == 'test'
         order = Order.objects.create(
             buyer=user,
             store=first_store['store'],
@@ -125,7 +126,8 @@ class CreateOrderSerializer(serializers.Serializer):
             affiliate=affiliate,
             affiliate_commission=affiliate_commission,
             payment_method=validated_data['payment_method'],
-            payment_status='completed' if validated_data['payment_method'] == 'test' else 'pending',
+            payment_status='completed' if is_test else 'pending',
+            status='confirmed' if is_test else 'pending',
             shipping_address=validated_data['shipping_address'],
             buyer_notes=validated_data.get('buyer_notes', ''),
         )
