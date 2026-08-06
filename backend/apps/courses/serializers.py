@@ -121,9 +121,18 @@ class CourseDetailSerializer(serializers.ModelSerializer):
 class EnrollmentSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source='course.product.name', read_only=True)
     course_slug = serializers.CharField(source='course.product.slug', read_only=True)
+    course_id = serializers.UUIDField(source='course.id', read_only=True)
     total_lessons = serializers.IntegerField(source='course.total_lessons', read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Enrollment
-        fields = ('id', 'course_title', 'course_slug', 'total_lessons',
-                  'progress', 'completed', 'completed_at', 'created_at')
+        fields = ('id', 'course_id', 'course_title', 'course_slug', 'total_lessons',
+                  'image', 'progress', 'completed', 'completed_at', 'created_at')
+
+    def get_image(self, obj):
+        img = obj.course.product.images.filter(is_primary=True).first()
+        if img:
+            request = self.context.get('request')
+            return request.build_absolute_uri(img.image.url) if request else img.image.url
+        return None

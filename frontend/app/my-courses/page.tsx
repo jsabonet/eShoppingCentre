@@ -9,9 +9,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1
 
 interface EnrollmentData {
   id: string;
+  course_id: string;
   course_title: string;
   course_slug: string;
   total_lessons: number;
+  image: string | null;
   progress: number;
   completed: boolean;
   completed_at: string | null;
@@ -84,7 +86,11 @@ export default function MyCoursesPage() {
             <Link key={enr.id} href={`/my-courses/${enr.id}/learn`}
               className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all">
               <div className="h-40 overflow-hidden relative bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center">
-                <BookOpen size={48} className="text-accent/30" />
+                {enr.image ? (
+                  <img src={enr.image} alt={enr.course_title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                ) : (
+                  <BookOpen size={48} className="text-accent/30" />
+                )}
                 {enr.completed && (
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                     <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
