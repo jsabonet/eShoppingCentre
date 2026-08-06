@@ -24,14 +24,18 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-  // Timer-based progress -- fires every second while video is ready
+  // Timer-based progress — fires every 3s, pauses when tab hidden
   useEffect(() => {
     if (!videoReady || loading) return;
     elapsedRef.current = startTime;
-    timerRef.current = setInterval(() => {
-      elapsedRef.current += 1;
+
+    const tick = () => {
+      if (document.hidden) return; // skip when tab not visible
+      elapsedRef.current += 3;
       onProgressRef.current?.(elapsedRef.current);
-    }, 1000);
+    };
+
+    timerRef.current = setInterval(tick, 3000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [videoReady, loading, startTime, lessonId]);
 
