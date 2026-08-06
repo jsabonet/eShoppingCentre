@@ -96,12 +96,26 @@ class CourseDetailSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='product.name', read_only=True)
     description = serializers.CharField(source='product.description', read_only=True)
     price = serializers.DecimalField(source='product.price', max_digits=12, decimal_places=2, read_only=True)
+    compare_price = serializers.DecimalField(source='product.compare_price', max_digits=12, decimal_places=2, read_only=True)
+    rating = serializers.DecimalField(source='product.rating', max_digits=3, decimal_places=2, read_only=True)
+    students_count = serializers.SerializerMethodField()
     instructor_name = serializers.CharField(source='instructor.first_name', read_only=True)
     modules = CourseModuleSerializer(many=True, read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
         fields = '__all__'
+
+    def get_image(self, obj):
+        img = obj.product.images.filter(is_primary=True).first()
+        if img:
+            request = self.context.get('request')
+            return request.build_absolute_uri(img.image.url) if request else img.image.url
+        return None
+
+    def get_students_count(self, obj):
+        return obj.enrollments.count()
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):

@@ -35,6 +35,10 @@ interface CourseDetail {
   title: string;
   description: string;
   price: string;
+  compare_price: string | null;
+  rating: string;
+  students_count: number;
+  image: string | null;
   instructor_name: string;
   level: string;
   duration: string;
@@ -89,9 +93,8 @@ export default function CourseDetailPage() {
   const totalLessons = course.modules.reduce((sum, m) => sum + m.lessons.length, 0);
   const fmtPrice = (p: string) => `${Number(p).toLocaleString('pt-MZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MZN`;
   const features = [
-    course.level ? LEVEL_LABELS[course.level] || course.level : 'Todos os níveis',
-    `${course.duration || totalLessons + ' aulas'}`,
-    `${totalLessons} aulas`,
+    course.duration || `${totalLessons} aulas`,
+    `${totalLessons} aulas em ${course.modules.length} módulos`,
     course.certificate_enabled ? 'Certificado de conclusão' : null,
     'Acesso vitalício',
     'Suporte via WhatsApp',
@@ -126,8 +129,9 @@ export default function CourseDetailPage() {
                 <span className="px-2 py-0.5 bg-accent/10 text-accent rounded text-xs font-medium">
                   {LEVEL_LABELS[course.level] || course.level}
                 </span>
+                <span className="flex items-center gap-1"><Star size={14} className="text-accent fill-accent" />{Number(course.rating).toFixed(1)}</span>
+                <span className="flex items-center gap-1"><Users size={14} />{course.students_count} alunos</span>
                 <span className="flex items-center gap-1"><Clock size={14} />{course.duration}</span>
-                <span className="flex items-center gap-1"><BookOpen size={14} />{totalLessons} aulas</span>
               </div>
               <h1 className="text-3xl md:text-4xl font-bold mb-3">{course.title}</h1>
               <p className="text-lg text-muted-foreground mb-6">{course.description}</p>
@@ -143,20 +147,27 @@ export default function CourseDetailPage() {
             </div>
             <div className="lg:col-span-1">
               <div className="bg-card border border-border rounded-xl overflow-hidden sticky top-32">
-                <div className="h-48 bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center">
-                  <BookOpen size={64} className="text-accent/20" />
+                <div className="h-48 bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center overflow-hidden">
+                  {course.image ? (
+                    <img src={course.image} alt={course.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <BookOpen size={64} className="text-accent/20" />
+                  )}
                 </div>
                 <div className="p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-3xl font-bold text-accent">{fmtPrice(course.price)}</span>
+                    {course.compare_price && Number(course.compare_price) > Number(course.price) && (
+                      <span className="text-lg text-muted-foreground line-through">{fmtPrice(course.compare_price)}</span>
+                    )}
                   </div>
                   <button onClick={handleBuy}
                     className="w-full px-4 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 mb-3">
                     <ShoppingCart size={18} /> Comprar Agora
                   </button>
                   <div className="space-y-2 text-sm">
-                    {features.map((f) => (
-                      <div key={f} className="flex items-center gap-2"><CheckCircle size={16} className="text-green-600" /> {f}</div>
+                    {features.map((f, i) => (
+                      <div key={i} className="flex items-center gap-2"><CheckCircle size={16} className="text-green-600" /> {f}</div>
                     ))}
                   </div>
                 </div>
