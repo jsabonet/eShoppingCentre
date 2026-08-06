@@ -67,10 +67,9 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, durationSec
       if (data.token && data.video_uid) {
         const tp = resumeAt > 0 ? `&startTime=${resumeAt}s` : '';
         const ifr = document.createElement('iframe');
-        ifr.src = `https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}&controls=true&preload=true&autoplay=true${tp}`;
+        ifr.src = `https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}&controls=true&preload=auto&autoplay=true${tp}`;
         ifr.className = 'absolute inset-0 w-full h-full border-0';
         ifr.allow = 'autoplay; fullscreen; picture-in-picture';
-        ifr.allowFullscreen = true;
         ifr.title = 'Video da aula';
         ifr.onload = () => setVideoReady(true);
         if (playerRef.current) { playerRef.current.innerHTML = ''; playerRef.current.appendChild(ifr); }
