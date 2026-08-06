@@ -83,7 +83,7 @@ export default function MyCoursesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {enrollments.map((enr) => (
-            <Link key={enr.id} href={`/my-courses/${enr.id}/learn`}
+            <Link key={enr.id} href={`/my-courses/${enr.course_id}/learn`}
               className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all">
               <div className="h-40 overflow-hidden relative bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center">
                 {enr.image ? (
