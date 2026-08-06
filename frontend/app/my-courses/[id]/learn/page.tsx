@@ -8,6 +8,7 @@ import {
   Menu, X, BookOpen, Loader2
 } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import CourseVideoPlayer from '@/src/components/CourseVideoPlayer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -16,6 +17,9 @@ interface LessonData {
   title: string;
   description: string;
   video_url: string;
+  video_provider: string;
+  cloudflare_video_uid: string;
+  cloudflare_video_status: string;
   duration: string;
   is_free_preview: boolean;
   sort_order: number;
@@ -224,25 +228,33 @@ export default function CourseLearnPage() {
 
         {/* Video / Content Area */}
         <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden">
-          {currentLesson?.video_url ? (
-            <iframe
-              src={currentLesson.video_url
-                .replace('watch?v=', 'embed/')
-                .replace('vimeo.com/', 'player.vimeo.com/video/')
-                .replace('youtu.be/', 'youtube.com/embed/')}
-              className="w-full h-full"
-              allowFullScreen
-              title={currentLesson.title}
-            />
+          {currentLesson ? (
+            currentLesson.cloudflare_video_uid ? (
+              <CourseVideoPlayer lessonId={currentLesson.id} />
+            ) : currentLesson.video_url ? (
+              <iframe
+                src={currentLesson.video_url
+                  .replace('watch?v=', 'embed/')
+                  .replace('vimeo.com/', 'player.vimeo.com/video/')
+                  .replace('youtu.be/', 'youtube.com/embed/')}
+                className="w-full h-full"
+                allowFullScreen
+                title={currentLesson.title}
+              />
+            ) : (
+              <div className="text-center text-white/60 p-8">
+                <BookOpen size={64} className="mx-auto mb-4 text-white/30" />
+                <p className="text-lg font-medium mb-2">Sem video</p>
+                <p className="text-sm text-white/40">
+                  {currentLesson.description || 'Esta aula nao tem video.'}
+                </p>
+              </div>
+            )
           ) : (
             <div className="text-center text-white/60 p-8">
               <BookOpen size={64} className="mx-auto mb-4 text-white/30" />
-              <p className="text-lg font-medium mb-2">
-                {currentLesson ? 'Sem video' : 'Seleccione uma aula'}
-              </p>
-              <p className="text-sm text-white/40">
-                {currentLesson?.description || 'Navegue pela barra lateral para comecar.'}
-              </p>
+              <p className="text-lg font-medium mb-2">Seleccione uma aula</p>
+              <p className="text-sm text-white/40">Navegue pela barra lateral para comecar.</p>
             </div>
           )}
         </div>
