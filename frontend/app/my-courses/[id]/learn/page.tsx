@@ -162,7 +162,6 @@ export default function CourseLearnPage() {
   const handleVideoProgress = useCallback((seconds: number) => {
     if (!currentLessonId) return;
     setWatchedMap(prev => ({ ...prev, [currentLessonId]: seconds }));
-    // Debounce save to backend every 5s
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       saveWatchProgress(currentLessonId, seconds);

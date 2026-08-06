@@ -1,24 +1,22 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
 interface CourseVideoPlayerProps {
   lessonId: string;
-  startTime?: number; // segundos para retomar
+  startTime?: number;
   onProgress?: (seconds: number) => void;
   onEnded?: () => void;
 }
 
 export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress, onEnded }: CourseVideoPlayerProps) {
   const playerRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [videoReady, setVideoReady] = useState(false);
-  const progressRef = useRef(0);
-  const endedRef = useRef(false);
-  // Stable callback refs to avoid effect re-creation
+  const elapsedRef = useRef(startTime);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onProgressRef = useRef(onProgress);
   const onEndedRef = useRef(onEnded);
   onProgressRef.current = onProgress;
@@ -26,126 +24,55 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-  // Listen for Cloudflare Stream postMessage events
+  // Timer-based progress -- fires every second while video is ready
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      // Log all postMessage for debugging
-      if (e.data && typeof e.data === 'object' && (e.data.source || e.data.type || '').toString().toLowerCase().includes('cloudflare')) {
-        console.log('[CourseVideoPlayer] postMessage:', JSON.stringify(e.data).slice(0, 200));
-      }
-      if (!e.data || typeof e.data !== 'object') return;
-      const source = (e.data.source || e.data.type || '').toString().toLowerCase();
-      if (!source.includes('cloudflare')) return;
-      const payload = e.data;
-      switch (payload.event) {
-        case 'timeupdate':
-          if (payload.time > 0) {
-            progressRef.current = Math.floor(payload.time);
-            console.log('[CourseVideoPlayer] timeupdate:', progressRef.current, 's');
-            onProgressRef.current?.(progressRef.current);
-          }
-          break;
-        case 'ended':
-        case 'videoEnded':
-          if (!endedRef.current) {
-            endedRef.current = true;
-            console.log('[CourseVideoPlayer] video ended - triggering onEnded');
-            onEndedRef.current?.();
-          }
-          break;
-        case 'play':
-          console.log('[CourseVideoPlayer] play event');
-          break;
-        case 'pause':
-          console.log('[CourseVideoPlayer] pause event');
-          break;
-        default:
-          console.log('[CourseVideoPlayer] unknown event:', payload.event);
-      }
-    };
-    window.addEventListener('message', handler);
-    console.log('[CourseVideoPlayer] postMessage listener registered for lesson:', lessonId);
-    return () => {
-      window.removeEventListener('message', handler);
-      console.log('[CourseVideoPlayer] postMessage listener removed');
-    };
-  }, [lessonId]); // Only re-attach when lesson changes
-
-  // Reset ended flag when lesson changes
-  useEffect(() => {
-    endedRef.current = false;
-    progressRef.current = 0;
-  }, [lessonId]);
+    if (!videoReady || loading) return;
+    elapsedRef.current = startTime;
+    timerRef.current = setInterval(() => {
+      elapsedRef.current += 1;
+      onProgressRef.current?.(elapsedRef.current);
+    }, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [videoReady, loading, startTime, lessonId]);
 
   const fetchToken = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    setVideoReady(false);
-    endedRef.current = false;
-
+    setLoading(true); setError(''); setVideoReady(false);
+    elapsedRef.current = startTime;
     try {
-      const token = localStorage.getItem('access_token');
+      const tok = localStorage.getItem('access_token');
       const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/stream-token/`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { 'Authorization': `Bearer ${tok}` },
       });
-
       if (!res.ok) {
-        if (res.status === 401) {
-          window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-          return;
-        }
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `Erro ${res.status}`);
+        if (res.status === 401) { window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname); return; }
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || `Erro ${res.status}`);
       }
-
       const data = await res.json();
-
       if (data.token && data.video_uid) {
-        const timeParam = startTime > 0 ? `&startTime=${startTime}s` : '';
-        const iframe = document.createElement('iframe');
-        iframe.src = `https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}&controls=true&preload=true&autoplay=true${timeParam}`;
-        iframe.className = 'absolute inset-0 w-full h-full border-0';
-        iframe.allow = 'autoplay; fullscreen; picture-in-picture';
-        iframe.allowFullscreen = true;
-        iframe.title = 'Video da aula';
-        iframe.onload = () => setVideoReady(true);
-        iframeRef.current = iframe;
-
-        if (playerRef.current) {
-          playerRef.current.innerHTML = '';
-          playerRef.current.appendChild(iframe);
-        }
+        const tp = startTime > 0 ? `&startTime=${startTime}s` : '';
+        const ifr = document.createElement('iframe');
+        ifr.src = `https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}&controls=true&preload=true&autoplay=true${tp}`;
+        ifr.className = 'absolute inset-0 w-full h-full border-0';
+        ifr.allow = 'autoplay; fullscreen; picture-in-picture';
+        ifr.allowFullscreen = true;
+        ifr.title = 'Video da aula';
+        ifr.onload = () => setVideoReady(true);
+        if (playerRef.current) { playerRef.current.innerHTML = ''; playerRef.current.appendChild(ifr); }
         setLoading(false);
-      } else {
-        throw new Error(data.detail || 'Video ainda nao disponivel.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Erro ao carregar o video.');
-      setLoading(false);
-    }
+      } else { throw new Error(data.detail || 'Video ainda nao disponivel.'); }
+    } catch (err: any) { setError(err.message || 'Erro ao carregar o video.'); setLoading(false); }
   }, [lessonId, startTime, API_URL]);
 
-  useEffect(() => {
-    fetchToken();
-  }, [fetchToken]);
+  useEffect(() => { fetchToken(); }, [fetchToken]);
 
   if (error) {
     return (
       <div className="aspect-video w-full max-w-5xl mx-auto bg-gradient-to-b from-gray-900 to-black flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center px-6">
-          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
-            <AlertCircle size={28} className="text-red-400" />
-          </div>
-          <div>
-            <p className="text-white/80 font-medium text-sm mb-1">Não foi possível carregar o vídeo</p>
-            <p className="text-white/40 text-xs">{error}</p>
-          </div>
-          <button
-            onClick={fetchToken}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors"
-          >
-            <RefreshCw size={14} /> Tentar novamente
-          </button>
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center"><AlertCircle size={28} className="text-red-400" /></div>
+          <div><p className="text-white/80 font-medium text-sm mb-1">Nao foi possivel carregar o video</p><p className="text-white/40 text-xs">{error}</p></div>
+          <button onClick={fetchToken} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors"><RefreshCw size={14} /> Tentar novamente</button>
         </div>
       </div>
     );
@@ -153,21 +80,8 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
 
   return (
     <div className="relative w-full h-full">
-      {/* Loading overlay */}
-      {loading && (
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black flex items-center justify-center z-10">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 size={36} className="animate-spin text-white/60" />
-            <p className="text-white/50 text-sm">A preparar o vídeo...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Player container */}
-      <div
-        ref={playerRef}
-        className={`absolute inset-0 bg-black transition-opacity duration-500 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
-      />
+      {loading && (<div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black flex items-center justify-center z-10"><div className="flex flex-col items-center gap-3"><Loader2 size={36} className="animate-spin text-white/60" /><p className="text-white/50 text-sm">A preparar o video...</p></div></div>)}
+      <div ref={playerRef} className={`absolute inset-0 bg-black transition-opacity duration-500 ${videoReady ? 'opacity-100' : 'opacity-0'}`} />
     </div>
   );
 }
