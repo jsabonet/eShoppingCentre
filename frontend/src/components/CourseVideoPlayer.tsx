@@ -15,7 +15,8 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [videoReady, setVideoReady] = useState(false);
-  const elapsedRef = useRef(startTime);
+  const startTimestamp = useRef(0); // Date.now() when video started
+  const initialOffset = useRef(startTime); // seconds already watched
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onProgressRef = useRef(onProgress);
   const onEndedRef = useRef(onEnded);
@@ -24,24 +25,26 @@ export default function CourseVideoPlayer({ lessonId, startTime = 0, onProgress,
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-  // Timer-based progress — fires every 3s, pauses when tab hidden
+  // Timestamp-based progress — calculates elapsed from start, no counter needed
   useEffect(() => {
     if (!videoReady || loading) return;
-    elapsedRef.current = startTime;
+    initialOffset.current = startTime;
+    startTimestamp.current = Date.now();
 
-    const tick = () => {
-      if (document.hidden) return; // skip when tab not visible
-      elapsedRef.current += 3;
-      onProgressRef.current?.(elapsedRef.current);
-    };
+    // Single lightweight interval just to report progress for save/UI
+    timerRef.current = setInterval(() => {
+      if (document.hidden) return;
+      const elapsed = initialOffset.current + Math.floor((Date.now() - startTimestamp.current) / 1000);
+      onProgressRef.current?.(elapsed);
+    }, 3000);
 
-    timerRef.current = setInterval(tick, 3000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [videoReady, loading, startTime, lessonId]);
 
   const fetchToken = useCallback(async () => {
     setLoading(true); setError(''); setVideoReady(false);
-    elapsedRef.current = startTime;
+    initialOffset.current = startTime;
+    startTimestamp.current = 0;
     try {
       const tok = localStorage.getItem('access_token');
       const res = await fetch(`${API_URL}/courses/lessons/${lessonId}/stream-token/`, {
