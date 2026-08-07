@@ -26,13 +26,9 @@ export default function ChatButton({ storeId, storeName, subject, productId, ord
       window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
       return;
     }
-    if (opened) {
-      setOpenWidget(true);
-      return;
-    }
     setLoading(true);
     try {
-      // Try to find existing conversation
+      // Find existing conversation for this store
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/chat/`, {
         headers: {
           'Content-Type': 'application/json',
@@ -42,17 +38,23 @@ export default function ChatButton({ storeId, storeName, subject, productId, ord
       if (res.ok) {
         const data = await res.json();
         const conversations = data.results || data || [];
-        const existing = conversations.find((c: any) => c.store_name === storeName && (!productId || c.product_slug));
+        // Look for existing conversation with this store
+        const existing = conversations.find((c: any) => c.store_name === storeName);
         if (existing) {
+          // Open widget directly into this conversation (not the list)
           setOpenWidget(true);
-          setOpened(true);
+          // Dispatch event to select this conversation
+          window.dispatchEvent(new CustomEvent('select-chat-conversation', { detail: existing.id }));
           return;
         }
       }
       // Start new conversation
-      await startConversation(storeId, subject, '', productId, orderId);
-      setOpened(true);
-      setOpenWidget(true);
+      const conv = await startConversation(storeId, subject, '', productId, orderId);
+      if (conv) {
+        setOpenWidget(true);
+        // Auto-select the new conversation
+        window.dispatchEvent(new CustomEvent('select-chat-conversation', { detail: conv.id }));
+      }
       fetchConversations();
     } catch {} finally { setLoading(false); }
   };

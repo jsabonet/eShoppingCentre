@@ -50,6 +50,16 @@ export default function ChatWidget() {
     })();
   }, [activeConvId]);
 
+  // Listen for external "select this conversation" events (from ChatButton)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const convId = (e as CustomEvent).detail;
+      if (convId) setActiveConvId(convId);
+    };
+    window.addEventListener('select-chat-conversation', handler);
+    return () => window.removeEventListener('select-chat-conversation', handler);
+  }, []);
+
   // Scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
