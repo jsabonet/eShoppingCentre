@@ -38,6 +38,8 @@ export default function AdminStoreDetailPage() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [followers, setFollowers] = useState<any[]>([]);
   const [storeReviews, setStoreReviews] = useState<any[]>([]);
+  const [chatModal, setChatModal] = useState<{ convId: string; messages: any[] } | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -73,6 +75,22 @@ export default function AdminStoreDetailPage() {
   }, [id, isAuthenticated, isAdmin, authLoading, router]);
 
   const status = store ? (STATUS_BADGE[store.status] || { label: store.status, cls: 'bg-gray-100 text-gray-700' }) : null;
+
+  const openConversation = async (convId: string) => {
+    setChatLoading(true);
+    setChatModal({ convId, messages: [] });
+    try {
+      const token = localStorage.getItem('access_token');
+      const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const res = await fetch(`${API}/admin/chat/${convId}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setChatModal({ convId, messages: data.messages || [] });
+      }
+    } catch {} finally { setChatLoading(false); }
+  };
 
   return (
     <AdminLayout>
@@ -345,13 +363,14 @@ export default function AdminStoreDetailPage() {
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {conversations.map((c: any) => (
-                      <div key={c.id} className="p-2 bg-muted/20 rounded-lg text-sm">
+                      <button key={c.id} onClick={() => openConversation(c.id)}
+                        className="w-full p-2 bg-muted/20 rounded-lg text-sm text-left hover:bg-muted/40 transition-colors">
                         <p className="font-medium truncate">{c.subject}</p>
                         <p className="text-xs text-muted-foreground">
                           {c.buyer_name} ↔ {c.seller_name}
                           {c.last_message && <> · {new Date(c.last_message.created_at).toLocaleDateString('pt-MZ')}</>}
                         </p>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -408,6 +427,43 @@ export default function AdminStoreDetailPage() {
           </div>
         </div>
       ) : null}
+
+      {/* ── Chat Conversation Modal ── */}
+      {chatModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setChatModal(null)}>
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-bold">💬 Conversa</h3>
+              <button onClick={() => setChatModal(null)} className="p-1 hover:bg-muted rounded">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {chatLoading ? (
+                <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin" /></div>
+              ) : chatModal.messages.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Nenhuma mensagem.</p>
+              ) : (
+                chatModal.messages.map((msg: any) => (
+                  <div key={msg.id} className={`flex ${msg.is_mine ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] rounded-xl px-4 py-2 text-sm ${
+                      msg.is_mine ? 'bg-accent text-white' : 'bg-muted'
+                    }`}>
+                      <p className="text-xs font-bold mb-0.5">{msg.sender_name}</p>
+                      <p className="whitespace-pre-wrap">{msg.body}</p>
+                      <p className="text-[10px] opacity-60 mt-1 text-right">
+                        {new Date(msg.created_at).toLocaleString('pt-MZ')}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal de Preview de Documentos ── */}
       {previewDoc && (
