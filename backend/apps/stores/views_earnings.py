@@ -98,10 +98,26 @@ class StoreStatsView(APIView):
             # Type-specific stats
             'downloaded_today': downloaded_today,
             'active_students': active_students,
+            # Social
+            'followers_count': store.followers.count(),
             # Lists
             'recent_orders': recent_data,
             'top_products': top_data,
+            'recent_reviews': self._get_recent_reviews(store),
         })
+
+    def _get_recent_reviews(self, store):
+        from apps.reviews.models import StoreReview
+        reviews = StoreReview.objects.filter(
+            store=store, is_hidden=False,
+        ).order_by('-created_at')[:5]
+        return [{
+            'id': str(r.id),
+            'user_name': r.user.first_name or r.user.email.split('@')[0],
+            'overall_rating': r.overall_rating,
+            'comment': r.comment[:200] if r.comment else '',
+            'created_at': r.created_at.isoformat(),
+        } for r in reviews]
 
 
 class StoreEarningsView(APIView):

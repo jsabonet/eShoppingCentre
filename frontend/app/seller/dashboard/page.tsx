@@ -99,6 +99,7 @@ export default function SellerDashboardPage() {
     { label: 'Receita Total', value: fmtPrice(data.total_revenue), icon: DollarSign, color: 'bg-blue-100 text-blue-700', sub: `${fmtNum(data.total_orders)} encomendas` },
     { label: 'Produtos Activos', value: fmtNum(data.total_products), icon: Package, color: 'bg-purple-100 text-purple-700', sub: 'em catálogo' },
     { label: 'Avaliação', value: `${data.store_rating.toFixed(1)} ★`, icon: Star, color: 'bg-pink-100 text-pink-700', sub: 'média da loja' },
+    { label: 'Seguidores', value: fmtNum((data as any).followers_count || 0), icon: Users, color: 'bg-amber-100 text-amber-700', sub: 'na loja' },
   ];
 
   const typeStats: Record<string, { label: string; value: string; icon: any; color: string; sub: string }[]> = {
@@ -216,6 +217,31 @@ export default function SellerDashboardPage() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Recent Reviews */}
+          <div className="bg-card border border-border rounded-xl">
+            <div className="p-4 border-b border-border">
+              <h2 className="font-bold">⭐ Avaliações Recentes</h2>
+            </div>
+            <div className="divide-y divide-border">
+              {!((data as any).recent_reviews?.length) ? (
+                <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma avaliação ainda.</p>
+              ) : (
+                (data as any).recent_reviews.map((review: any) => (
+                  <div key={review.id} className="p-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-sm">{review.user_name}</span>
+                      <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">
+                        ⭐ {review.overall_rating}/5
+                      </span>
+                    </div>
+                    {review.comment && <p className="text-xs text-muted-foreground">{review.comment}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">{timeAgo(review.created_at)}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
