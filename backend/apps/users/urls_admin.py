@@ -4,6 +4,7 @@ from .views_admin import (
     PendingPayoutsView, ApprovePayoutView,
     AdminUserListView, AdminUserDetailView,
     AdminAllStoresView, AdminStoreManageView, AdminAllOrdersView,
+    AdminStoreConversationsView, AdminStoreFollowersView, AdminStoreReviewsView,
 )
 
 urlpatterns = [
@@ -17,4 +18,8 @@ urlpatterns = [
     path('payouts/<uuid:pk>/approve/', ApprovePayoutView.as_view(), name='admin_approve_payout'),
     path('users/', AdminUserListView.as_view(), name='admin_user_list'),
     path('users/<pk>/', AdminUserDetailView.as_view(), name='admin_user_detail'),
+    # Store data for admin
+    path('stores/<uuid:store_id>/conversations/', AdminStoreConversationsView.as_view(), name='admin_store_conversations'),
+    path('stores/<uuid:store_id>/followers/', AdminStoreFollowersView.as_view(), name='admin_store_followers'),
+    path('stores/<uuid:store_id>/reviews/', AdminStoreReviewsView.as_view(), name='admin_store_reviews'),
 ]

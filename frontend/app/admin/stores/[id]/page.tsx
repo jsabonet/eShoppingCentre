@@ -35,6 +35,9 @@ export default function AdminStoreDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [previewDoc, setPreviewDoc] = useState<{ url: string; label: string } | null>(null);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [storeReviews, setStoreReviews] = useState<any[]>([]);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -48,6 +51,22 @@ export default function AdminStoreDetailPage() {
       try {
         const { data } = await adminAPI.getStore(id);
         setStore(data);
+
+        // Fetch conversations, followers, reviews for this store
+        const token = localStorage.getItem('access_token');
+        const h = { headers: { Authorization: `Bearer ${token}` } };
+        const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+        try {
+          const [cRes, fRes, rRes] = await Promise.all([
+            fetch(`${API}/admin/stores/${id}/conversations/`, h),
+            fetch(`${API}/admin/stores/${id}/followers/`, h),
+            fetch(`${API}/admin/stores/${id}/reviews/`, h),
+          ]);
+          if (cRes.ok) { const d = await cRes.json(); setConversations(d.results || []); }
+          if (fRes.ok) { const d = await fRes.json(); setFollowers(d.results || []); }
+          if (rRes.ok) { const d = await rRes.json(); setStoreReviews(d.results || []); }
+        } catch {}
       } catch { setError('Erro ao carregar a loja.'); }
       finally { setLoading(false); }
     })();
@@ -316,6 +335,74 @@ export default function AdminStoreDetailPage() {
               <div className="bg-white rounded-lg border border-border p-5 shadow-sm">
                 <h3 className="font-bold mb-3">💬 Notas Admin</h3>
                 <p className="text-sm text-muted-foreground italic">{store.admin_notes || 'Nenhuma nota.'}</p>
+              </div>
+
+              {/* Conversations */}
+              <div className="bg-white rounded-lg border border-border p-5 shadow-sm">
+                <h3 className="font-bold mb-3 flex items-center gap-2">💬 Conversas ({conversations.length})</h3>
+                {conversations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma conversa.</p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {conversations.map((c: any) => (
+                      <div key={c.id} className="p-2 bg-muted/20 rounded-lg text-sm">
+                        <p className="font-medium truncate">{c.subject}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {c.buyer_name} ↔ {c.seller_name}
+                          {c.last_message && <> · {new Date(c.last_message.created_at).toLocaleDateString('pt-MZ')}</>}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Followers */}
+              <div className="bg-white rounded-lg border border-border p-5 shadow-sm">
+                <h3 className="font-bold mb-3 flex items-center gap-2">👥 Seguidores ({followers.length})</h3>
+                {followers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum seguidor.</p>
+                ) : (
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {followers.map((f: any) => (
+                      <div key={f.id} className="flex items-center justify-between p-2 bg-muted/20 rounded-lg text-sm">
+                        <div>
+                          <span className="font-medium">{f.user_name}</span>
+                          <span className="text-xs text-muted-foreground ml-2">{f.user_email}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(f.created_at).toLocaleDateString('pt-MZ')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Store Reviews */}
+              <div className="bg-white rounded-lg border border-border p-5 shadow-sm">
+                <h3 className="font-bold mb-3 flex items-center gap-2">⭐ Avaliações ({storeReviews.length})</h3>
+                {storeReviews.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma avaliação.</p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {storeReviews.map((r: any) => (
+                      <div key={r.id} className="p-2 bg-muted/20 rounded-lg text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{r.user_name}</span>
+                          <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">
+                            ⭐ {r.overall_rating}/5
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Com: {r.communication_rating} · Prec: {r.accuracy_rating}
+                          {r.shipping_rating != null && <> · Ent: {r.shipping_rating}</>}
+                        </p>
+                        {r.comment && <p className="text-xs mt-1 italic">{r.comment.slice(0, 150)}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

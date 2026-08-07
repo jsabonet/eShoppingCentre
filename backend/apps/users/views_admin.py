@@ -1,6 +1,7 @@
 from rest_framework import permissions, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAdminUser
 from django.db.models import Sum
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
@@ -308,3 +309,63 @@ class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method in ('PUT', 'PATCH'):
             return UserProfileSerializer
         return UserProfileSerializer
+
+
+# ─── Admin: Store Data (Chats, Followers, Reviews) ───
+
+class AdminStoreConversationsView(APIView):
+    """GET /api/v1/admin/stores/{store_id}/conversations/ — Admin vê conversas da loja."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, store_id):
+        from apps.chat.models import Conversation
+        from apps.chat.serializers import ConversationListSerializer
+
+        conversations = Conversation.objects.filter(
+            store_id=store_id,
+        ).select_related('buyer', 'seller', 'product').order_by('-last_message_at')[:50]
+
+        data = ConversationListSerializer(
+            conversations, many=True, context={'request': request}
+        ).data
+        return Response({'count': len(data), 'results': data})
+
+
+class AdminStoreFollowersView(APIView):
+    """GET /api/v1/admin/stores/{store_id}/followers/ — Admin vê seguidores da loja."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, store_id):
+        from apps.stores.models import StoreFollower
+
+        followers = StoreFollower.objects.filter(
+            store_id=store_id,
+        ).select_related('user').order_by('-created_at')[:100]
+
+        data = [{
+            'id': str(f.id),
+            'user_id': str(f.user.id),
+            'user_name': f.user.first_name or f.user.email.split('@')[0],
+            'user_email': f.user.email,
+            'notify_new_products': f.notify_new_products,
+            'created_at': f.created_at.isoformat(),
+        } for f in followers]
+        return Response({'count': len(data), 'results': data})
+
+
+class AdminStoreReviewsView(APIView):
+    """GET /api/v1/admin/stores/{store_id}/reviews/ — Admin vê reviews da loja."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, store_id):
+        from apps.reviews.models import StoreReview
+        from apps.reviews.serializers import StoreReviewSerializer
+
+        reviews = StoreReview.objects.filter(
+            store_id=store_id,
+        ).order_by('-created_at')[:50]
+
+        data = StoreReviewSerializer(
+            reviews, many=True, context={'request': request}
+        ).data
+        return Response({'count': len(data), 'results': data})
