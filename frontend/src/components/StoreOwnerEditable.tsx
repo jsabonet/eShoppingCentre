@@ -30,6 +30,7 @@ interface StoreData {
   total_sales: number;
   followers_count?: number;
   product_type?: string;
+  review_count?: number;
 }
 
 interface Props {
@@ -220,6 +221,9 @@ export default function StoreOwnerEditable({ store }: Props) {
               <span className="flex items-center gap-1"><Package size={14} /> {store.total_products || 0} produtos</span>
               <span className="flex items-center gap-1"><TrendingUp size={14} /> {store.total_sales || 0} vendas</span>
               <span className="flex items-center gap-1"><Users size={14} /> {store.followers_count ?? 0} seguidores</span>
+              {(store.review_count ?? 0) > 0 && (
+                <span className="flex items-center gap-1"><Star size={14} className="text-amber-500" /> {store.review_count} reviews</span>
+              )}
             </div>
 
             {/* Description — collapsible */}

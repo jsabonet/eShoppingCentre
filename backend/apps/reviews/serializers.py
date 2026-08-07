@@ -3,7 +3,7 @@ from .models import Review, StoreReview
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.first_name', read_only=True)
+    user_name = serializers.SerializerMethodField()
     user_avatar = serializers.SerializerMethodField()
 
     class Meta:
@@ -20,6 +20,13 @@ class ReviewSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.user.avatar.url)
             return obj.user.avatar.url
         return None
+
+    def get_user_name(self, obj):
+        name = obj.user.first_name
+        if name:
+            return name
+        email = obj.user.email
+        return email.split('@')[0] if '@' in email else email
 
     def create(self, validated_data):
         user = self.context['request'].user
@@ -39,7 +46,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 
 class StoreReviewSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.first_name', read_only=True)
+    user_name = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreReview
@@ -50,6 +57,13 @@ class StoreReviewSerializer(serializers.ModelSerializer):
             'helpful_count', 'seller_reply', 'seller_replied_at', 'created_at',
         )
         read_only_fields = ('is_verified_purchase', 'helpful_count', 'seller_replied_at')
+
+    def get_user_name(self, obj):
+        name = obj.user.first_name
+        if name:
+            return name
+        email = obj.user.email
+        return email.split('@')[0] if '@' in email else email
 
     def create(self, validated_data):
         user = self.context['request'].user

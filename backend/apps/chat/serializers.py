@@ -3,7 +3,7 @@ from .models import Conversation, Message
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    sender_name = serializers.CharField(source='sender.first_name', read_only=True)
+    sender_name = serializers.SerializerMethodField()
     sender_id = serializers.UUIDField(source='sender.id', read_only=True)
     is_mine = serializers.SerializerMethodField()
 
@@ -19,12 +19,19 @@ class MessageSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return request and request.user == obj.sender
 
+    def get_sender_name(self, obj):
+        name = obj.sender.first_name
+        if name:
+            return name
+        email = obj.sender.email
+        return email.split('@')[0] if '@' in email else email
+
 
 class ConversationListSerializer(serializers.ModelSerializer):
     store_name = serializers.CharField(source='store.name', read_only=True)
     store_slug = serializers.CharField(source='store.slug', read_only=True)
-    buyer_name = serializers.CharField(source='buyer.first_name', read_only=True)
-    seller_name = serializers.CharField(source='seller.first_name', read_only=True)
+    buyer_name = serializers.SerializerMethodField()
+    seller_name = serializers.SerializerMethodField()
     product_name = serializers.CharField(source='product.name', read_only=True, allow_null=True)
     product_slug = serializers.CharField(source='product.slug', read_only=True, allow_null=True)
     last_message = serializers.SerializerMethodField()
@@ -54,6 +61,20 @@ class ConversationListSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return 0
         return obj.messages.filter(is_read=False).exclude(sender=request.user).count()
+
+    def get_buyer_name(self, obj):
+        name = obj.buyer.first_name
+        if name:
+            return name
+        email = obj.buyer.email
+        return email.split('@')[0] if '@' in email else email
+
+    def get_seller_name(self, obj):
+        name = obj.seller.first_name
+        if name:
+            return name
+        email = obj.seller.email
+        return email.split('@')[0] if '@' in email else email
 
 
 class ConversationDetailSerializer(ConversationListSerializer):

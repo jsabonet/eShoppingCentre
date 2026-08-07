@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Star, ThumbsUp, Flag } from 'lucide-react';
+import { Star, ThumbsUp, Flag, LogIn } from 'lucide-react';
+import Link from 'next/link';
 import ReviewStars from './ReviewStars';
 import LoadingSpinner from './LoadingSpinner';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -71,6 +72,13 @@ export default function StoreReviews({ storeSlug, storeName, storeType }: StoreR
 
   useEffect(() => { fetchReviews(); }, [storeSlug]);
 
+  // Listen for "open-store-review-form" event from StoreActions button
+  useEffect(() => {
+    const handler = () => setShowForm(true);
+    window.addEventListener('open-store-review-form', handler);
+    return () => window.removeEventListener('open-store-review-form', handler);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.comment || !form.comment.trim()) {
@@ -78,7 +86,7 @@ export default function StoreReviews({ storeSlug, storeName, storeType }: StoreR
       return;
     }
     if (!user) {
-      window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+      setFormError('login_required');
       return;
     }
     setSubmitting(true);
@@ -126,7 +134,7 @@ export default function StoreReviews({ storeSlug, storeName, storeType }: StoreR
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 mt-6">
+    <div className="bg-card border border-border rounded-xl p-5 mt-6" id="store-reviews">
       <h3 className="font-bold text-lg mb-4">Avaliacoes da Loja</h3>
 
       {/* Averages */}
@@ -161,7 +169,17 @@ export default function StoreReviews({ storeSlug, storeName, storeType }: StoreR
       {showForm && (
         <div className="border border-border rounded-lg p-4 mb-4 bg-muted/20">
           <h4 className="font-bold text-sm mb-3">Avaliar {storeName}</h4>
-          {formError && <div className="mb-3 p-2 bg-red-50 text-red-600 text-sm rounded-lg">{formError}</div>}
+          {formError && formError === 'login_required' ? (
+            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+              <p className="text-amber-800 mb-2 flex items-center gap-1.5"><LogIn size={14} /> Faça login para publicar a sua avaliacao.</p>
+              <Link href={`/login?redirect=/store/${storeSlug}`}
+                className="inline-flex items-center gap-1 px-4 py-1.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium">
+                Entrar
+              </Link>
+            </div>
+          ) : formError && (
+            <div className="mb-3 p-2 bg-red-50 text-red-600 text-sm rounded-lg">{formError}</div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               {[

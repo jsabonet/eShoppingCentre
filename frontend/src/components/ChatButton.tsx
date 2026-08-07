@@ -50,7 +50,7 @@ export default function ChatButton({ storeId, storeName, subject, productId, ord
         }
       }
       // Start new conversation
-      await startConversation(storeId, subject, 'Ola! Tenho uma duvida.', productId, orderId);
+      await startConversation(storeId, subject, '', productId, orderId);
       setOpened(true);
       setOpenWidget(true);
       fetchConversations();

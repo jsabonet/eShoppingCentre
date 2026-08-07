@@ -83,6 +83,7 @@ export default async function StorePage({ params }: StorePageProps) {
           total_products: store.total_products || 0, total_sales: store.total_sales || 0,
           followers_count: store.followers_count || 0,
           product_type: store.product_type || 'physical',
+          review_count: store.review_count || 0,
         }} />
       </div>
 

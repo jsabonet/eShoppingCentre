@@ -64,6 +64,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
     recent_orders = serializers.SerializerMethodField()
     monthly_sales = serializers.SerializerMethodField()
     followers_count = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
     clear_logo = serializers.BooleanField(default=False, write_only=True)
     clear_banner = serializers.BooleanField(default=False, write_only=True)
 
@@ -81,7 +82,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
                   'total_revenue', 'total_orders', 'total_products',
                   'moderation_logs', 'has_documents',
                   'store_products', 'recent_orders', 'monthly_sales',
-                  'followers_count', 'clear_logo', 'clear_banner')
+                  'followers_count', 'review_count', 'clear_logo', 'clear_banner')
         read_only_fields = ('id', 'rating', 'total_sales', 'status',
                            'owner', 'owner_name', 'owner_email', 'owner_verified',
                            'owner_date_joined', 'total_revenue', 'total_orders',
@@ -208,6 +209,9 @@ class StoreDetailSerializer(serializers.ModelSerializer):
 
     def get_followers_count(self, obj):
         return obj.followers.count()
+
+    def get_review_count(self, obj):
+        return obj.reviews.filter(is_hidden=False).count()
 
     def validate(self, data):
         if not data.get('slug'):

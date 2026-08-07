@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/v1/admin/categories/', include('apps.products.urls_admin')),
     path('api/v1/admin/blog/', include('apps.blog.urls_admin')),
     path('api/v1/admin/courses/', include('apps.courses.urls_admin')),
+    path('api/v1/admin/chat/', include('apps.chat.urls_admin')),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
 ]

@@ -55,7 +55,44 @@ export default function ChatWidget() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Poll messages every 30s
+  // ─── WebSocket: mensagens em tempo real ───
+  useEffect(() => {
+    if (!activeConvId) return;
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    const baseHost = API_URL.replace(/^https?:\/\//, '').replace(/\/api\/v1.*$/, '');
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${baseHost}/ws/chat/${activeConvId}/?token=${token}`;
+
+    let socket: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 5;
+
+    const connect = () => {
+      if (attempts >= MAX_ATTEMPTS) return;
+      attempts++;
+      try { socket = new WebSocket(wsUrl); } catch { return; }
+
+      socket.onopen = () => { attempts = 0; };
+      socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          setMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
+          fetchConversations();
+        } catch {}
+      };
+      socket.onclose = () => {
+        if (attempts < MAX_ATTEMPTS) reconnectTimer = setTimeout(connect, 3000);
+      };
+      socket.onerror = () => socket?.close();
+    };
+
+    connect();
+    return () => { socket?.close(); if (reconnectTimer) clearTimeout(reconnectTimer); };
+  }, [activeConvId, fetchConversations]);
+
+  // Poll messages every 5s (fallback)
   useEffect(() => {
     if (!activeConvId) return;
     const iv = setInterval(async () => {
@@ -63,11 +100,15 @@ export default function ChatWidget() {
         const res = await fetch(`${API_URL}/chat/${activeConvId}/`, { headers: headers() });
         if (res.ok) {
           const data = await res.json();
-          setMessages(data.messages || []);
+          setMessages(prev => {
+            const fetched = data.messages || [];
+            if (fetched.length === prev.length) return prev;
+            return fetched;
+          });
           fetchConversations();
         }
       } catch {}
-    }, 30000);
+    }, 5000);
     return () => clearInterval(iv);
   }, [activeConvId, fetchConversations]);
 

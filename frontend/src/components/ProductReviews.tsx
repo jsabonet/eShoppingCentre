@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Star, ThumbsUp, Flag, MessageSquare, X } from 'lucide-react';
+import { Star, ThumbsUp, Flag, MessageSquare, X, LogIn } from 'lucide-react';
+import Link from 'next/link';
 import ReviewStars from './ReviewStars';
 import LoadingSpinner from './LoadingSpinner';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -78,7 +79,7 @@ export default function ProductReviews({ productId, productName, rating, reviewC
       return;
     }
     if (!user) {
-      window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+      setFormError('login_required');
       return;
     }
     setSubmitting(true);
@@ -166,7 +167,15 @@ export default function ProductReviews({ productId, productName, rating, reviewC
             <h3 className="font-bold">Avaliar: {productName}</h3>
             <button onClick={() => setShowForm(false)} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
           </div>
-          {formError && (
+          {formError && formError === 'login_required' ? (
+            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+              <p className="text-amber-800 mb-2 flex items-center gap-1.5"><LogIn size={14} /> Faça login para publicar a sua avaliacao.</p>
+              <Link href={`/login?redirect=/product/${encodeURIComponent(window.location.pathname.split('/').pop() || '')}`}
+                className="inline-flex items-center gap-1 px-4 py-1.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium">
+                Entrar
+              </Link>
+            </div>
+          ) : formError && (
             <div className="mb-3 p-2 bg-red-50 text-red-600 text-sm rounded-lg">{formError}</div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">

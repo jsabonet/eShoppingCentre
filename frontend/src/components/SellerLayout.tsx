@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Package, ShoppingCart, Users, DollarSign, Settings, Store,
   ChevronLeft, ChevronRight, LogOut, Plus, ExternalLink, TrendingUp, Gift, Menu, X, AlertCircle,
-  GraduationCap, Award
+  GraduationCap, Award, MessageCircle
 } from 'lucide-react';
 import { storesAPI } from '@/src/lib/api';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -40,6 +40,7 @@ function getBaseNav(productType: string) {
       { href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/seller/courses', label: 'Cursos', icon: GraduationCap },
       { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart },
+      { href: '/seller/messages', label: 'Mensagens', icon: MessageCircle },
       { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
       { href: '/seller/settings', label: 'Configurações', icon: Settings },
     ];
@@ -48,6 +49,7 @@ function getBaseNav(productType: string) {
     { href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/seller/products', label: 'Produtos', icon: Package },
     { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart },
+    { href: '/seller/messages', label: 'Mensagens', icon: MessageCircle },
     { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
     { href: '/seller/settings', label: 'Configurações', icon: Settings },
   ];

@@ -154,3 +154,27 @@ class UnreadCountView(APIView):
             conversation__is_archived_by_seller=False,
         ).exclude(sender=user).count()
         return Response({'unread_count': count})
+
+
+# ─── Admin ───
+
+class AdminConversationListView(generics.ListAPIView):
+    """GET /api/v1/admin/chat/ — Admin ve todas as conversas."""
+    serializer_class = ConversationListSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return Conversation.objects.select_related(
+            'store', 'buyer', 'seller', 'product',
+        ).order_by('-last_message_at')
+
+
+class AdminConversationDetailView(generics.RetrieveAPIView):
+    """GET /api/v1/admin/chat/{id}/ — Admin ve detalhe de conversa (read-only)."""
+    serializer_class = ConversationDetailSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return Conversation.objects.select_related(
+            'store', 'buyer', 'seller', 'product',
+        ).prefetch_related('messages')

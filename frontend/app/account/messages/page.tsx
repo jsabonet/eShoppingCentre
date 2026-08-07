@@ -49,6 +49,7 @@ export default function AccountMessagesPage() {
       }
     })();
   }, [activeConvId]);
+  }, [activeConvId]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
