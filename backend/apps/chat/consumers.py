@@ -3,10 +3,6 @@ import re
 from html import escape
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
-from rest_framework_simplejwt.tokens import AccessToken
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
 
 
 def sanitize_message(body):
@@ -58,6 +54,9 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def get_user_from_token(self):
+        from rest_framework_simplejwt.tokens import AccessToken
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
         token = None
         # Try query string first, then header
         query_string = self.scope.get('query_string', b'').decode()
