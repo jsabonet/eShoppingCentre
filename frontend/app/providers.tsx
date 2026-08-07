@@ -3,12 +3,14 @@
 import { usePathname } from 'next/navigation';
 import { AuthProvider, useAuth } from "@/src/hooks/useAuth";
 import { CartProvider } from "@/src/contexts/CartContext";
+import { ChatProvider } from "@/src/contexts/ChatContext";
 import { TooltipProvider } from "@/src/components/ui/tooltip";
 import { Toaster } from "@/src/components/ui/sonner";
 import Header from "@/src/components/Header";
 import Footer from "@/src/components/Footer";
 import PWAInstall from "@/src/components/PWAInstall";
 import NavigationLoader from "@/src/components/NavigationLoader";
+import ChatWidget from "@/src/components/ChatWidget";
 
 /** Rotas que precisam de auth resolvida antes de renderizar */
 const PROTECTED_PREFIXES = ['/admin', '/seller', '/account', '/checkout', '/my-courses', '/affiliate'];
@@ -52,6 +54,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <CartProvider>
+        <ChatProvider>
         <TooltipProvider>
           <AuthGate>
             <Header />
@@ -61,7 +64,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <NavigationLoader />
           <Toaster position="top-right" richColors closeButton />
           <PWAInstall />
+          <ChatWidget />
         </TooltipProvider>
+        </ChatProvider>
       </CartProvider>
     </AuthProvider>
   );

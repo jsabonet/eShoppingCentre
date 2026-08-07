@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, Pencil, Check, X, Store, Star, MapPin, Package, TrendingUp } from "lucide-react";
+import { Camera, Pencil, Check, X, Store, Star, MapPin, Package, TrendingUp, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { storesAPI } from "@/src/lib/api";
+import StoreActions from "./StoreActions";
 import axios from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -27,6 +28,8 @@ interface StoreData {
   rating: number;
   total_products: number;
   total_sales: number;
+  followers_count?: number;
+  product_type?: string;
 }
 
 interface Props {
@@ -37,6 +40,7 @@ export default function StoreOwnerEditable({ store }: Props) {
   const [isOwner, setIsOwner] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [editingTagline, setEditingTagline] = useState(false);
+  const [showFullDesc, setShowFullDesc] = useState(false);
   const [name, setName] = useState(store.name);
   const [tagline, setTagline] = useState(store.tagline);
   const [bannerUrl, setBannerUrl] = useState(mediaUrl(store.banner));
@@ -120,12 +124,12 @@ export default function StoreOwnerEditable({ store }: Props) {
         )}
       </div>
 
-      {/* Logo + Info */}
+      {/* Logo + Info + Actions — Compact Header */}
       <div className="max-w-[1500px] mx-auto px-4 py-6">
         <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 ${bannerUrl ? "-mt-12" : ""} relative z-10`}>
           {/* Logo */}
-          <div className={isOwner ? "relative group/logo" : "relative"}>
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl border-4 border-white shadow-lg overflow-hidden bg-white shrink-0">
+          <div className={isOwner ? "relative group/logo shrink-0" : "relative shrink-0"}>
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl overflow-hidden bg-white">
               {logoUrl ? (
                 <img src={logoUrl} alt={name} className="w-full h-full object-cover" />
               ) : (
@@ -144,8 +148,8 @@ export default function StoreOwnerEditable({ store }: Props) {
             )}
           </div>
 
-          {/* Name + Tagline — glassmorphism container for contrast against any banner */}
-          <div className={`flex-1 ${bannerUrl ? 'backdrop-blur-md bg-white/75 dark:bg-black/60 rounded-xl px-4 py-3' : ''}`}>
+          {/* Name + Tagline + Stats + Description */}
+          <div className="flex-1 min-w-0">
             {/* Name */}
             <div className={`flex items-center gap-2 ${isOwner ? "group/name" : ""}`}>
               {editingName ? (
@@ -167,8 +171,7 @@ export default function StoreOwnerEditable({ store }: Props) {
                   <h1 className="text-2xl md:text-3xl font-bold">{name}</h1>
                   {isOwner && (
                   <button onClick={() => setEditingName(true)}
-                    className="p-1 opacity-0 group-hover/name:opacity-100 hover:bg-muted rounded transition-all"
-                    title="Editar nome">
+                    className="p-1 opacity-0 group-hover/name:opacity-100 hover:bg-muted rounded transition-all">
                     <Pencil size={14} className="text-muted-foreground" />
                   </button>
                   )}
@@ -198,9 +201,7 @@ export default function StoreOwnerEditable({ store }: Props) {
                   {tagline ? (
                     <p className="text-sm text-muted-foreground">{tagline}</p>
                   ) : (
-                    isOwner ? (
-                      <p className="text-sm text-muted-foreground/50 italic">Adicionar slogan...</p>
-                    ) : null
+                    isOwner ? <p className="text-sm text-muted-foreground/50 italic">Adicionar slogan...</p> : null
                   )}
                   {isOwner && (
                   <button onClick={() => setEditingTagline(true)}
@@ -212,14 +213,41 @@ export default function StoreOwnerEditable({ store }: Props) {
               )}
             </div>
 
-            <p className="text-muted-foreground">{store.description}</p>
-            <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
+            {/* Stats Row */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1"><Star size={14} className="text-amber-500 fill-amber-500" /> {store.rating.toFixed(1)}</span>
               <span className="flex items-center gap-1"><MapPin size={14} /> {store.location || "Moçambique"}</span>
               <span className="flex items-center gap-1"><Package size={14} /> {store.total_products || 0} produtos</span>
               <span className="flex items-center gap-1"><TrendingUp size={14} /> {store.total_sales || 0} vendas</span>
+              <span className="flex items-center gap-1"><Users size={14} /> {store.followers_count ?? 0} seguidores</span>
             </div>
+
+            {/* Description — collapsible */}
+            {store.description && (
+              <div className="mt-2">
+                <button onClick={() => setShowFullDesc(!showFullDesc)}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  {showFullDesc ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  {showFullDesc ? 'Menos informacoes' : 'Sobre a loja'}
+                </button>
+                {showFullDesc && (
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-2xl">{store.description}</p>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Actions — only for visitors */}
+          {!isOwner && (
+            <div className="shrink-0 self-start mt-2 sm:mt-0">
+              <StoreActions
+                storeId={store.id}
+                storeSlug={store.slug}
+                storeName={store.name}
+                storeType={(store.product_type as 'physical' | 'digital' | 'course') || 'physical'}
+              />
+            </div>
+          )}
         </div>
       </div>
 

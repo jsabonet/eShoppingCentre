@@ -1,7 +1,9 @@
 ﻿"use client";
 
 import { useState } from 'react';
-import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play, Download, Monitor, FileText, GraduationCap, BookOpen, Award, Users, ChevronDown, Store } from 'lucide-react';
+import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play, Download, Monitor, FileText, GraduationCap, BookOpen, Award, Users, ChevronDown, Store, MessageCircle } from 'lucide-react';
+import ChatButton from './ChatButton';
+import ProductReviews from './ProductReviews';
 import { CartProvider, useCart } from '../contexts/CartContext';
 import ProductCard from './ProductCard';
 import CartDrawer from './CartDrawer';
@@ -392,6 +394,20 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                   </a>
                 )}
 
+                {/* Chat button */}
+                {product.storeId && product.storeName && (
+                  <div className="mt-2">
+                    <ChatButton
+                      storeId={product.storeId}
+                      storeName={product.storeName}
+                      subject={`Duvida sobre: ${product.name}`}
+                      productId={product.id}
+                      variant="link"
+                      className="justify-center w-full"
+                    />
+                  </div>
+                )}
+
                 <div className="mt-4 pt-4 border-t border-border text-xs text-muted-foreground space-y-1">
                   {isCourse ? (
                     <>
@@ -666,6 +682,16 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
           </div>
         </section>
       )}
+
+      {/* Reviews */}
+      <div className="max-w-[1500px] mx-auto px-4">
+        <ProductReviews
+          productId={product.id}
+          productName={product.name}
+          rating={product.rating}
+          reviewCount={product.reviewCount}
+        />
+      </div>
 
       {/* AI Similar Products */}
       {relatedProducts.length > 0 && (

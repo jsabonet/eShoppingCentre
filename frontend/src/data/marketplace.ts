@@ -52,6 +52,7 @@ export interface Product {
   salesCount?: number;
   storeName?: string;
   storeSlug?: string;
+  storeId?: string;
   // Digital product fields
   productType?: 'physical' | 'digital' | 'course';
   digitalFormat?: string;

@@ -98,6 +98,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     salesCount: product.sales_count || 0,
     storeName: product.store?.name || '',
     storeSlug: product.store?.slug || '',
+    storeId: product.store?.id || '',
     productType: product.product_type || 'physical',
     digitalFormat: product.digital_format || '',
     digitalVersion: product.digital_version || '',

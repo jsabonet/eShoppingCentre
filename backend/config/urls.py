@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/v1/courses/', include('apps.courses.urls')),
     path('api/v1/blog/', include('apps.blog.urls')),
     path('api/v1/reviews/', include('apps.reviews.urls')),
+    path('api/v1/chat/', include('apps.chat.urls')),
     path('api/v1/admin/', include('apps.users.urls_admin')),
     path('api/v1/admin/categories/', include('apps.products.urls_admin')),
     path('api/v1/admin/blog/', include('apps.blog.urls_admin')),

@@ -118,3 +118,18 @@ class StoreModerationLog(BaseModel):
 
     def __str__(self):
         return f'{self.store.name} — {self.get_action_display()} por {self.admin} em {self.created_at:%d/%m/%Y}'
+
+
+class StoreFollower(BaseModel):
+    """Utilizador segue uma loja para receber notificacoes de novos produtos."""
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='followed_stores')
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='followers')
+    notify_new_products = models.BooleanField(default=True)
+    notify_promotions = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = [['user', 'store']]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.email} → {self.store.name}'
