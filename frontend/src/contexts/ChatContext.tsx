@@ -72,6 +72,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const fetchConversations = useCallback(async () => {
     try {
+      const tok = localStorage.getItem('access_token');
+      if (!tok) return;
       setLoading(true);
       const res = await fetch(`${API_URL}/chat/`, { headers: headers() });
       if (res.ok) {
@@ -85,6 +87,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const fetchUnreadCount = useCallback(async () => {
     try {
+      const tok = localStorage.getItem('access_token');
+      if (!tok) return;
       const res = await fetch(`${API_URL}/chat/unread-count/`, { headers: headers() });
       if (res.ok) {
         const data = await res.json();

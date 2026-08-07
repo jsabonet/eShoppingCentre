@@ -130,7 +130,7 @@ export default function StoreOwnerEditable({ store }: Props) {
         <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 ${bannerUrl ? "-mt-12" : ""} relative z-10`}>
           {/* Logo */}
           <div className={isOwner ? "relative group/logo shrink-0" : "relative shrink-0"}>
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl overflow-hidden bg-white">
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl border-2 border-white shadow-md overflow-hidden bg-white">
               {logoUrl ? (
                 <img src={logoUrl} alt={name} className="w-full h-full object-cover" />
               ) : (
@@ -149,8 +149,8 @@ export default function StoreOwnerEditable({ store }: Props) {
             )}
           </div>
 
-          {/* Name + Tagline + Stats + Description */}
-          <div className="flex-1 min-w-0">
+          {/* Name + Tagline + Stats + Description — glass panel for legibility */}
+          <div className="flex-1 min-w-0 backdrop-blur-md bg-white/80 dark:bg-black/70 rounded-xl px-4 py-3 shadow-sm border border-white/20">
             {/* Name */}
             <div className={`flex items-center gap-2 ${isOwner ? "group/name" : ""}`}>
               {editingName ? (

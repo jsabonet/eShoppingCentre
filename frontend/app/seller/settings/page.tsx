@@ -243,7 +243,8 @@ export default function SellerSettingsPage() {
           </div>
           <div className="max-w-375 mx-auto px-4 py-6">
             <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 ${displayBanner ? '-mt-12' : ''} relative z-10`}>
-              <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl border border-border/50 overflow-hidden bg-white shrink-0 relative group">
+              {/* Logo — always white bg with subtle shadow for contrast against any banner */}
+              <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl border-2 border-white shadow-md overflow-hidden bg-white shrink-0 relative group">
                 {displayLogo ? (
                   <img src={displayLogo} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
@@ -268,8 +269,9 @@ export default function SellerSettingsPage() {
                 )}
               </div>
               <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleLogoChange} />
-              <div className={`flex-1 ${displayBanner ? 'backdrop-blur-md bg-white/75 dark:bg-black/60 rounded-xl px-4 py-3' : ''}`}>
-                <h1 className="text-2xl md:text-3xl font-bold">{form.name || 'Nome da Loja'}</h1>
+              {/* Name — glassmorphism panel for legibility on any banner color */}
+              <div className="flex-1 backdrop-blur-md bg-white/80 dark:bg-black/70 rounded-xl px-4 py-3 shadow-sm border border-white/20">
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{form.name || 'Nome da Loja'}</h1>
                 <p className="text-sm text-muted-foreground">{form.tagline || 'Slogan da loja'}</p>
               </div>
             </div>
