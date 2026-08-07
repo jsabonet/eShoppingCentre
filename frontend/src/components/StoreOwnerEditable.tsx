@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Camera, Pencil, Check, X, Store, Star, MapPin, Package, TrendingUp, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { storesAPI } from "@/src/lib/api";
 import StoreActions from "./StoreActions";
+import ReviewStars from "./ReviewStars";
 import axios from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -216,7 +217,10 @@ export default function StoreOwnerEditable({ store }: Props) {
 
             {/* Stats Row */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-2 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1"><Star size={14} className="text-amber-500 fill-amber-500" /> {store.rating.toFixed(1)}</span>
+              <span className="flex items-center gap-1">
+                <span className="text-amber-500 font-bold">{store.rating.toFixed(1)}</span>
+                <ReviewStars rating={store.rating} size={14} />
+              </span>
               <span className="flex items-center gap-1"><MapPin size={14} /> {store.location || "Moçambique"}</span>
               <span className="flex items-center gap-1"><Package size={14} /> {store.total_products || 0} produtos</span>
               <span className="flex items-center gap-1"><TrendingUp size={14} /> {store.total_sales || 0} vendas</span>
