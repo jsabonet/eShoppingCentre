@@ -1,5 +1,6 @@
 from django.db import models
 from apps.core.models import BaseModel
+from apps.core.fields import EncryptedTextField
 
 
 class Conversation(BaseModel):
@@ -39,7 +40,7 @@ class Message(BaseModel):
         Conversation, on_delete=models.CASCADE, related_name='messages'
     )
     sender = models.ForeignKey('users.User', on_delete=models.CASCADE)
-    body = models.TextField()
+    body = EncryptedTextField()  # AES-encrypted at rest
     attachment = models.FileField(
         upload_to='chat/%Y/%m/', blank=True,
         help_text='Imagem ou documento (max 10MB)'
@@ -47,8 +48,38 @@ class Message(BaseModel):
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
 
+    # Security
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        'users.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='deleted_messages',
+    )
+
     class Meta:
         ordering = ['created_at']
 
     def __str__(self):
-        return f'{self.sender.email}: {self.body[:80]}'
+        preview = self.body[:80] if self.body else ''
+        return f'{self.sender.email}: {preview}'
+
+    def soft_delete(self, user):
+        self.is_deleted = True
+        self.deleted_at = models.DateTimeField.now()
+        self.deleted_by = user
+        self.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+
+
+class ConversationAccessLog(BaseModel):
+    """Registo de quem acedeu a cada conversa e quando."""
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name='access_logs'
+    )
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.email} acedeu a {self.conversation_id} em {self.created_at}'

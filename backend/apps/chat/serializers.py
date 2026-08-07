@@ -84,5 +84,5 @@ class ConversationDetailSerializer(ConversationListSerializer):
         fields = ConversationListSerializer.Meta.fields + ('messages',)
 
     def get_messages(self, obj):
-        qs = obj.messages.all().order_by('created_at')
+        qs = obj.messages.filter(is_deleted=False).order_by('created_at')
         return MessageSerializer(qs, many=True, context=self.context).data

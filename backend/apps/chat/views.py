@@ -1,13 +1,32 @@
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
-from .models import Conversation, Message
+from django.utils.html import escape
+import re
+from .models import Conversation, Message, ConversationAccessLog
 from .serializers import (
     ConversationListSerializer, ConversationDetailSerializer, MessageSerializer,
 )
+
+
+class MessageThrottle(UserRateThrottle):
+    """Limite: 30 mensagens por minuto por utilizador."""
+    rate = '30/minute'
+    scope = 'chat_message'
+
+
+def sanitize_message(body):
+    """Remove HTML tags e scripts, mantém texto seguro."""
+    # Remove HTML tags
+    clean = re.sub(r'<[^>]*>', '', body)
+    # Escape remaining HTML entities
+    clean = escape(clean)
+    # Limit length
+    return clean[:5000]
 
 
 class ConversationListView(generics.ListCreateAPIView):
@@ -86,10 +105,18 @@ class ConversationDetailView(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         conversation = self.get_object()
 
+        # Log access
+        ip = request.META.get('REMOTE_ADDR', '')
+        ConversationAccessLog.objects.create(
+            conversation=conversation,
+            user=request.user,
+            ip_address=ip if ip else None,
+        )
+
         # Mark unread messages as read (only those NOT sent by current user)
-        conversation.messages.filter(is_read=False).exclude(
-            sender=request.user
-        ).update(is_read=True, read_at=timezone.now())
+        conversation.messages.filter(
+            is_read=False, is_deleted=False,
+        ).exclude(sender=request.user).update(is_read=True, read_at=timezone.now())
 
         return super().retrieve(request, *args, **kwargs)
 
@@ -98,6 +125,7 @@ class MessageCreateView(generics.CreateAPIView):
     """POST /api/v1/chat/{conversation_id}/messages/ — Envia mensagem."""
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [MessageThrottle]
 
     def perform_create(self, serializer):
         conversation = get_object_or_404(
@@ -110,7 +138,13 @@ class MessageCreateView(generics.CreateAPIView):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('Nao pertence a esta conversa.')
 
-        serializer.save(conversation=conversation, sender=user)
+        body = self.request.data.get('body', '')
+        body = sanitize_message(body)
+        if not body.strip():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError('Mensagem vazia.')
+
+        serializer.save(conversation=conversation, sender=user, body=body)
 
 
 class ConversationArchiveView(APIView):
@@ -144,12 +178,12 @@ class UnreadCountView(APIView):
     def get(self, request):
         user = request.user
         count = Message.objects.filter(
-            is_read=False,
+            is_read=False, is_deleted=False,
             conversation__buyer=user,
             conversation__is_archived_by_buyer=False,
         ).exclude(sender=user).count()
         count += Message.objects.filter(
-            is_read=False,
+            is_read=False, is_deleted=False,
             conversation__seller=user,
             conversation__is_archived_by_seller=False,
         ).exclude(sender=user).count()

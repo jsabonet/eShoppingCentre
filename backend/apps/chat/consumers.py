@@ -1,11 +1,18 @@
 import json
+import re
+from html import escape
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
-from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+def sanitize_message(body):
+    clean = re.sub(r'<[^>]*>', '', body)
+    clean = escape(clean)
+    return clean[:5000]
 
 
 class ChatConsumer(AsyncJsonWebsocketConsumer):
@@ -31,6 +38,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     async def receive_json(self, content):
         """Recebe mensagem do cliente, guarda na BD e retransmite."""
         body = content.get('body', '').strip()
+        body = sanitize_message(body)
         if not body:
             return
 

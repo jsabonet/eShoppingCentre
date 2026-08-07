@@ -182,6 +182,10 @@ CLOUDFLARE_STREAM_DOMAIN = config('CLOUDFLARE_STREAM_DOMAIN', default='customer-
 CLOUDFLARE_JWT_SECRET = config('CLOUDFLARE_JWT_SECRET', default='')
 CLOUDFLARE_STREAM_SIGNING_SECRET = config('CLOUDFLARE_STREAM_SIGNING_SECRET', default='')
 
+# ─── Message Encryption (Chat) ───
+# Gera com: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+MESSAGE_ENCRYPTION_KEY = config('MESSAGE_ENCRYPTION_KEY', default='')
+
 LANGUAGE_CODE = 'pt'
 TIME_ZONE = 'Africa/Maputo'
 USE_I18N = True
