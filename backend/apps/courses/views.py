@@ -524,6 +524,7 @@ class QuizListByCourseView(generics.ListAPIView):
     """GET /api/v1/courses/{course_id}/quizzes/ — Lista quizzes de um curso."""
     serializer_class = QuizListSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None  # desabilita paginação para retornar array simples
 
     def get_queryset(self):
         course_id = self.kwargs['course_id']
@@ -850,6 +851,7 @@ class QuizAttemptListView(generics.ListAPIView):
     """GET /api/v1/courses/quizzes/{quiz_id}/attempts/ — Listar tentativas do aluno neste quiz."""
     serializer_class = QuizAttemptListSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         quiz = get_object_or_404(Quiz, id=self.kwargs['quiz_id'])
