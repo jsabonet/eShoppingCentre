@@ -64,6 +64,7 @@ export default function CourseLearnPage() {
   const [accessExpired, setAccessExpired] = useState(false);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
   const [currentQuizId, setCurrentQuizId] = useState<string | null>(null);
+  const [lastLessonId, setLastLessonId] = useState<string | null>(null); // restaura ao sair do quiz
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [quizAttempts, setQuizAttempts] = useState<Record<string, QuizAttemptSummary>>({});
   const [watchedMap, setWatchedMap] = useState<Record<string, number>>({});
@@ -199,6 +200,7 @@ export default function CourseLearnPage() {
   };
 
   const goToQuiz = (quizId: string, moduleId: string) => {
+    setLastLessonId(currentLessonId); // guarda para restaurar depois
     setCurrentLessonId(null);
     setCurrentQuizId(quizId);
     setSidebarOpen(false);
@@ -435,7 +437,10 @@ export default function CourseLearnPage() {
           <div className="flex-1 bg-background overflow-y-auto">
             <div className="max-w-3xl mx-auto p-6">
               <button
-                onClick={() => setCurrentQuizId(null)}
+                onClick={() => {
+                  setCurrentQuizId(null);
+                  if (lastLessonId) setCurrentLessonId(lastLessonId);
+                }}
                 className="mb-4 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <ArrowLeft size={14} /> Voltar às aulas
