@@ -9,7 +9,7 @@ BASE_URL = f'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/stream'
 HEADERS = {'Authorization': f'Bearer {API_TOKEN}'}
 
 
-def create_direct_upload(max_duration_seconds=3600):
+def create_direct_upload(max_duration_seconds=14400):
     """
     Obtem um URL de upload directo do Cloudflare.
     O frontend usa este URL para enviar o video directamente (basic POST upload).
@@ -58,10 +58,10 @@ def delete_video(video_uid):
     return True
 
 
-def generate_stream_token(video_uid, max_duration_seconds=7200):
+def generate_stream_token(video_uid, max_duration_seconds=21600):
     """
     Gera um token JWT assinado para o player.
-    O token expira apos max_duration_seconds (default: 2 horas).
+    O token expira apos max_duration_seconds (default: 6 horas).
     """
     jwt_secret = getattr(settings, 'CLOUDFLARE_JWT_SECRET', 'default-secret-change-me')
     now = int(time.time())
