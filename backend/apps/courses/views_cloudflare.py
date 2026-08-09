@@ -81,8 +81,12 @@ class LessonVideoStatusView(APIView):
                 lesson.video_duration_seconds = status_data.get('duration', 0)
                 lesson.video_thumbnail = status_data.get('thumbnail', '')
                 lesson.save()
-            elif status_data['status'] == 'error':
-                lesson.cloudflare_video_status = 'error'
+            elif status_data['status'] in ('error', 'pendingupload'):
+                # pendingupload = upload nunca completou — permite re-upload
+                if status_data['status'] == 'error':
+                    lesson.cloudflare_video_status = 'error'
+                else:
+                    lesson.cloudflare_video_status = 'pending'
                 lesson.save()
 
             return Response(status_data)

@@ -75,6 +75,13 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
           setError('Falha no processamento do video.');
           return;
         }
+        if (data.status === 'pendingupload') {
+          // Upload nunca completou — permite re-upload
+          setStatus('pending');
+          setError('O upload nao foi concluido. Tente enviar o video novamente.');
+          return;
+          return;
+        }
         // Actualiza status intermedio (pending -> processing, etc.)
         if (data.status && data.status !== status) {
           setStatus(data.status);
