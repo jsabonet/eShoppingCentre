@@ -57,6 +57,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
   useEffect(() => {
     if ((status !== 'uploading' && status !== 'processing') || !lessonId) return;
 
+    console.log('[VideoUploader] Polling iniciado para', { lessonId, status });
     let attempts = 0;
     const maxAttempts = 60; // 5 minutos (5s * 60)
     const authToken = localStorage.getItem('access_token');
