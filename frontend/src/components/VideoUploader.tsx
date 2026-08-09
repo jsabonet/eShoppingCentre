@@ -21,9 +21,11 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
   const onUploadCompleteRef = useRef(onUploadComplete);
   onUploadCompleteRef.current = onUploadComplete;
 
-  // Sincroniza estado interno com props (ex: após fetchBuilder recarregar dados)
+  // Sincroniza estado interno com props, mas só avança (nunca regride)
+  // Ordem: pending → uploading → processing → ready → error
+  const STATUS_ORDER: Record<string, number> = { pending: 0, uploading: 1, processing: 2, ready: 3, error: 999 };
   useEffect(() => {
-    if (existingVideoStatus) {
+    if (existingVideoStatus && (STATUS_ORDER[existingVideoStatus] || 0) > (STATUS_ORDER[status] || 0)) {
       setStatus(existingVideoStatus);
     }
   }, [existingVideoStatus]);
