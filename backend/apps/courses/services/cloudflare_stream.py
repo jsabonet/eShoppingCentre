@@ -11,16 +11,18 @@ HEADERS = {'Authorization': f'Bearer {API_TOKEN}'}
 
 def create_direct_upload(max_duration_seconds=14400):
     """
-    Obtem um URL de upload directo do Cloudflare.
-    O frontend usa este URL para enviar o video directamente (basic POST upload).
+    Obtem um URL de upload directo do Cloudflare com seguranca nativa ativa.
     """
     if not ACCOUNT_ID or not API_TOKEN or 'precisa-gerar' in API_TOKEN:
         raise ValueError('Cloudflare Stream nao configurado. Configure CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN no .env')
+
     response = requests.post(
         f'{BASE_URL}/direct_upload',
         headers=HEADERS,
         json={
             'maxDurationSeconds': max_duration_seconds,
+            'requireSignedURLs': True,
+            'allowedOrigins': ['e-shoppingcentre.com'],
         }
     )
     response.raise_for_status()
