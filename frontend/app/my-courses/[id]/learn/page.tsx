@@ -72,6 +72,7 @@ export default function CourseLearnPage() {
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [attachments, setAttachments] = useState<{ id: string; title: string; file_url: string; file_name: string; file_size: number; file_type: string; }[]>([]);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSelectedRef = useRef(false); // evita loop de fetchCourse → setCurrentLessonId
 
   const apiHeaders = () => {
     const token = localStorage.getItem('access_token');
@@ -107,8 +108,9 @@ export default function CourseLearnPage() {
         mods.forEach((m, i) => { expanded[m.id] = i === 0; });
         setExpandedModules(expanded);
 
-        // Select first lesson if none selected
-        if (!currentLessonId && mods.length > 0 && mods[0].lessons.length > 0) {
+        // Select first lesson if none selected (only on first load)
+        if (!autoSelectedRef.current && mods.length > 0 && mods[0].lessons.length > 0) {
+          autoSelectedRef.current = true;
           setCurrentLessonId(mods[0].lessons[0].id);
         }
       } else if (res.status === 403) {
@@ -126,7 +128,7 @@ export default function CourseLearnPage() {
         return;
       }
     } catch {} finally { setLoading(false); }
-  }, [courseId, currentLessonId]);
+  }, [courseId]); // sem currentLessonId — evita loop de re-fetch
 
   // Save progress on page leave
   useEffect(() => {
