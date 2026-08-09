@@ -58,24 +58,38 @@ def delete_video(video_uid):
     return True
 
 
-def generate_stream_token(video_uid, max_duration_seconds=21600):
+def generate_stream_token(video_uid, max_duration_seconds=21600, client_ip=None):
     """
     Gera um token JWT assinado para o player.
     O token expira apos max_duration_seconds (default: 6 horas).
+    Se client_ip for fornecido, o token so e valido para esse IP.
     """
     jwt_secret = getattr(settings, 'CLOUDFLARE_JWT_SECRET', 'default-secret-change-me')
     now = int(time.time())
+
+    # Restringir ao IP do cliente (anti-partilha de token)
+    if client_ip:
+        access_rules = [
+            {
+                'type': 'ip.src',
+                'ip': [client_ip],
+                'action': 'allow',
+            }
+        ]
+    else:
+        access_rules = [
+            {
+                'type': 'any',
+                'action': 'allow',
+            }
+        ]
+
     payload = {
         'sub': video_uid,
         'kid': jwt_secret[:32],
         'exp': now + max_duration_seconds,
         'iat': now,
-        'accessRules': [
-            {
-                'type': 'ip.src',
-                'action': 'allow',
-            }
-        ]
+        'accessRules': access_rules,
     }
     token = jwt.encode(payload, jwt_secret, algorithm='HS256')
     return token

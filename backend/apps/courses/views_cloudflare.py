@@ -123,7 +123,13 @@ class LessonStreamTokenView(APIView):
         if not lesson.cloudflare_video_uid:
             return Response({'detail': 'Video ainda nao disponivel.'}, status=404)
 
-        token = generate_stream_token(lesson.cloudflare_video_uid)
+        # Extrair IP real do cliente (atras de nginx/proxy)
+        client_ip = (
+            request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+            or request.META.get('REMOTE_ADDR', '')
+        )
+
+        token = generate_stream_token(lesson.cloudflare_video_uid, client_ip=client_ip)
         stream_url = get_stream_url(lesson.cloudflare_video_uid)
 
         return Response({
