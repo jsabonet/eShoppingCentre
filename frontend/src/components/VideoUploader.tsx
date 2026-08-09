@@ -30,9 +30,9 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
     }
   }, [existingVideoStatus]);
 
-  // Carrega o stream token quando o video esta pronto
+  // Carrega o stream token quando o video esta pronto (so uma vez)
   useEffect(() => {
-    if (status === 'ready' && lessonId) {
+    if (status === 'ready' && lessonId && !streamUrl) {
       console.log('[VideoUploader] Video pronto, a carregar preview...', { lessonId });
       const fetchStream = async () => {
         try {
@@ -70,7 +70,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
         if (data.ready_to_stream || data.status === 'ready') {
           console.log('[VideoUploader] Video ficou pronto!', { lessonId });
           setStatus('ready');
-          onUploadCompleteRef.current();
+          // refreshSilent sera chamado pelo onUploadComplete inicial — nao precisa repetir
           return;
         }
         if (data.status === 'error') {
