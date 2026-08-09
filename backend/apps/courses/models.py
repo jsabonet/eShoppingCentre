@@ -123,3 +123,116 @@ class LessonProgress(BaseModel):
 
     class Meta:
         unique_together = [['enrollment', 'lesson']]
+
+
+# ─── Quizzes / Avaliações ───
+
+class Quiz(BaseModel):
+    """Quiz vinculado a um módulo (e opcionalmente a uma aula específica)."""
+    module = models.ForeignKey(CourseModule, on_delete=models.CASCADE, related_name='quizzes')
+    lesson = models.ForeignKey(
+        CourseLesson, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='quizzes',
+        help_text='Opcional: vincular o quiz a uma aula específica.'
+    )
+    title = models.CharField(max_length=500)
+    description = models.TextField(blank=True)
+    pass_percentage = models.PositiveIntegerField(
+        default=70,
+        help_text='Percentagem mínima para aprovação (ex: 70).'
+    )
+    max_attempts = models.PositiveIntegerField(
+        null=True, blank=True, default=3,
+        help_text='Número máximo de tentativas. Null = ilimitado.'
+    )
+    is_required = models.BooleanField(
+        default=False,
+        help_text='Se True, o aluno precisa passar neste quiz para concluir o módulo.'
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name_plural = 'Quizzes'
+        ordering = ['sort_order']
+
+    def __str__(self):
+        return f'Quiz: {self.title}'
+
+
+class Question(BaseModel):
+    """Questão individual dentro de um quiz."""
+    QUESTION_TYPES = (
+        ('multiple_choice', 'Múltipla Escolha'),
+        ('true_false', 'Verdadeiro/Falso'),
+        ('open_text', 'Texto Livre'),
+        ('multiple_select', 'Seleção Múltipla'),
+    )
+
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
+    text = models.TextField(help_text='Enunciado da questão.')
+    question_type = models.CharField(max_length=20, choices=QUESTION_TYPES, default='multiple_choice')
+    sort_order = models.PositiveIntegerField(default=0)
+    points = models.PositiveIntegerField(default=1, help_text='Pontuação da questão.')
+
+    class Meta:
+        ordering = ['sort_order']
+
+    def __str__(self):
+        return f'Q: {self.text[:80]}'
+
+
+class AnswerOption(BaseModel):
+    """Opção de resposta para questões de escolha (multiple_choice, true_false, multiple_select)."""
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='options')
+    text = models.TextField()
+    is_correct = models.BooleanField(default=False)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+    def __str__(self):
+        return f'{self.text[:60]} {"✓" if self.is_correct else ""}'
+
+
+class QuizAttempt(BaseModel):
+    """Tentativa de resolução de um quiz por um aluno."""
+    enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE, related_name='quiz_attempts')
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='attempts')
+    score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    total_points = models.PositiveIntegerField(default=0)
+    earned_points = models.PositiveIntegerField(default=0)
+    passed = models.BooleanField(null=True, blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    attempt_number = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        unique_together = [['enrollment', 'quiz', 'attempt_number']]
+        ordering = ['-attempt_number']
+
+    def __str__(self):
+        return f'{self.enrollment.user.email} — {self.quiz.title} (Tentativa #{self.attempt_number})'
+
+
+class QuizAnswer(BaseModel):
+    """Resposta do aluno a uma questão específica dentro de uma tentativa."""
+    attempt = models.ForeignKey(QuizAttempt, on_delete=models.CASCADE, related_name='answers')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    selected_option = models.ForeignKey(
+        AnswerOption, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='quiz_answers'
+    )
+    selected_options = models.ManyToManyField(
+        AnswerOption, blank=True,
+        related_name='quiz_answers_multi',
+        help_text='Opções selecionadas para questões do tipo multiple_select.'
+    )
+    open_text_answer = models.TextField(blank=True)
+    is_correct = models.BooleanField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [['attempt', 'question']]
+
+    def __str__(self):
+        return f'Resposta: {self.question.text[:50]}'

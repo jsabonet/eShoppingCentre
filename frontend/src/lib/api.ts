@@ -256,6 +256,80 @@ export interface CourseLesson {
   video_url?: string;
 }
 
+// ─── Quizzes ───
+
+export interface AnswerOption {
+  id: string;
+  text: string;
+  is_correct?: boolean; // hidden from students
+  sort_order: number;
+}
+
+export interface QuizQuestion {
+  id: string;
+  text: string;
+  question_type: 'multiple_choice' | 'true_false' | 'open_text' | 'multiple_select';
+  sort_order: number;
+  points: number;
+  options: AnswerOption[];
+}
+
+export interface Quiz {
+  id: string;
+  title: string;
+  description: string;
+  pass_percentage: number;
+  max_attempts: number | null;
+  is_required: boolean;
+  sort_order: number;
+  module_id: string;
+  lesson_id: string | null;
+  module_title?: string;
+  total_questions: number;
+  total_points: number;
+  questions?: QuizQuestion[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface QuizAttempt {
+  id: string;
+  quiz_id: string;
+  quiz_title: string;
+  user_email?: string;
+  score: number | null;
+  total_points: number;
+  earned_points: number;
+  passed: boolean | null;
+  pass_percentage: number;
+  max_attempts: number | null;
+  attempt_number: number;
+  started_at: string;
+  completed_at: string | null;
+  answers?: QuizAnswer[];
+}
+
+export interface QuizAnswer {
+  id: string;
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  selected_option_id: string | null;
+  selected_option_text: string | null;
+  selected_options_texts?: string[];
+  open_text_answer: string;
+  is_correct: boolean | null;
+}
+
+export interface QuizSubmitPayload {
+  answers: {
+    question_id: string;
+    selected_option_id?: string | null;
+    selected_option_ids?: string[];
+    open_text_answer?: string;
+  }[];
+}
+
 export interface Enrollment {
   id: string;
   progress: number;
@@ -548,6 +622,66 @@ export const coursesAPI = {
   getEnrollment: (id: string) => api.get<Enrollment>(`/courses/me/enrollments/${id}/`),
   completeLesson: (lessonId: string) =>
     api.patch(`/courses/me/lessons/${lessonId}/`, { completed: true }),
+};
+
+export const quizzesAPI = {
+  // List quizzes for a course
+  listByCourse: (courseId: string) =>
+    api.get<Quiz[]>(`/courses/${courseId}/quizzes/`),
+
+  // Get quiz detail (with questions & options)
+  getById: (quizId: string) =>
+    api.get<Quiz>(`/courses/quizzes/${quizId}/`),
+
+  // Create quiz in a module
+  create: (moduleId: string, data: Partial<Quiz>) =>
+    api.post<Quiz>(`/courses/modules/${moduleId}/quizzes/`, data),
+
+  // Update quiz
+  update: (quizId: string, data: Partial<Quiz>) =>
+    api.put<Quiz>(`/courses/quizzes/${quizId}/update/`, data),
+
+  // Delete quiz
+  delete: (quizId: string) =>
+    api.delete(`/courses/quizzes/${quizId}/delete/`),
+
+  // ─── Questions ───
+
+  // Add question to quiz
+  createQuestion: (quizId: string, data: any) =>
+    api.post<QuizQuestion>(`/courses/quizzes/${quizId}/questions/`, data),
+
+  // Update question (includes options)
+  updateQuestion: (questionId: string, data: any) =>
+    api.put<QuizQuestion>(`/courses/quizzes/questions/${questionId}/`, data),
+
+  // Delete question
+  deleteQuestion: (questionId: string) =>
+    api.delete(`/courses/quizzes/questions/${questionId}/delete/`),
+
+  // ─── Attempts (Student) ───
+
+  // Start a quiz attempt
+  startAttempt: (quizId: string) =>
+    api.post<{ attempt_id: string; attempt_number: number; quiz: Quiz; started_at: string }>(
+      `/courses/quizzes/${quizId}/attempt/`
+    ),
+
+  // Submit quiz answers
+  submit: (quizId: string, data: QuizSubmitPayload) =>
+    api.post<{
+      attempt_id: string; attempt_number: number; score: number;
+      earned_points: number; total_points: number; passed: boolean;
+      pass_percentage: number; completed_at: string;
+    }>(`/courses/quizzes/${quizId}/submit/`, data),
+
+  // Get quiz result
+  getResult: (quizId: string) =>
+    api.get<QuizAttempt>(`/courses/quizzes/${quizId}/results/`),
+
+  // List attempts for a quiz
+  listAttempts: (quizId: string) =>
+    api.get<QuizAttempt[]>(`/courses/quizzes/${quizId}/attempts/`),
 };
 
 export const blogAPI = {

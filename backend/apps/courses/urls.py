@@ -42,4 +42,23 @@ urlpatterns = [
     path('lessons/<uuid:lesson_id>/video-status/', LessonVideoStatusView.as_view(), name='lesson-video-status'),
     path('lessons/<uuid:lesson_id>/stream-token/', LessonStreamTokenView.as_view(), name='lesson-stream-token'),
     path('webhooks/cloudflare/', CloudflareWebhookView.as_view(), name='cloudflare-webhook'),
+
+    # ─── Quizzes / Avaliações ───
+    # Listar quizzes de um curso
+    path('<uuid:course_id>/quizzes/', views.QuizListByCourseView.as_view(), name='quiz_list'),
+    # Criar quiz num módulo
+    path('modules/<uuid:module_id>/quizzes/', views.QuizCreateView.as_view(), name='quiz_create'),
+    # Detalhe / Editar / Remover quiz
+    path('quizzes/<uuid:quiz_id>/', views.QuizDetailView.as_view(), name='quiz_detail'),
+    path('quizzes/<uuid:quiz_id>/update/', views.QuizUpdateView.as_view(), name='quiz_update'),
+    path('quizzes/<uuid:quiz_id>/delete/', views.QuizDeleteView.as_view(), name='quiz_delete'),
+    # Questões
+    path('quizzes/<uuid:quiz_id>/questions/', views.QuestionCreateView.as_view(), name='question_create'),
+    path('quizzes/questions/<uuid:question_id>/', views.QuestionUpdateView.as_view(), name='question_update'),
+    path('quizzes/questions/<uuid:question_id>/delete/', views.QuestionDeleteView.as_view(), name='question_delete'),
+    # Tentativas (Aluno)
+    path('quizzes/<uuid:quiz_id>/attempt/', views.QuizStartAttemptView.as_view(), name='quiz_attempt_start'),
+    path('quizzes/<uuid:quiz_id>/submit/', views.QuizSubmitView.as_view(), name='quiz_submit'),
+    path('quizzes/<uuid:quiz_id>/results/', views.QuizResultsView.as_view(), name='quiz_results'),
+    path('quizzes/<uuid:quiz_id>/attempts/', views.QuizAttemptListView.as_view(), name='quiz_attempts'),
 ]

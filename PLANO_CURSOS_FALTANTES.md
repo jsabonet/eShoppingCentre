@@ -299,9 +299,9 @@ Padrão IMS Global para integração com LMS corporativos (Moodle, Blackboard, C
 - ✅ Student list (seller dashboard)
 - ✅ Affiliate commission
 - ✅ Test checkout mode
+- ✅ **Quizzes / Avaliações** (models, API, admin, builder UI, taker UI, result UI)
 
 ### O que NÃO existe (este documento):
-- ❌ Quizzes
 - ❌ Certificados reais (PDF)
 - ❌ Notificações de curso
 - ❌ Reviews de curso

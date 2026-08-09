@@ -10,6 +10,7 @@ import {
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import VideoUploader from '@/src/components/VideoUploader';
+import QuizBuilder from '@/src/components/QuizBuilder';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -392,6 +393,9 @@ export default function CourseBuilderPage() {
                   >
                     <Plus size={14} className="inline mr-1" /> Adicionar Aula
                   </button>
+
+                  {/* Quizzes for this module */}
+                  <QuizBuilder moduleId={mod.id} courseId={courseId} />
                 </div>
               )}
             </div>

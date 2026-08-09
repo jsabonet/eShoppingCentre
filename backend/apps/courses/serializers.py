@@ -1,5 +1,9 @@
 from rest_framework import serializers
-from .models import Course, CourseModule, CourseLesson, Enrollment, LessonProgress
+from django.db.models import Sum
+from .models import (
+    Course, CourseModule, CourseLesson, Enrollment, LessonProgress,
+    Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
+)
 
 
 class CourseLessonSerializer(serializers.ModelSerializer):
@@ -52,12 +56,32 @@ class CourseLessonDetailSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class QuizListSerializer(serializers.ModelSerializer):
+    """Versão simplificada para listagem (sem questions completas)."""
+    total_questions = serializers.SerializerMethodField()
+    total_points = serializers.SerializerMethodField()
+    module_title = serializers.CharField(source='module.title', read_only=True)
+
+    class Meta:
+        model = Quiz
+        fields = ('id', 'title', 'description', 'pass_percentage', 'max_attempts',
+                  'is_required', 'sort_order', 'module_id', 'lesson_id',
+                  'module_title', 'total_questions', 'total_points', 'created_at')
+
+    def get_total_questions(self, obj):
+        return obj.questions.count()
+
+    def get_total_points(self, obj):
+        return obj.questions.aggregate(total=Sum('points'))['total'] or 0
+
+
 class CourseModuleSerializer(serializers.ModelSerializer):
     lessons = CourseLessonSerializer(many=True, read_only=True)
+    quizzes = QuizListSerializer(many=True, read_only=True)
 
     class Meta:
         model = CourseModule
-        fields = ('id', 'title', 'description', 'sort_order', 'lessons')
+        fields = ('id', 'title', 'description', 'sort_order', 'lessons', 'quizzes')
 
 
 class CourseModuleWriteSerializer(serializers.ModelSerializer):
@@ -152,3 +176,136 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             request = self.context.get('request')
             return request.build_absolute_uri(img.image.url) if request else img.image.url
         return None
+
+
+# ─── Quizzes / Avaliações ───
+
+class AnswerOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AnswerOption
+        fields = ('id', 'text', 'is_correct', 'sort_order')
+        extra_kwargs = {'is_correct': {'write_only': True}}
+
+
+class AnswerOptionWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AnswerOption
+        fields = ('id', 'text', 'is_correct', 'sort_order')
+
+
+class QuestionSerializer(serializers.ModelSerializer):
+    options = AnswerOptionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Question
+        fields = ('id', 'text', 'question_type', 'sort_order', 'points', 'options')
+
+
+class QuestionWriteSerializer(serializers.ModelSerializer):
+    options = AnswerOptionWriteSerializer(many=True)
+
+    class Meta:
+        model = Question
+        fields = ('id', 'text', 'question_type', 'sort_order', 'points', 'options')
+
+    def create(self, validated_data):
+        options_data = validated_data.pop('options', [])
+        question = Question.objects.create(**validated_data)
+        for opt_data in options_data:
+            AnswerOption.objects.create(question=question, **opt_data)
+        return question
+
+    def update(self, instance, validated_data):
+        options_data = validated_data.pop('options', None)
+        instance = super().update(instance, validated_data)
+        if options_data is not None:
+            instance.options.all().delete()
+            for opt_data in options_data:
+                AnswerOption.objects.create(question=instance, **opt_data)
+        return instance
+
+
+class QuizSerializer(serializers.ModelSerializer):
+    questions = QuestionSerializer(many=True, read_only=True)
+    total_questions = serializers.SerializerMethodField()
+    total_points = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Quiz
+        fields = ('id', 'title', 'description', 'pass_percentage', 'max_attempts',
+                  'is_required', 'sort_order', 'module_id', 'lesson_id',
+                  'questions', 'total_questions', 'total_points', 'created_at', 'updated_at')
+
+    def get_total_questions(self, obj):
+        return obj.questions.count()
+
+    def get_total_points(self, obj):
+        return obj.questions.aggregate(total=Sum('points'))['total'] or 0
+
+
+class QuizWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Quiz
+        fields = ('id', 'title', 'description', 'pass_percentage', 'max_attempts',
+                  'is_required', 'sort_order', 'module_id', 'lesson_id')
+
+
+# ─── Quiz Attempt ───
+
+class QuizAnswerSubmitSerializer(serializers.Serializer):
+    """Serializer para submissão de uma resposta individual."""
+    question_id = serializers.UUIDField()
+    selected_option_id = serializers.UUIDField(required=False, allow_null=True)
+    selected_option_ids = serializers.ListField(
+        child=serializers.UUIDField(), required=False, allow_empty=True
+    )
+    open_text_answer = serializers.CharField(required=False, allow_blank=True)
+
+
+class QuizSubmitSerializer(serializers.Serializer):
+    """Serializer para submissão completa do quiz."""
+    answers = QuizAnswerSubmitSerializer(many=True)
+
+
+class QuizAnswerSerializer(serializers.ModelSerializer):
+    question_text = serializers.CharField(source='question.text', read_only=True)
+    question_type = serializers.CharField(source='question.question_type', read_only=True)
+    selected_option_text = serializers.CharField(source='selected_option.text', read_only=True)
+    selected_options_texts = serializers.SerializerMethodField()
+
+    class Meta:
+        model = QuizAnswer
+        fields = ('id', 'question_id', 'question_text', 'question_type',
+                  'selected_option_id', 'selected_option_text',
+                  'selected_options_texts', 'open_text_answer', 'is_correct')
+
+    def get_selected_options_texts(self, obj):
+        return [opt.text for opt in obj.selected_options.all()]
+
+
+class QuizAttemptSerializer(serializers.ModelSerializer):
+    answers = QuizAnswerSerializer(many=True, read_only=True)
+    quiz_title = serializers.CharField(source='quiz.title', read_only=True)
+    user_email = serializers.CharField(source='enrollment.user.email', read_only=True)
+    pass_percentage = serializers.IntegerField(source='quiz.pass_percentage', read_only=True)
+    max_attempts = serializers.IntegerField(source='quiz.max_attempts', read_only=True)
+
+    class Meta:
+        model = QuizAttempt
+        fields = ('id', 'quiz_id', 'quiz_title', 'user_email',
+                  'score', 'total_points', 'earned_points', 'passed',
+                  'pass_percentage', 'max_attempts',
+                  'attempt_number', 'started_at', 'completed_at',
+                  'answers')
+
+
+class QuizAttemptListSerializer(serializers.ModelSerializer):
+    """Versão simplificada para listagem de tentativas."""
+    quiz_title = serializers.CharField(source='quiz.title', read_only=True)
+    pass_percentage = serializers.IntegerField(source='quiz.pass_percentage', read_only=True)
+
+    class Meta:
+        model = QuizAttempt
+        fields = ('id', 'quiz_id', 'quiz_title', 'score', 'total_points',
+                  'earned_points', 'passed', 'pass_percentage',
+                  'attempt_number', 'started_at', 'completed_at')

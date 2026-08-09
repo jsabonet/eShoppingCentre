@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Course, CourseModule, CourseLesson, Enrollment
+from .models import (
+    Course, CourseModule, CourseLesson, Enrollment,
+    Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
+)
 
 class CourseLessonInline(admin.TabularInline):
     model = CourseLesson
@@ -18,3 +21,60 @@ class CourseAdmin(admin.ModelAdmin):
 @admin.register(Enrollment)
 class EnrollmentAdmin(admin.ModelAdmin):
     list_display = ('user', 'course', 'progress', 'completed')
+
+
+# ─── Quizzes ───
+
+class AnswerOptionInline(admin.TabularInline):
+    model = AnswerOption
+    extra = 2
+
+
+class QuestionInline(admin.TabularInline):
+    model = Question
+    extra = 1
+
+
+@admin.register(Quiz)
+class QuizAdmin(admin.ModelAdmin):
+    list_display = ('title', 'module', 'pass_percentage', 'max_attempts', 'is_required')
+    list_filter = ('module__course', 'is_required')
+    search_fields = ('title',)
+
+
+@admin.register(Question)
+class QuestionAdmin(admin.ModelAdmin):
+    list_display = ('text_preview', 'quiz', 'question_type', 'points', 'sort_order')
+    list_filter = ('question_type', 'quiz')
+    inlines = [AnswerOptionInline]
+
+    def text_preview(self, obj):
+        return obj.text[:80]
+    text_preview.short_description = 'Enunciado'
+
+
+@admin.register(AnswerOption)
+class AnswerOptionAdmin(admin.ModelAdmin):
+    list_display = ('text_preview', 'question', 'is_correct', 'sort_order')
+    list_filter = ('is_correct',)
+
+    def text_preview(self, obj):
+        return obj.text[:60]
+    text_preview.short_description = 'Texto'
+
+
+@admin.register(QuizAttempt)
+class QuizAttemptAdmin(admin.ModelAdmin):
+    list_display = ('enrollment', 'quiz', 'score', 'passed', 'attempt_number', 'completed_at')
+    list_filter = ('passed', 'quiz')
+    readonly_fields = ('started_at', 'completed_at')
+
+
+@admin.register(QuizAnswer)
+class QuizAnswerAdmin(admin.ModelAdmin):
+    list_display = ('attempt', 'question_preview', 'is_correct')
+    list_filter = ('is_correct',)
+
+    def question_preview(self, obj):
+        return obj.question.text[:60]
+    question_preview.short_description = 'Questão'

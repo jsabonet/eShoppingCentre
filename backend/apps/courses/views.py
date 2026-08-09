@@ -2,11 +2,17 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from .models import Course, CourseModule, CourseLesson, Enrollment, LessonProgress, LessonAttachment
+from django.db import transaction
+from .models import (
+    Course, CourseModule, CourseLesson, Enrollment, LessonProgress, LessonAttachment,
+    Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
+)
 from .serializers import (
     CourseListSerializer, CourseDetailSerializer,
     EnrollmentSerializer, CourseLessonDetailSerializer,
     CourseModuleSerializer, CourseModuleWriteSerializer, CourseLessonWriteSerializer,
+    QuizSerializer, QuizWriteSerializer, QuizListSerializer,
+    QuizAttemptSerializer, QuizAttemptListSerializer, QuizSubmitSerializer,
 )
 
 
@@ -138,7 +144,7 @@ class CourseLearnView(APIView):
         if not enrollment.has_access:
             return Response({'detail': 'O seu acesso a este curso expirou.'}, status=403)
 
-        modules = course.modules.all().prefetch_related('lessons')
+        modules = course.modules.all().prefetch_related('lessons', 'quizzes')
 
         # Marcar aulas concluidas para o aluno
         completed_ids = set(
@@ -152,6 +158,19 @@ class CourseLearnView(APIView):
             context={'request': request, 'enrollment': enrollment}
         ).data
 
+        # Quiz attempts status for all quizzes in this course
+        quiz_attempts = {}
+        for attempt in QuizAttempt.objects.filter(
+            enrollment=enrollment, completed_at__isnull=False
+        ).select_related('quiz').order_by('-attempt_number'):
+            quiz_id = str(attempt.quiz_id)
+            if quiz_id not in quiz_attempts:
+                quiz_attempts[quiz_id] = {
+                    'passed': attempt.passed,
+                    'score': float(attempt.score) if attempt.score is not None else None,
+                    'attempt_number': attempt.attempt_number,
+                }
+
         return Response({
             'course_id': str(course.id),
             'course_title': course.product.name,
@@ -159,6 +178,7 @@ class CourseLearnView(APIView):
             'progress': float(enrollment.progress),
             'completed': enrollment.completed,
             'completed_ids': list(completed_ids),
+            'quiz_attempts': quiz_attempts,
         })
 
 
@@ -494,3 +514,348 @@ class LessonAttachmentDeleteView(APIView):
             return Response({'detail': 'Nao autorizado.'}, status=403)
         attachment.delete()
         return Response({'detail': 'Anexo removido.'})
+
+
+# ═══════════════════════════════════════════
+#  QUIZZES / AVALIAÇÕES
+# ═══════════════════════════════════════════
+
+class QuizListByCourseView(generics.ListAPIView):
+    """GET /api/v1/courses/{course_id}/quizzes/ — Lista quizzes de um curso."""
+    serializer_class = QuizListSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        course_id = self.kwargs['course_id']
+        return Quiz.objects.filter(
+            module__course_id=course_id
+        ).select_related('module', 'lesson').order_by('module__sort_order', 'sort_order')
+
+
+class QuizDetailView(generics.RetrieveAPIView):
+    """GET /api/v1/courses/quizzes/{quiz_id}/ — Detalhe completo do quiz (com questões e opções)."""
+    queryset = Quiz.objects.all().prefetch_related('questions__options')
+    serializer_class = QuizSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'quiz_id'
+
+
+class QuizCreateView(generics.CreateAPIView):
+    """POST /api/v1/courses/modules/{module_id}/quizzes/ — Criar quiz num módulo."""
+    serializer_class = QuizWriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        module = get_object_or_404(CourseModule, id=self.kwargs['module_id'])
+        if module.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        last = module.quizzes.order_by('-sort_order').first()
+        sort_order = (last.sort_order + 1) if last else 0
+        serializer.save(module=module, sort_order=sort_order)
+
+
+class QuizUpdateView(generics.UpdateAPIView):
+    """PUT /api/v1/courses/quizzes/{quiz_id}/ — Editar quiz."""
+    queryset = Quiz.objects.all()
+    serializer_class = QuizWriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'quiz_id'
+
+    def perform_update(self, serializer):
+        if self.get_object().module.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        serializer.save()
+
+
+class QuizDeleteView(generics.DestroyAPIView):
+    """DELETE /api/v1/courses/quizzes/{quiz_id}/ — Remover quiz."""
+    queryset = Quiz.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'quiz_id'
+
+    def perform_destroy(self, instance):
+        if instance.module.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        instance.delete()
+
+
+# ─── Questions CRUD ───
+
+from .serializers import QuestionWriteSerializer, QuestionSerializer
+
+
+class QuestionCreateView(generics.CreateAPIView):
+    """POST /api/v1/courses/quizzes/{quiz_id}/questions/ — Adicionar questão ao quiz."""
+    serializer_class = QuestionWriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        quiz = get_object_or_404(Quiz, id=self.kwargs['quiz_id'])
+        if quiz.module.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        last = quiz.questions.order_by('-sort_order').first()
+        sort_order = (last.sort_order + 1) if last else 0
+        serializer.save(quiz=quiz, sort_order=sort_order)
+
+
+class QuestionUpdateView(generics.UpdateAPIView):
+    """PUT /api/v1/courses/quizzes/questions/{question_id}/ — Editar questão (inclui opções)."""
+    queryset = Question.objects.all()
+    serializer_class = QuestionWriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'question_id'
+
+    def perform_update(self, serializer):
+        if self.get_object().quiz.module.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        serializer.save()
+
+
+class QuestionDeleteView(generics.DestroyAPIView):
+    """DELETE /api/v1/courses/quizzes/questions/{question_id}/ — Remover questão."""
+    queryset = Question.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'question_id'
+
+    def perform_destroy(self, instance):
+        if instance.quiz.module.course.product.store.owner != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Nao autorizado.')
+        instance.delete()
+
+
+# ─── Quiz Attempt (Aluno) ───
+
+class QuizStartAttemptView(APIView):
+    """POST /api/v1/courses/quizzes/{quiz_id}/attempt/ — Iniciar tentativa de quiz."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, quiz_id):
+        quiz = get_object_or_404(Quiz, id=quiz_id)
+
+        # Verificar matrícula
+        enrollment = get_object_or_404(
+            Enrollment, user=request.user, course=quiz.module.course
+        )
+
+        if not enrollment.has_access:
+            return Response({'detail': 'O seu acesso a este curso expirou.'}, status=403)
+
+        # Verificar número máximo de tentativas
+        if quiz.max_attempts is not None:
+            existing_attempts = QuizAttempt.objects.filter(
+                enrollment=enrollment, quiz=quiz
+            ).count()
+            if existing_attempts >= quiz.max_attempts:
+                return Response(
+                    {'detail': f'Limite de {quiz.max_attempts} tentativa(s) atingido.'},
+                    status=400
+                )
+
+        # Contar tentativas anteriores para definir attempt_number
+        last_attempt = QuizAttempt.objects.filter(
+            enrollment=enrollment, quiz=quiz
+        ).order_by('-attempt_number').first()
+        attempt_number = (last_attempt.attempt_number + 1) if last_attempt else 1
+
+        attempt = QuizAttempt.objects.create(
+            enrollment=enrollment,
+            quiz=quiz,
+            attempt_number=attempt_number,
+        )
+
+        # Retornar o quiz completo com questões (sem opções corretas visíveis)
+        quiz_data = QuizSerializer(quiz, context={'request': request}).data
+
+        return Response({
+            'attempt_id': str(attempt.id),
+            'attempt_number': attempt_number,
+            'quiz': quiz_data,
+            'started_at': attempt.started_at,
+        }, status=201)
+
+
+class QuizSubmitView(APIView):
+    """POST /api/v1/courses/quizzes/{quiz_id}/submit/ — Submeter respostas do quiz."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, quiz_id):
+        quiz = get_object_or_404(Quiz.objects.select_related('module__course'), id=quiz_id)
+
+        enrollment = get_object_or_404(
+            Enrollment, user=request.user, course=quiz.module.course
+        )
+
+        if not enrollment.has_access:
+            return Response({'detail': 'O seu acesso a este curso expirou.'}, status=403)
+
+        # Obter a tentativa mais recente não completada, ou criar uma nova
+        attempt = QuizAttempt.objects.filter(
+            enrollment=enrollment, quiz=quiz, completed_at__isnull=True
+        ).order_by('-attempt_number').first()
+
+        if not attempt:
+            # Verificar limite de tentativas
+            if quiz.max_attempts is not None:
+                existing = QuizAttempt.objects.filter(
+                    enrollment=enrollment, quiz=quiz
+                ).count()
+                if existing >= quiz.max_attempts:
+                    return Response(
+                        {'detail': f'Limite de {quiz.max_attempts} tentativa(s) atingido.'},
+                        status=400
+                    )
+
+            last = QuizAttempt.objects.filter(
+                enrollment=enrollment, quiz=quiz
+            ).order_by('-attempt_number').first()
+            attempt_number = (last.attempt_number + 1) if last else 1
+
+            attempt = QuizAttempt.objects.create(
+                enrollment=enrollment, quiz=quiz, attempt_number=attempt_number
+            )
+
+        # Validar submission
+        submit_serializer = QuizSubmitSerializer(data=request.data)
+        if not submit_serializer.is_valid():
+            return Response(submit_serializer.errors, status=400)
+
+        answers_data = submit_serializer.validated_data['answers']
+
+        # Processar respostas
+        total_points = 0
+        earned_points = 0
+        questions = {str(q.id): q for q in quiz.questions.all().prefetch_related('options')}
+
+        for answer_data in answers_data:
+            question_id = str(answer_data['question_id'])
+            question = questions.get(question_id)
+            if not question:
+                continue
+
+            total_points += question.points
+
+            # Criar/atualizar resposta
+            quiz_answer, _ = QuizAnswer.objects.update_or_create(
+                attempt=attempt,
+                question_id=question_id,
+                defaults={
+                    'open_text_answer': answer_data.get('open_text_answer', ''),
+                }
+            )
+
+            # Limpar opções anteriores para reseleção
+            quiz_answer.selected_options.clear()
+
+            is_correct = None
+
+            if question.question_type in ('multiple_choice', 'true_false'):
+                selected_id = answer_data.get('selected_option_id')
+                if selected_id:
+                    quiz_answer.selected_option_id = selected_id
+                    # Verificar se está correta
+                    correct_option = question.options.filter(id=selected_id, is_correct=True).exists()
+                    is_correct = correct_option
+                    if correct_option:
+                        earned_points += question.points
+
+            elif question.question_type == 'multiple_select':
+                selected_ids = answer_data.get('selected_option_ids', [])
+                if selected_ids:
+                    quiz_answer.selected_options.set(selected_ids)
+                    # Verificar se todas as opções corretas (e apenas elas) foram selecionadas
+                    correct_ids = set(
+                        question.options.filter(is_correct=True).values_list('id', flat=True)
+                    )
+                    selected_set = set(selected_ids)
+                    is_correct = (selected_set == correct_ids)
+                    if is_correct:
+                        earned_points += question.points
+
+            elif question.question_type == 'open_text':
+                # Texto livre — marcar como correto (avaliação manual depois)
+                quiz_answer.open_text_answer = answer_data.get('open_text_answer', '')
+                quiz_answer.selected_option = None
+                is_correct = None  # Precisa de revisão manual
+
+            quiz_answer.is_correct = is_correct
+            quiz_answer.save()
+
+        # Calcular score
+        score = (earned_points / total_points * 100) if total_points > 0 else 0
+        passed = score >= quiz.pass_percentage
+
+        # Atualizar tentativa
+        from django.utils import timezone
+        attempt.score = round(score, 2)
+        attempt.total_points = total_points
+        attempt.earned_points = earned_points
+        attempt.passed = passed
+        attempt.completed_at = timezone.now()
+        attempt.save()
+
+        # Se passou e é required, podemos atualizar progresso do módulo
+        if passed and quiz.is_required:
+            # Marcar como "quiz concluído" — pode ser usado para desbloquear próximos módulos
+            pass
+
+        return Response({
+            'attempt_id': str(attempt.id),
+            'attempt_number': attempt.attempt_number,
+            'score': float(attempt.score),
+            'earned_points': earned_points,
+            'total_points': total_points,
+            'passed': passed,
+            'pass_percentage': quiz.pass_percentage,
+            'completed_at': attempt.completed_at,
+        })
+
+
+class QuizResultsView(generics.RetrieveAPIView):
+    """GET /api/v1/courses/quizzes/{quiz_id}/results/ — Ver resultado da última tentativa."""
+    serializer_class = QuizAttemptSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'quiz_id'
+    lookup_url_kwarg = 'quiz_id'
+
+    def get_object(self):
+        quiz = get_object_or_404(Quiz, id=self.kwargs['quiz_id'])
+        enrollment = get_object_or_404(
+            Enrollment, user=self.request.user, course=quiz.module.course
+        )
+        # Última tentativa completada
+        attempt = QuizAttempt.objects.filter(
+            enrollment=enrollment, quiz=quiz, completed_at__isnull=False
+        ).order_by('-attempt_number').first()
+
+        if not attempt:
+            from rest_framework.exceptions import NotFound
+            raise NotFound('Nenhuma tentativa concluída encontrada.')
+
+        return attempt
+
+
+class QuizAttemptListView(generics.ListAPIView):
+    """GET /api/v1/courses/quizzes/{quiz_id}/attempts/ — Listar tentativas do aluno neste quiz."""
+    serializer_class = QuizAttemptListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        quiz = get_object_or_404(Quiz, id=self.kwargs['quiz_id'])
+        enrollment = get_object_or_404(
+            Enrollment, user=self.request.user, course=quiz.module.course
+        )
+        return QuizAttempt.objects.filter(
+            enrollment=enrollment, quiz=quiz
+        ).order_by('-attempt_number')
