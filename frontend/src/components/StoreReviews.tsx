@@ -6,6 +6,7 @@ import Link from 'next/link';
 import ReviewStars from './ReviewStars';
 import LoadingSpinner from './LoadingSpinner';
 import { useAuth } from '@/src/hooks/useAuth';
+import { toast } from '@/src/lib/toast';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -111,9 +112,17 @@ export default function StoreReviews({ storeSlug, storeName, storeType }: StoreR
         setShowForm(false);
         setForm({ communication: 5, shipping: 5, accuracy: 5, overall: 5, title: '', comment: '' });
         fetchReviews();
+        toast.success('Avaliacao enviada!', 'Obrigado pelo seu feedback.');
       } else {
-        const err = await res.json();
-        setFormError(typeof err === 'object' ? Object.values(err).flat().join('. ') : 'Erro ao enviar.');
+        const err = await res.json().catch(() => ({}));
+        const msg = typeof err === 'string' ? err : Object.values(err || {}).flat().join('. ');
+        if (msg.includes('duplicate') || msg.includes('already exists') || msg.includes('ja existe')) {
+          toast.warning('Review duplicada', 'Ja existe uma avaliacao sua para esta loja.');
+          setShowForm(false);
+        } else {
+          setFormError(msg || 'Erro ao enviar.');
+          toast.error('Erro ao enviar', msg || 'Tente novamente mais tarde.');
+        }
       }
     } catch {
       setFormError('Erro de rede.');

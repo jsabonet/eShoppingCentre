@@ -6,6 +6,7 @@ import Link from 'next/link';
 import ReviewStars from './ReviewStars';
 import LoadingSpinner from './LoadingSpinner';
 import { useAuth } from '@/src/hooks/useAuth';
+import { toast } from '@/src/lib/toast';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -101,9 +102,18 @@ export default function ProductReviews({ productId, productName, rating, reviewC
         setFormComment('');
         setFormRating(5);
         fetchReviews();
+        toast.success('Avaliacao enviada!', 'Obrigado pelo seu feedback.');
       } else {
-        const err = await res.json();
-        setFormError(typeof err === 'object' ? Object.values(err).flat().join('. ') : 'Erro ao enviar.');
+        const err = await res.json().catch(() => ({}));
+        // Detetar review duplicada (backend agora retorna 200 com a existente)
+        const msg = typeof err === 'string' ? err : Object.values(err || {}).flat().join('. ');
+        if (msg.includes('duplicate') || msg.includes('already exists') || msg.includes('ja existe')) {
+          toast.warning('Review duplicada', 'Ja existe uma avaliacao sua para este produto.');
+          setShowForm(false);
+        } else {
+          setFormError(msg || 'Erro ao enviar.');
+          toast.error('Erro ao enviar', msg || 'Tente novamente mais tarde.');
+        }
       }
     } catch {
       setFormError('Erro de rede.');
