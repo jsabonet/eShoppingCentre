@@ -467,14 +467,10 @@ export default function CourseLearnPage() {
                   />
                 ) : currentLesson.cloudflare_video_uid && currentLesson.video_status !== 'ready' ? (
                   <div className="text-center text-white/60 p-8">
-                    <Loader2 size={48} className="mx-auto mb-4 text-white/30 animate-spin" />
-                    <p className="text-lg font-medium mb-2">Video em processamento</p>
+                    <AlertTriangle size={48} className="mx-auto mb-4 text-amber-400/40" />
+                    <p className="text-lg font-medium mb-2">Video indisponivel</p>
                     <p className="text-sm text-white/40">
-                      {currentLesson.video_status === 'uploading' ? 'O video esta a ser enviado...'
-                       : currentLesson.video_status === 'processing' ? 'A Cloudflare esta a processar o video...'
-                       : currentLesson.video_status === 'pending' ? 'Video pendente de upload.'
-                       : currentLesson.video_status === 'error' ? 'Erro no processamento do video.'
-                       : 'O video ainda nao esta disponivel.'}
+                      Este video ainda nao esta disponivel. Por favor, tente novamente mais tarde.
                     </p>
                   </div>
                 ) : currentLesson.video_url ? (
