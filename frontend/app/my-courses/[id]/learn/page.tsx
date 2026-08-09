@@ -22,6 +22,7 @@ interface LessonData {
   video_provider: string;
   cloudflare_video_uid: string;
   cloudflare_video_status: string;
+  video_status: string; // alias para cloudflare_video_status
   duration: string;
   is_free_preview: boolean;
   sort_order: number;
@@ -455,7 +456,7 @@ export default function CourseLearnPage() {
             {/* Video / Content Area */}
             <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
               {currentLesson ? (
-                currentLesson.cloudflare_video_uid ? (
+                currentLesson.cloudflare_video_uid && currentLesson.video_status === 'ready' ? (
                   <CourseVideoPlayer
                     key={currentLesson.id}
                     lessonId={currentLesson.id}
@@ -464,6 +465,18 @@ export default function CourseLearnPage() {
                     onProgress={handleVideoProgress}
                     onEnded={handleVideoEnded}
                   />
+                ) : currentLesson.cloudflare_video_uid && currentLesson.video_status !== 'ready' ? (
+                  <div className="text-center text-white/60 p-8">
+                    <Loader2 size={48} className="mx-auto mb-4 text-white/30 animate-spin" />
+                    <p className="text-lg font-medium mb-2">Video em processamento</p>
+                    <p className="text-sm text-white/40">
+                      {currentLesson.video_status === 'uploading' ? 'O video esta a ser enviado...'
+                       : currentLesson.video_status === 'processing' ? 'A Cloudflare esta a processar o video...'
+                       : currentLesson.video_status === 'pending' ? 'Video pendente de upload.'
+                       : currentLesson.video_status === 'error' ? 'Erro no processamento do video.'
+                       : 'O video ainda nao esta disponivel.'}
+                    </p>
+                  </div>
                 ) : currentLesson.video_url ? (
                   <iframe
                     src={currentLesson.video_url

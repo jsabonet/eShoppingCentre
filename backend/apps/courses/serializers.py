@@ -10,11 +10,12 @@ class CourseLessonSerializer(serializers.ModelSerializer):
     completed = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     watched_duration = serializers.SerializerMethodField()
+    video_status = serializers.CharField(source='cloudflare_video_status', read_only=True)
 
     class Meta:
         model = CourseLesson
         fields = ('id', 'title', 'description', 'duration', 'is_free_preview',
-                  'completed', 'watched_duration', 'sort_order', 'video_url', 'video_provider',
+                  'completed', 'watched_duration', 'video_status', 'sort_order', 'video_url', 'video_provider',
                   'content', 'cloudflare_video_uid', 'cloudflare_video_status')
 
     def get_completed(self, obj):
