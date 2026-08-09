@@ -15,8 +15,8 @@ from .services.cloudflare_stream import (
 
 
 class StreamTokenThrottle(UserRateThrottle):
-    """Limite: 30 tokens por minuto por utilizador."""
-    rate = '30/minute'
+    """Limite: 60 tokens por minuto por utilizador."""
+    rate = '60/minute'
     scope = 'stream_token'
 
 

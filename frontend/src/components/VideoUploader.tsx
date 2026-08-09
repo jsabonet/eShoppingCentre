@@ -33,6 +33,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
   // Carrega o stream token quando o video esta pronto
   useEffect(() => {
     if (status === 'ready' && lessonId) {
+      console.log('[VideoUploader] Video pronto, a carregar preview...', { lessonId });
       const fetchStream = async () => {
         try {
           const token = localStorage.getItem('access_token');
@@ -42,6 +43,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
           if (res.ok) {
             const data = await res.json();
             setStreamUrl(`https://iframe.cloudflarestream.com/${data.video_uid}?token=${data.token}`);
+            console.log('[VideoUploader] Preview carregada com sucesso', { lessonId });
           }
         } catch { /* ignora erro de rede */ }
       };
@@ -66,6 +68,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
         const data = await res.json();
 
         if (data.ready_to_stream || data.status === 'ready') {
+          console.log('[VideoUploader] Video ficou pronto!', { lessonId });
           setStatus('ready');
           onUploadCompleteRef.current();
           return;
@@ -184,6 +187,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
       setProgress(100);
       setStatus('processing');
       setUploading(false);
+      console.log('[VideoUploader] Upload concluido, a aguardar processamento...', { lessonId });
       onUploadCompleteRef.current();
     } catch (err: any) {
       const msg = err?.message || 'Erro desconhecido.';
@@ -243,13 +247,13 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
             </span>
-            <span className="text-amber-700 text-sm font-medium">A processar video no Cloudflare</span>
+            <span className="text-amber-700 text-sm font-medium">A processar video</span>
           </div>
           <div className="h-2 bg-amber-100 rounded-full overflow-hidden">
             <div className="h-full w-1/2 bg-amber-400 rounded-full animate-pulse" />
           </div>
           <p className="text-sm text-muted-foreground">
-            O video esta a ser codificado. Pode continuar a editar o curso — <button onClick={onUploadComplete} className="text-accent hover:underline font-medium">verificar estado</button>
+            O video esta a ser processado. A pagina atualizara automaticamente quando estiver pronto.
           </p>
         </div>
       ) : status === 'ready' ? (
