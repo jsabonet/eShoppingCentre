@@ -16,6 +16,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
   const [error, setError] = useState('');
   const [streamUrl, setStreamUrl] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const streamFetchedRef = useRef(false); // impede re-fetch de stream token
 
   // Estabiliza o callback para nao disparar re-renders do efeito de polling
   const onUploadCompleteRef = useRef(onUploadComplete);
@@ -30,9 +31,10 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
     }
   }, [existingVideoStatus]);
 
-  // Carrega o stream token quando o video esta pronto (so uma vez)
+  // Carrega o stream token quando o video esta pronto (so uma vez por montagem)
   useEffect(() => {
-    if (status === 'ready' && lessonId && !streamUrl) {
+    if (status === 'ready' && lessonId && !streamFetchedRef.current) {
+      streamFetchedRef.current = true;
       console.log('[VideoUploader] Video pronto, a carregar preview...', { lessonId });
       const fetchStream = async () => {
         try {
@@ -118,6 +120,7 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
     setError('');
     setProgress(0);
     setStreamUrl('');
+    streamFetchedRef.current = false; // permite re-fetch apos novo upload
 
     try {
       if (file.size > 200 * 1024 * 1024) {
