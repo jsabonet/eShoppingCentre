@@ -8,10 +8,11 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ('id', 'user_name', 'user_avatar', 'rating', 'title', 'comment',
+        fields = ('id', 'user_name', 'user_avatar', 'product', 'rating', 'title', 'comment',
                   'is_verified_purchase', 'helpful_count', 'seller_reply',
                   'seller_replied_at', 'created_at')
         read_only_fields = ('is_verified_purchase', 'helpful_count', 'seller_replied_at')
+        extra_kwargs = {'product': {'write_only': True}}
 
     def get_user_avatar(self, obj):
         if obj.user.avatar:

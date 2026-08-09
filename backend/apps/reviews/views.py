@@ -8,8 +8,18 @@ from .serializers import ReviewSerializer, StoreReviewSerializer
 
 
 class ReviewCreateView(generics.CreateAPIView):
+    """POST /api/v1/reviews/ — Criar review de produto (ou devolver existente)."""
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        product_id = request.data.get('product')
+        if product_id:
+            existing = Review.objects.filter(user=request.user, product_id=product_id).first()
+            if existing:
+                serializer = self.get_serializer(existing)
+                return Response(serializer.data)
+        return super().create(request, *args, **kwargs)
 
 
 class ProductReviewsView(generics.ListAPIView):
@@ -84,13 +94,9 @@ class ReviewHelpfulView(APIView):
 # ─── Store Reviews ───
 
 class StoreReviewListView(generics.ListCreateAPIView):
-    """GET /api/v1/stores/{slug}/reviews/ — Listar. POST — Criar."""
+    """GET /api/v1/stores/{slug}/reviews/ — Listar. POST — Criar (ou devolver existente)."""
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
-    def get_serializer_class(self):
-        if self.request.method == 'POST':
-            return StoreReviewSerializer
-        return StoreReviewSerializer
+    serializer_class = StoreReviewSerializer
 
     def get_queryset(self):
         from apps.stores.models import Store
@@ -98,6 +104,18 @@ class StoreReviewListView(generics.ListCreateAPIView):
         return StoreReview.objects.filter(
             store=store, is_hidden=False,
         ).order_by('-created_at')
+
+    def create(self, request, *args, **kwargs):
+        from apps.stores.models import Store
+        store = get_object_or_404(Store, slug=self.kwargs['slug'])
+
+        # Se já existe review, devolve a existente (evita IntegrityError)
+        existing = StoreReview.objects.filter(user=request.user, store=store).first()
+        if existing:
+            serializer = self.get_serializer(existing)
+            return Response(serializer.data)
+
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         from apps.stores.models import Store
