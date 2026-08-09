@@ -73,7 +73,6 @@ export default function CourseBuilderPage() {
       setModules(data.modules || []);
       setExpandedModules(new Set((data.modules || []).map((m: ModuleData) => m.id)));
 
-      // Fetch attachments for all lessons
       const allLessons: LessonData[] = (data.modules || []).flatMap((m: ModuleData) => m.lessons);
       for (const lesson of allLessons) {
         fetchAttachmentsSilent(lesson.id);
@@ -83,6 +82,21 @@ export default function CourseBuilderPage() {
       setModules([]);
     }
     finally { setLoading(false); }
+  }, [courseId]);
+
+  // Refresh silencioso — para onUploadComplete (sem loading state, sem fechar modulos)
+  const refreshSilent = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/courses/${courseId}/builder/`, { headers: apiHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setCourseTitle(data.course_title || '');
+      setModules(data.modules || []);
+      const allLessons: LessonData[] = (data.modules || []).flatMap((m: ModuleData) => m.lessons);
+      for (const lesson of allLessons) {
+        fetchAttachmentsSilent(lesson.id);
+      }
+    } catch {}
   }, [courseId]);
 
   useEffect(() => { fetchBuilder(); }, [fetchBuilder]);
@@ -334,7 +348,7 @@ export default function CourseBuilderPage() {
                         <VideoUploader
                           lessonId={lesson.id}
                           existingVideoStatus={lesson.cloudflare_video_status}
-                          onUploadComplete={() => fetchBuilder()}
+                          onUploadComplete={refreshSilent}
                         />
                         {/* Legacy video URL */}
                         {lesson.video_url && lesson.video_provider !== 'cloudflare' && (
