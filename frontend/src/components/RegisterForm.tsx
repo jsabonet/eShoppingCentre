@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import PasswordInput from './PasswordInput';
 
 export default function RegisterForm() {
   const [fullName, setFullName] = useState('');
@@ -96,12 +97,9 @@ export default function RegisterForm() {
 
         <div>
           <label className="block text-sm font-medium mb-2">Password *</label>
-          <input
-            type="password"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 border border-border rounded-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            placeholder="••••••••"
             required
           />
           <p className="text-xs text-muted-foreground mt-1">
@@ -113,12 +111,9 @@ export default function RegisterForm() {
           <label className="block text-sm font-medium mb-2">
             Confirmar Palavra-passe *
           </label>
-          <input
-            type="password"
+          <PasswordInput
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full px-4 py-2 border border-border rounded-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            placeholder="••••••••"
             required
           />
         </div>

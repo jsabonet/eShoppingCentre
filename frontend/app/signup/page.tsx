@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/src/hooks/useAuth';
 import GoogleSignInButton from '@/src/components/GoogleSignInButton';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import PasswordInput from '@/src/components/PasswordInput';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -48,8 +49,8 @@ export default function SignupPage() {
           <div><label className="block text-sm font-medium mb-1">Email *</label><input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} required className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
           <div><label className="block text-sm font-medium mb-1">Username *</label><input type="text" value={form.username} onChange={(e) => update('username', e.target.value)} required className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
           <div><label className="block text-sm font-medium mb-1">Telefone</label><input type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-          <div><label className="block text-sm font-medium mb-1">Password *</label><input type="password" value={form.password} onChange={(e) => update('password', e.target.value)} required className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-          <div><label className="block text-sm font-medium mb-1">Confirmar Password *</label><input type="password" value={form.password2} onChange={(e) => update('password2', e.target.value)} required className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
+          <div><label className="block text-sm font-medium mb-1">Password *</label><PasswordInput value={form.password} onChange={(e) => update('password', e.target.value)} required /></div>
+          <div><label className="block text-sm font-medium mb-1">Confirmar Password *</label><PasswordInput value={form.password2} onChange={(e) => update('password2', e.target.value)} required /></div>
 
           <label className="flex items-start gap-3 cursor-pointer">
             <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)}
