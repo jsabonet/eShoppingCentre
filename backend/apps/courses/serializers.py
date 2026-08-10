@@ -185,7 +185,6 @@ class AnswerOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnswerOption
         fields = ('id', 'text', 'is_correct', 'sort_order')
-        extra_kwargs = {'is_correct': {'write_only': True}}
 
 
 class AnswerOptionWriteSerializer(serializers.ModelSerializer):
@@ -213,6 +212,7 @@ class QuestionWriteSerializer(serializers.ModelSerializer):
         options_data = validated_data.pop('options', [])
         question = Question.objects.create(**validated_data)
         for opt_data in options_data:
+            opt_data.pop('id', None)  # Deixa o DB gerar novo UUID
             AnswerOption.objects.create(question=question, **opt_data)
         return question
 
@@ -220,9 +220,18 @@ class QuestionWriteSerializer(serializers.ModelSerializer):
         options_data = validated_data.pop('options', None)
         instance = super().update(instance, validated_data)
         if options_data is not None:
-            instance.options.all().delete()
+            # Update existing options by ID, create new ones if no ID
+            existing_ids = set(instance.options.values_list('id', flat=True))
+            updated_ids = set()
             for opt_data in options_data:
-                AnswerOption.objects.create(question=instance, **opt_data)
+                opt_id = opt_data.pop('id', None)
+                if opt_id and opt_id in existing_ids:
+                    AnswerOption.objects.filter(id=opt_id, question=instance).update(**opt_data)
+                    updated_ids.add(opt_id)
+                else:
+                    AnswerOption.objects.create(question=instance, **opt_data)
+            # Remove options that were deleted in the frontend
+            instance.options.exclude(id__in=updated_ids).delete()
         return instance
 
 

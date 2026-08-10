@@ -675,8 +675,13 @@ class QuizStartAttemptView(APIView):
             attempt_number=attempt_number,
         )
 
-        # Retornar o quiz completo com questões (sem opções corretas visíveis)
+        # Retornar o quiz completo com questoes (sem opcoes corretas visiveis)
         quiz_data = QuizSerializer(quiz, context={'request': request}).data
+
+        # Remover is_correct das opcoes — o aluno nao pode ver as respostas
+        for question in quiz_data.get('questions', []):
+            for option in question.get('options', []):
+                option.pop('is_correct', None)
 
         return Response({
             'attempt_id': str(attempt.id),
