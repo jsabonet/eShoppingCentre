@@ -302,14 +302,23 @@ export default function CourseBuilderPage() {
 
         {/* Modules */}
         <div className="space-y-4">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground bg-muted/30 rounded-lg px-4 py-2 flex-wrap">
+            <span title="Modulos agrupam aulas">📁 <strong>Modulo</strong> — agrupa aulas</span>
+            <span className="hidden sm:inline">|</span>
+            <span title="Cada aula tem um video + descricao + anexos">🎬 <strong>Aula</strong> — video + conteudo</span>
+            <span className="hidden sm:inline">|</span>
+            <span title="0 = imediato, 7 = 7 dias apos matricula">🕐 <strong>Drip</strong> — libertacao programada</span>
+            <span className="hidden sm:inline">|</span>
+            <span title="Aulas gratuitas sao visiveis para qualquer visitante">👁️ <strong>Preview</strong> — aula gratuita</span>
+          </div>
           {modules.map((mod) => (
             <div key={mod.id} className="border border-border rounded-xl bg-card overflow-hidden">
               {/* Module Header */}
               <div className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 hover:bg-muted/20 transition-colors flex-wrap">
-                <button onClick={() => toggleModule(mod.id)} className="p-0.5">
+                <button onClick={() => toggleModule(mod.id)} className="p-0.5" title={expandedModules.has(mod.id) ? 'Recolher modulo' : 'Expandir modulo'}>
                   {expandedModules.has(mod.id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
-                <GripVertical size={16} className="text-muted-foreground" />
+                <GripVertical size={16} className="text-muted-foreground" title="Arrastar para reordenar" />
                 <input
                   type="text"
                   defaultValue={mod.title}
@@ -339,7 +348,8 @@ export default function CourseBuilderPage() {
                   />
                   <span className="text-muted-foreground shrink-0">dias</span>
                 </div>
-                <button onClick={() => deleteModule(mod.id)} className="p-1 text-muted-foreground hover:text-red-500 transition-colors">
+                <button onClick={() => deleteModule(mod.id)} className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                  title="Remover modulo e todas as suas aulas">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -350,8 +360,8 @@ export default function CourseBuilderPage() {
                   {mod.lessons.map((lesson) => (
                     <div key={lesson.id} className="border border-border rounded-lg p-3 bg-background">
                       <div className="flex items-center gap-2 mb-2">
-                        <GripVertical size={14} className="text-muted-foreground" />
-                        <Play size={14} className="text-muted-foreground" />
+                        <GripVertical size={14} className="text-muted-foreground" title="Arrastar para reordenar" />
+                        <Play size={14} className="text-muted-foreground" title="Aula com video" />
                         <input
                           key={`lesson-title-${lesson.id}-${lesson.title}`}
                           type="text"
@@ -362,14 +372,15 @@ export default function CourseBuilderPage() {
                         />
                         <button
                           onClick={() => toggleFreePreview(lesson)}
-                          title={lesson.is_free_preview ? 'Aula gratuita (pre-visualizacao)' : 'Aula privada'}
+                          title={lesson.is_free_preview ? 'Aula gratuita — visivel para visitantes' : 'Aula privada — apenas para alunos matriculados'}
                           className="p-1 rounded hover:bg-muted transition-colors"
                         >
                           {lesson.is_free_preview
                             ? <Eye size={16} className="text-green-500" />
                             : <EyeOff size={16} className="text-muted-foreground" />}
                         </button>
-                        <button onClick={() => deleteLesson(lesson.id)} className="p-1 text-muted-foreground hover:text-red-500 transition-colors">
+                        <button onClick={() => deleteLesson(lesson.id)} className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                          title="Remover aula">
                           <Trash2 size={16} />
                         </button>
                       </div>
