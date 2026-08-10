@@ -86,14 +86,18 @@ export default function CourseBuilderPage() {
 
   // Refresh silencioso — para onUploadComplete (sem loading, mantem expandidos)
   const refreshSilent = useCallback(async () => {
-    console.log('[Builder] refreshSilent - a atualizar...');
     try {
       const res = await fetch(`${API_URL}/courses/${courseId}/builder/`, { headers: apiHeaders() });
       if (!res.ok) return;
       const data = await res.json();
       setCourseTitle(data.course_title || '');
       setModules(data.modules || []);
-      console.log('[Builder] refreshSilent - OK,', (data.modules || []).length, 'modulos');
+      // Manter todos os modulos expandidos para a nova aula ficar visivel
+      setExpandedModules(prev => {
+        const next = new Set(prev);
+        (data.modules || []).forEach((m: ModuleData) => next.add(m.id));
+        return next;
+      });
       const allLessons: LessonData[] = (data.modules || []).flatMap((m: ModuleData) => m.lessons);
       for (const lesson of allLessons) {
         fetchAttachmentsSilent(lesson.id);
