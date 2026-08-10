@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Plus, GripVertical, Eye, EyeOff, Trash2, ChevronDown, ChevronRight,
-  Save, ArrowLeft, Play, FileText, Upload, Paperclip, Download, X, Clock, Info
+  Save, ArrowLeft, Play, FileText, Upload, Paperclip, Download, X, Clock, Info, FolderOpen
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -302,14 +302,22 @@ export default function CourseBuilderPage() {
 
         {/* Modules */}
         <div className="space-y-4">
-          <div className="flex items-center gap-4 text-xs text-muted-foreground bg-muted/30 rounded-lg px-4 py-2 flex-wrap">
-            <span title="Modulos agrupam aulas">📁 <strong>Modulo</strong> — agrupa aulas</span>
-            <span className="hidden sm:inline">|</span>
-            <span title="Cada aula tem um video + descricao + anexos">🎬 <strong>Aula</strong> — video + conteudo</span>
-            <span className="hidden sm:inline">|</span>
-            <span title="0 = imediato, 7 = 7 dias apos matricula">🕐 <strong>Drip</strong> — libertacao programada</span>
-            <span className="hidden sm:inline">|</span>
-            <span title="Aulas gratuitas sao visiveis para qualquer visitante">👁️ <strong>Preview</strong> — aula gratuita</span>
+          <div className="flex items-center gap-3 sm:gap-4 text-xs text-muted-foreground bg-muted/30 rounded-lg px-4 py-2 flex-wrap">
+            <span className="flex items-center gap-1" title="Modulos agrupam aulas">
+              <FolderOpen size={13} className="text-accent" /> <strong>Modulo</strong> — agrupa aulas
+            </span>
+            <span className="hidden sm:inline text-border">|</span>
+            <span className="flex items-center gap-1" title="Cada aula tem um video + descricao + anexos">
+              <Play size={13} className="text-accent" /> <strong>Aula</strong> — video + conteudo
+            </span>
+            <span className="hidden sm:inline text-border">|</span>
+            <span className="flex items-center gap-1" title="0 = imediato, 7 = 7 dias apos matricula">
+              <Clock size={13} className="text-accent" /> <strong>Drip</strong> — libertacao programada
+            </span>
+            <span className="hidden sm:inline text-border">|</span>
+            <span className="flex items-center gap-1" title="Aulas gratuitas sao visiveis para qualquer visitante">
+              <Eye size={13} className="text-accent" /> <strong>Preview</strong> — aula gratuita
+            </span>
           </div>
           {modules.map((mod) => (
             <div key={mod.id} className="border border-border rounded-xl bg-card overflow-hidden">
