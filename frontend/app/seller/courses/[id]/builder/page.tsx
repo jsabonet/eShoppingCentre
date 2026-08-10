@@ -290,7 +290,7 @@ export default function CourseBuilderPage() {
         {/* Modules */}
         <div className="space-y-4">
           {modules.map((mod) => (
-            <div key={`${mod.id}-${mod.lessons.length}`} className="border border-border rounded-xl bg-card overflow-hidden">
+            <div key={mod.id} className="border border-border rounded-xl bg-card overflow-hidden">
               {/* Module Header */}
               <div className="flex items-center gap-3 p-4 hover:bg-muted/20 transition-colors">
                 <button onClick={() => toggleModule(mod.id)} className="p-0.5">
