@@ -108,6 +108,7 @@ class CourseLessonWriteSerializer(serializers.ModelSerializer):
 class CourseListSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='product.name', read_only=True)
     slug = serializers.CharField(source='product.slug', read_only=True)
+    store_slug = serializers.CharField(source='product.store.slug', read_only=True)
     price = serializers.DecimalField(source='product.price', max_digits=12, decimal_places=2, read_only=True)
     compare_price = serializers.DecimalField(source='product.compare_price', max_digits=12, decimal_places=2, read_only=True)
     image = serializers.SerializerMethodField()
@@ -118,7 +119,7 @@ class CourseListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ('id', 'slug', 'title', 'instructor_name', 'level', 'duration',
+        fields = ('id', 'slug', 'store_slug', 'title', 'instructor_name', 'level', 'duration',
                   'total_lessons', 'image', 'price', 'compare_price', 'rating',
                   'students_count', 'access_duration_days')
 
@@ -144,6 +145,7 @@ class CourseListSerializer(serializers.ModelSerializer):
 class CourseDetailSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='product.name', read_only=True)
     description = serializers.CharField(source='product.description', read_only=True)
+    store_slug = serializers.CharField(source='product.store.slug', read_only=True)
     price = serializers.DecimalField(source='product.price', max_digits=12, decimal_places=2, read_only=True)
     compare_price = serializers.DecimalField(source='product.compare_price', max_digits=12, decimal_places=2, read_only=True)
     rating = serializers.DecimalField(source='product.rating', max_digits=3, decimal_places=2, read_only=True)

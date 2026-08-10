@@ -10,6 +10,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1
 interface CourseData {
   id: string;
   slug: string;
+  store_slug: string;
   title: string;
   instructor_name: string;
   level: string;
@@ -112,7 +113,12 @@ export default function CoursesPage() {
                 </div>
                 <div className="p-4">
                   <h3 className="font-bold mb-1 group-hover:text-accent transition-colors line-clamp-1">{course.title}</h3>
-                  <p className="text-sm text-muted-foreground mb-3">Por {course.instructor_name}</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Por{' '}
+                    <Link href={`/store/${course.store_slug}`} className="hover:text-accent hover:underline transition-colors">
+                      {course.instructor_name}
+                    </Link>
+                  </p>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
                     <span className="flex items-center gap-1"><Star size={14} className="text-accent fill-accent" />{Number(course.rating).toFixed(1)}</span>
                     <span className="flex items-center gap-1"><Users size={14} />{course.students_count}</span>

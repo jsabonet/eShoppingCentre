@@ -51,6 +51,7 @@ interface CourseDetail {
   students_count: number;
   image: string | null;
   instructor_name: string;
+  store_slug: string;
   level: string;
   duration: string;
   total_lessons: number;
@@ -270,7 +271,12 @@ export default function CourseDetailPage() {
                   {course.instructor_name?.split(' ').map((n: string) => n[0]).join('') || '?'}
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Por {course.instructor_name || 'Instrutor'}</p>
+                  <p className="text-sm font-medium">
+                    Por{' '}
+                    <Link href={`/store/${course.store_slug}`} className="hover:text-accent hover:underline transition-colors">
+                      {course.instructor_name || 'Instrutor'}
+                    </Link>
+                  </p>
                   <p className="text-xs text-muted-foreground">Instrutor na plataforma</p>
                 </div>
               </div>
