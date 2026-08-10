@@ -102,6 +102,8 @@ export default function CourseBuilderPage() {
       for (const lesson of allLessons) {
         fetchAttachmentsSilent(lesson.id);
       }
+      // Recarregar a pagina apos o upload bem-sucedido
+      setTimeout(() => window.location.reload(), 1500);
     } catch {}
   }, [courseId]);
 

@@ -73,7 +73,8 @@ export default function VideoUploader({ lessonId, onUploadComplete, existingVide
         if (data.ready_to_stream || data.status === 'ready') {
           console.log('[VideoUploader] Video ficou pronto!', { lessonId });
           setStatus('ready');
-          // refreshSilent sera chamado pelo onUploadComplete inicial — nao precisa repetir
+          // Recarrega a pagina apos 2s para o user ver o preview brevemente
+          setTimeout(() => window.location.reload(), 2000);
           return;
         }
         if (data.status === 'error') {

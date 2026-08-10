@@ -192,10 +192,10 @@ export default function QuizTaker({ courseId, moduleId, quizId }: Props) {
           {quizzes.map(quiz => (
             <div
               key={quiz.id}
-              className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/20 transition-colors"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border border-border rounded-lg hover:bg-muted/20 transition-colors"
             >
-              <div>
-                <p className="text-sm font-medium">{quiz.title}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{quiz.title}</p>
                 <p className="text-xs text-muted-foreground">
                   {quiz.total_questions} questões · {quiz.total_points} pts · Aprovação: {quiz.pass_percentage}%
                   {quiz.max_attempts && ` · Max. ${quiz.max_attempts} tentativas`}
@@ -203,7 +203,7 @@ export default function QuizTaker({ courseId, moduleId, quizId }: Props) {
               </div>
               <button
                 onClick={() => startQuiz(quiz)}
-                className="px-4 py-1.5 bg-accent text-accent-foreground rounded-lg text-xs font-medium hover:bg-accent/90"
+                className="px-4 py-1.5 bg-accent text-accent-foreground rounded-lg text-xs font-medium hover:bg-accent/90 shrink-0 self-start sm:self-auto"
               >
                 Iniciar
               </button>
@@ -222,14 +222,14 @@ export default function QuizTaker({ courseId, moduleId, quizId }: Props) {
     return (
       <div className="border-t border-border pt-4 mt-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-sm font-semibold">{currentQuiz.title}</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold truncate">{currentQuiz.title}</h3>
             <p className="text-xs text-muted-foreground">
               {questions.length} questões · {currentQuiz.total_points} pts · {currentQuiz.pass_percentage}% para aprovar
             </p>
           </div>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
             <Clock size={14} />
             <span>{formatTime(timer)}</span>
           </div>
@@ -324,7 +324,7 @@ export default function QuizTaker({ courseId, moduleId, quizId }: Props) {
         </div>
 
         {/* Submit Button */}
-        <div className="mt-6 flex items-center justify-between">
+        <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
           <button
             onClick={() => {
               if (timerInterval) clearInterval(timerInterval);
@@ -332,14 +332,14 @@ export default function QuizTaker({ courseId, moduleId, quizId }: Props) {
               setCurrentQuiz(null);
               setAnswers({});
             }}
-            className="px-4 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors"
+            className="px-4 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors text-center"
           >
             Sair
           </button>
           <button
             onClick={submitQuiz}
             disabled={submitting || answeredCount < questions.length}
-            className="px-6 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {submitting ? (
               <>
@@ -390,9 +390,20 @@ export default function QuizTaker({ courseId, moduleId, quizId }: Props) {
 
         {/* Answer Review */}
         {attempt.answers && attempt.answers.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold mb-2">Revisão das Respostas</h4>
-            {attempt.answers.map((answer, idx) => (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold">Resumo das Respostas</h4>
+              <span className="text-xs text-muted-foreground">
+                {attempt.answers.filter(a => a.is_correct === true).length} de {attempt.answers.length} corretas
+              </span>
+            </div>
+            {attempt.answers.map((answer, idx) => {
+              // Cruzar com currentQuiz para obter as respostas corretas
+              const question = currentQuiz?.questions?.find(q => q.id === answer.question_id);
+              const correctOptions = question?.options?.filter(o => o.is_correct) || [];
+              const correctTexts = correctOptions.map(o => o.text);
+
+              return (
               <div
                 key={answer.id}
                 className={`p-3 rounded-lg border text-sm ${
@@ -405,49 +416,68 @@ export default function QuizTaker({ courseId, moduleId, quizId }: Props) {
               >
                 <div className="flex items-start gap-2">
                   {answer.is_correct === true ? (
-                    <CheckCircle size={14} className="text-green-500 mt-0.5 shrink-0" />
+                    <CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" />
                   ) : answer.is_correct === false ? (
-                    <XCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                    <XCircle size={16} className="text-red-500 mt-0.5 shrink-0" />
                   ) : (
-                    <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                    <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" />
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">{idx + 1}. {answer.question_text}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Tipo: {answer.question_type === 'multiple_choice' ? 'Múltipla Escolha'
-                        : answer.question_type === 'multiple_select' ? 'Seleção Múltipla'
-                        : answer.question_type === 'true_false' ? 'V/F'
-                        : 'Texto Livre'}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    {/* Pergunta */}
+                    <p className="font-medium text-sm">
+                      <span className="text-muted-foreground mr-1">{idx + 1}.</span>
+                      {answer.question_text}
                     </p>
+
+                    {/* Resposta do aluno */}
                     {answer.selected_option_text && (
-                      <p className="text-xs mt-1">
-                        <span className="text-muted-foreground">Resposta: </span>
-                        <span className={answer.is_correct === false ? 'text-red-600 font-medium' : ''}>
+                      <p className="text-xs">
+                        <span className="text-muted-foreground">A sua resposta: </span>
+                        <span className={answer.is_correct === false ? 'text-red-600 font-medium line-through' : 'text-green-700 font-medium'}>
                           {answer.selected_option_text}
                         </span>
                       </p>
                     )}
                     {answer.selected_options_texts && answer.selected_options_texts.length > 0 && (
-                      <p className="text-xs mt-1">
-                        <span className="text-muted-foreground">Respostas: </span>
-                        {answer.selected_options_texts.join(', ')}
+                      <p className="text-xs">
+                        <span className="text-muted-foreground">As suas respostas: </span>
+                        <span className={answer.is_correct === false ? 'text-red-600 font-medium' : 'text-green-700 font-medium'}>
+                          {answer.selected_options_texts.join(', ')}
+                        </span>
                       </p>
                     )}
                     {answer.open_text_answer && (
-                      <p className="text-xs mt-1">
-                        <span className="text-muted-foreground">Resposta: </span>
-                        {answer.open_text_answer}
+                      <p className="text-xs">
+                        <span className="text-muted-foreground">A sua resposta: </span>
+                        <span className="italic">{answer.open_text_answer}</span>
                       </p>
+                    )}
+
+                    {/* Resposta correta (sempre visível, destacada se errou) */}
+                    {correctTexts.length > 0 && (
+                      <div className={`text-xs p-2 rounded ${
+                        answer.is_correct === false
+                          ? 'bg-green-100 border border-green-200'
+                          : 'bg-white/50'
+                      }`}>
+                        <span className="text-muted-foreground">
+                          {correctTexts.length > 1 ? 'Respostas corretas: ' : 'Resposta correta: '}
+                        </span>
+                        <span className="text-green-700 font-medium">
+                          {correctTexts.join(' · ')}
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex gap-3 mt-6">
+        <div className="flex flex-col sm:flex-row gap-3 mt-6">
           <button
             onClick={() => {
               setState('list');
@@ -456,7 +486,7 @@ export default function QuizTaker({ courseId, moduleId, quizId }: Props) {
               setAnswers({});
               fetchQuizzes();
             }}
-            className="px-4 py-2 border border-border rounded-lg text-sm hover:bg-muted transition-colors"
+            className="px-4 py-2 border border-border rounded-lg text-sm hover:bg-muted transition-colors text-center"
           >
             Voltar
           </button>

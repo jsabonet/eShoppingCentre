@@ -153,33 +153,53 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
     optionId: string,
     questionType: string
   ) => {
-    if (questionType === 'multiple_choice' || questionType === 'true_false') {
-      // Single correct — set all options to incorrect, then toggle
-      const newOptions = question.options.map(o => ({
-        id: o.id,
-        text: o.text,
-        is_correct: o.id === optionId ? !o.is_correct : false,
-        sort_order: o.sort_order,
-      }));
-      await updateQuestion(quizId, question.id, {
-        text: question.text,
-        question_type: question.question_type,
-        points: question.points,
-        options: newOptions,
+    if (!question.options) return;
+
+    // Optimistic local update — feedback imediato
+    const optimisticOptions = question.options.map(o => ({
+      id: o.id,
+      text: o.text,
+      is_correct:
+        questionType === 'multiple_select'
+          ? o.id === optionId ? !o.is_correct : o.is_correct
+          : o.id === optionId ? !o.is_correct : false,
+      sort_order: o.sort_order,
+    }));
+
+    setQuizzes(prev =>
+      prev.map(q =>
+        q.id === quizId
+          ? {
+              ...q,
+              questions: q.questions?.map(qq =>
+                qq.id === question.id ? { ...qq, options: optimisticOptions } : qq
+              ),
+            }
+          : q
+      )
+    );
+
+    // Persist on server
+    try {
+      const res = await fetch(`${API_URL}/courses/quizzes/questions/${question.id}/`, {
+        method: 'PUT',
+        headers: apiHeaders(),
+        body: JSON.stringify({
+          text: question.text,
+          question_type: question.question_type,
+          points: question.points,
+          options: optimisticOptions,
+        }),
       });
-    } else if (questionType === 'multiple_select') {
-      const newOptions = question.options.map(o => ({
-        id: o.id,
-        text: o.text,
-        is_correct: o.id === optionId ? !o.is_correct : o.is_correct,
-        sort_order: o.sort_order,
-      }));
-      await updateQuestion(quizId, question.id, {
-        text: question.text,
-        question_type: question.question_type,
-        points: question.points,
-        options: newOptions,
-      });
+      if (!res.ok) {
+        // Revert on failure
+        await fetchQuizDetail(quizId);
+        setError('Erro ao guardar. Tente novamente.');
+      }
+      // Sucesso: estado otimista ja esta correto, nao precisa de re-fetch
+    } catch {
+      await fetchQuizDetail(quizId);
+      setError('Erro de rede ao guardar.');
     }
   };
 
@@ -278,8 +298,8 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
         {quizzes.map((quiz) => (
           <div key={quiz.id} className="border border-border rounded-lg bg-muted/20 overflow-hidden">
             {/* Quiz Header */}
-            <div className="flex items-center gap-2 p-2.5 hover:bg-muted/30 transition-colors">
-              <button onClick={() => toggleQuiz(quiz.id)} className="p-0.5">
+            <div className="flex flex-wrap items-center gap-2 p-2.5 hover:bg-muted/30 transition-colors">
+              <button onClick={() => toggleQuiz(quiz.id)} className="p-0.5 shrink-0">
                 {expandedQuiz === quiz.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </button>
               <HelpCircle size={14} className="text-accent shrink-0" />
@@ -290,25 +310,27 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
                   if (e.target.value.trim() && e.target.value !== quiz.title)
                     updateQuiz(quiz.id, 'title', e.target.value.trim());
                 }}
-                className="flex-1 px-1.5 py-0.5 text-sm font-medium bg-transparent border border-transparent hover:border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+                className="flex-1 min-w-30 px-1.5 py-0.5 text-sm font-medium bg-transparent border border-transparent hover:border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
                 placeholder="Título do quiz..."
               />
-              <span className="text-xs text-muted-foreground">{quiz.total_questions} questões</span>
-              <button
-                onClick={() => deleteQuiz(quiz.id)}
-                className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
-              >
-                <Trash2 size={14} />
-              </button>
+              <div className="flex items-center gap-2 shrink-0 ml-auto">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{quiz.total_questions} questões</span>
+                <button
+                  onClick={() => deleteQuiz(quiz.id)}
+                  className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
 
             {/* Quiz Settings & Questions */}
             {expandedQuiz === quiz.id && (
-              <div className="px-3 pb-3 space-y-3 border-t border-border pt-2">
+              <div className="px-2 sm:px-3 pb-3 space-y-3 border-t border-border pt-2">
                 {/* Settings Row */}
-                <div className="flex flex-wrap gap-2 items-center">
+                <div className="flex flex-wrap gap-x-4 gap-y-2 items-center">
                   <div className="flex items-center gap-1">
-                    <label className="text-xs text-muted-foreground">Aprovação:</label>
+                    <label className="text-xs text-muted-foreground whitespace-nowrap">Aprovação:</label>
                     <input
                       type="number"
                       defaultValue={quiz.pass_percentage}
@@ -320,7 +342,7 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
                     <span className="text-xs text-muted-foreground">%</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <label className="text-xs text-muted-foreground">Max. tentativas:</label>
+                    <label className="text-xs text-muted-foreground whitespace-nowrap">Max. tentativas:</label>
                     <input
                       type="number"
                       defaultValue={quiz.max_attempts ?? ''}
@@ -349,12 +371,12 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
                   {quiz.questions?.map((question) => (
                     <div key={question.id} className="border border-border rounded-lg bg-background overflow-hidden">
                       {/* Question Header */}
-                      <div className="flex items-center gap-2 p-2 hover:bg-muted/10 transition-colors">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 p-2 hover:bg-muted/10 transition-colors">
                         <button
                           onClick={() =>
                             setExpandedQuestion(expandedQuestion === question.id ? null : question.id)
                           }
-                          className="p-0.5"
+                          className="p-0.5 shrink-0"
                         >
                           {expandedQuestion === question.id ? (
                             <ChevronDown size={12} />
@@ -362,7 +384,7 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
                             <ChevronRight size={12} />
                           )}
                         </button>
-                        <span className="text-xs font-medium text-muted-foreground shrink-0">
+                        <span className="text-xs font-medium text-muted-foreground shrink-0 bg-muted/50 px-1.5 py-0.5 rounded">
                           {questionTypeLabel(question.question_type)}
                         </span>
                         <input
@@ -377,21 +399,23 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
                                 options: question.options.map(o => ({ id: o.id, text: o.text, is_correct: o.is_correct, sort_order: o.sort_order })),
                               });
                           }}
-                          className="flex-1 px-1.5 py-0.5 text-xs bg-transparent border border-transparent hover:border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+                          className="flex-1 min-w-30 px-1.5 py-0.5 text-xs bg-transparent border border-transparent hover:border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
                           placeholder="Enunciado da questão..."
                         />
-                        <span className="text-xs text-muted-foreground">{question.points} pts</span>
-                        <button
-                          onClick={() => deleteQuestion(quiz.id, question.id)}
-                          className="p-0.5 text-muted-foreground hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">{question.points} pts</span>
+                          <button
+                            onClick={() => deleteQuestion(quiz.id, question.id)}
+                            className="p-0.5 text-muted-foreground hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Question Detail: Options */}
                       {expandedQuestion === question.id && (
-                        <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
+                        <div className="px-2 sm:px-3 pb-3 space-y-2 border-t border-border pt-2">
                           {/* Type & Points */}
                           <div className="flex flex-wrap gap-2 items-center">
                             <select
@@ -429,6 +453,10 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
                                 className="w-14 px-1.5 py-0.5 border border-border rounded text-xs bg-background"
                               />
                             </div>
+                            {/* Help text sobre respostas certas */}
+                            <span className="text-xs text-muted-foreground italic">
+                              Clique no <CheckCircle size={10} className="inline text-green-500" /> para marcar a resposta certa
+                            </span>
                           </div>
 
                           {/* Options (for non-open_text) */}
@@ -443,17 +471,17 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
                                 </span>
                               </div>
                               {question.options.map((option, idx) => (
-                                <div key={option.id} className="flex items-center gap-2">
+                                <div key={option.id} className="flex items-center gap-1.5 sm:gap-2">
                                   <button
                                     onClick={() => toggleCorrectOption(quiz.id, question, option.id, question.question_type)}
-                                    className={`p-0.5 rounded-full transition-colors ${
+                                    className={`shrink-0 p-0.5 rounded-full transition-colors ${
                                       option.is_correct
-                                        ? 'text-green-500 bg-green-50'
-                                        : 'text-muted-foreground hover:text-green-400'
+                                        ? 'text-green-500 bg-green-50 ring-1 ring-green-300'
+                                        : 'text-gray-300 hover:text-green-400 hover:bg-green-50/50'
                                     }`}
-                                    title={option.is_correct ? 'Correta' : 'Marcar como correta'}
+                                    title={option.is_correct ? 'Resposta correta — clique para desmarcar' : 'Marcar como resposta correta'}
                                   >
-                                    <CheckCircle size={14} />
+                                    <CheckCircle size={16} />
                                   </button>
                                   <input
                                     type="text"
@@ -462,9 +490,14 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
                                       if (e.target.value.trim())
                                         updateOptionText(quiz.id, question, option.id, e.target.value.trim());
                                     }}
-                                    className="flex-1 px-1.5 py-0.5 text-xs bg-transparent border border-transparent hover:border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+                                    className="flex-1 min-w-20 px-1.5 py-0.5 text-xs bg-transparent border border-transparent hover:border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
                                     placeholder={`Opção ${idx + 1}...`}
                                   />
+                                  {option.is_correct && (
+                                    <span className="text-[10px] text-green-600 font-medium bg-green-50 px-1.5 py-0.5 rounded shrink-0">
+                                      Correta
+                                    </span>
+                                  )}
                                   {question.options.length > 2 && (
                                     <button
                                       onClick={() => deleteOption(quiz.id, question, option.id)}

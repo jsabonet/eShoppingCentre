@@ -163,13 +163,14 @@ export default function CourseLearnPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  // Converte duração "MM:SS" ou "H:MM:SS" para segundos
+  // Converte duracao "MM:SS" ou "H:MM:SS" para segundos
+  // Retorna 0 se a duracao for desconhecida, para nao disparar onEnded prematuramente
   const parseDurationSeconds = (dur: string): number => {
-    if (!dur) return 1;
+    if (!dur || dur === '0' || dur === '00:00' || dur === '0:00:00') return 0;
     const parts = dur.split(':').map(Number);
     if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
     if (parts.length === 2) return parts[0] * 60 + parts[1];
-    return Number(dur) || 1;
+    return Number(dur) || 0;
   };
 
   // Flatten all lessons for prev/next navigation
@@ -243,13 +244,10 @@ export default function CourseLearnPage() {
       });
       if (res.ok) {
         setCompletedIds(prev => new Set([...prev, currentLessonId]));
-        // Auto-advance after short delay
-        if (currentIndex < allLessons.length - 1) {
-          setTimeout(() => goToLesson(allLessons[currentIndex + 1].id), 1500);
-        }
+        // NAO avanca automaticamente — deixa o aluno decidir
       }
     } catch {} finally { setCompleting(false); }
-  }, [currentLessonId, completing, currentIndex, allLessons, watchedMap, saveWatchProgress]);
+  }, [currentLessonId, completing, watchedMap, saveWatchProgress]);
 
   const markComplete = async () => {
     if (!currentLessonId || completing) return;
