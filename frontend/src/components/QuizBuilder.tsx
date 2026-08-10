@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Plus, Trash2, GripVertical, ChevronDown, ChevronRight,
-  Save, X, HelpCircle, CheckCircle, AlertTriangle, Loader2
+  Save, X, HelpCircle, CheckCircle, AlertTriangle, Loader2, Eye, Edit3
 } from 'lucide-react';
 import { quizzesAPI, Quiz, QuizQuestion, AnswerOption } from '@/src/lib/api';
 
@@ -28,6 +28,7 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [quizSummary, setQuizSummary] = useState<Record<string, boolean>>({});
 
   const fetchQuizzes = useCallback(async () => {
     if (!courseId) return;
@@ -327,6 +328,107 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
             {/* Quiz Settings & Questions */}
             {expandedQuiz === quiz.id && (
               <div className="px-2 sm:px-3 pb-3 space-y-3 border-t border-border pt-2">
+                {/* Toggle: Edit / Summary */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-medium">
+                    {quizSummary[quiz.id] ? 'Pré-visualização do Quiz' : 'Configuração do Quiz'}
+                  </span>
+                  <button
+                    onClick={() => setQuizSummary(prev => ({ ...prev, [quiz.id]: !prev[quiz.id] }))}
+                    className="flex items-center gap-1 px-2 py-1 text-xs rounded border border-border hover:bg-muted transition-colors"
+                  >
+                    {quizSummary[quiz.id] ? (
+                      <><Edit3 size={11} /> Editar</>
+                    ) : (
+                      <><Eye size={11} /> Ver Resumo</>
+                    )}
+                  </button>
+                </div>
+
+                {quizSummary[quiz.id] ? (
+                  /* ─── Resumo / Pré-visualização ─── */
+                  <div className="space-y-3">
+                    {/* Stats */}
+                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground bg-muted/20 rounded-lg p-3">
+                      <span><strong className="text-foreground">{quiz.total_questions}</strong> questões</span>
+                      <span><strong className="text-foreground">{quiz.questions?.reduce((s, q) => s + (q.points || 0), 0) || 0}</strong> pontos</span>
+                      <span>Aprovação: <strong className="text-foreground">{quiz.pass_percentage}%</strong></span>
+                      {quiz.max_attempts ? (
+                        <span>Max. <strong className="text-foreground">{quiz.max_attempts}</strong> tentativas</span>
+                      ) : (
+                        <span>Tentativas ilimitadas</span>
+                      )}
+                      {quiz.is_required && (
+                        <span className="text-amber-600 font-medium">Obrigatório</span>
+                      )}
+                    </div>
+
+                    {/* Questions */}
+                    {quiz.questions?.length ? (
+                      <div className="space-y-3">
+                        {quiz.questions.map((q, qIdx) => {
+                          const correct = q.options?.filter(o => o.is_correct) || [];
+                          return (
+                            <div key={q.id} className="border border-border rounded-lg bg-background p-3">
+                              <div className="flex items-start gap-2">
+                                <span className="text-xs font-bold text-muted-foreground mt-0.5 shrink-0">{qIdx + 1}.</span>
+                                <div className="flex-1 min-w-0 space-y-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="text-sm font-medium">{q.text}</p>
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground shrink-0">
+                                      {q.question_type === 'multiple_choice' ? 'Múltipla Escolha'
+                                        : q.question_type === 'multiple_select' ? 'Seleção Múltipla'
+                                        : q.question_type === 'true_false' ? 'V/F'
+                                        : 'Texto Livre'}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">{q.points} pts</span>
+                                  </div>
+
+                                  {q.question_type !== 'open_text' ? (
+                                    <div className="space-y-1">
+                                      {q.options?.map(opt => (
+                                        <div
+                                          key={opt.id}
+                                          className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${
+                                            opt.is_correct
+                                              ? 'bg-green-50 border border-green-200'
+                                              : 'bg-muted/20 border border-transparent'
+                                          }`}
+                                        >
+                                          <CheckCircle
+                                            size={12}
+                                            className={opt.is_correct ? 'text-green-500' : 'text-gray-300'}
+                                          />
+                                          <span className={opt.is_correct ? 'text-green-800 font-medium' : 'text-muted-foreground'}>
+                                            {opt.text}
+                                          </span>
+                                          {opt.is_correct && (
+                                            <span className="text-[10px] text-green-600 font-medium bg-green-100 px-1.5 py-0.5 rounded ml-auto">
+                                              Correta
+                                            </span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground italic">
+                                      Resposta livre — correção manual
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground py-4 text-center">
+                        Nenhuma questão adicionada a este quiz.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
                 {/* Settings Row */}
                 <div className="flex flex-wrap gap-x-4 gap-y-2 items-center">
                   <div className="flex items-center gap-1">
@@ -535,6 +637,8 @@ export default function QuizBuilder({ moduleId, courseId }: Props) {
                     <Plus size={12} /> Adicionar Questão
                   </button>
                 </div>
+                  </>
+                )}
               </div>
             )}
           </div>
