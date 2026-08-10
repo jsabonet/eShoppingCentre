@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Plus, GripVertical, Eye, EyeOff, Trash2, ChevronDown, ChevronRight,
-  Save, ArrowLeft, Play, FileText, Upload, Paperclip, Download, X, Clock
+  Save, ArrowLeft, Play, FileText, Upload, Paperclip, Download, X, Clock, Info
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -319,16 +319,17 @@ export default function CourseBuilderPage() {
                 />
                 <span className="text-xs text-muted-foreground hidden sm:inline">{mod.lessons.length} aulas</span>
                 {/* Drip content */}
-                <div className={`flex items-center gap-1.5 text-xs rounded-lg px-2 py-1 shrink-0 ${(mod.drip_days ?? 0) > 0 ? 'bg-accent/10 text-accent' : 'bg-muted/40 text-muted-foreground'}`}
-                  title={(mod.drip_days ?? 0) > 0 ? `Desbloqueia ${mod.drip_days} dias após matrícula` : 'Disponível imediatamente'}>
+                <div
+                  className={`flex items-center gap-1 text-xs rounded-lg pl-1.5 pr-1 py-1 shrink-0 group relative ${(mod.drip_days ?? 0) > 0 ? 'bg-accent/10 text-accent ring-1 ring-accent/20' : 'bg-muted/40 text-muted-foreground'}`}
+                  title={(mod.drip_days ?? 0) > 0 ? `Módulo bloqueado por ${mod.drip_days} dias após matrícula` : 'Drip: libertação programada (0 = imediato)'}>
                   <Clock size={12} className="shrink-0" />
+                  <span className="hidden sm:inline text-[10px] font-medium opacity-70">Drip</span>
                   <input
                     type="number"
                     min="0"
                     max="365"
                     defaultValue={mod.drip_days ?? ''}
                     placeholder="0"
-                    title="Drip: dias após matrícula para desbloquear (0 = imediato)"
                     onBlur={(e) => {
                       const val = e.target.value.trim();
                       const num = val === '' || val === '0' ? null : Math.max(0, Math.min(365, parseInt(val) || 0));
