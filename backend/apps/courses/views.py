@@ -238,6 +238,10 @@ class ModuleUpdateView(generics.UpdateAPIView):
     lookup_field = 'id'
     lookup_url_kwarg = 'module_id'
 
+    def get_serializer(self, *args, **kwargs):
+        kwargs['partial'] = True
+        return super().get_serializer(*args, **kwargs)
+
     def perform_update(self, serializer):
         if self.get_object().course.product.store.owner != self.request.user:
             from rest_framework.exceptions import PermissionDenied
