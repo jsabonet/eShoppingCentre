@@ -17,6 +17,7 @@ export default function AccountPage() {
   const [wishlistCount, setWishlistCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
   const [courseCount, setCourseCount] = useState(0);
+  const [downloadCount, setDownloadCount] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -30,11 +31,14 @@ export default function AccountPage() {
 
   const loadData = async () => {
     try {
-      const [ordersRes, wishlistRes, addressesRes, coursesRes] = await Promise.allSettled([
+      const [ordersRes, wishlistRes, addressesRes, coursesRes, downloadsRes] = await Promise.allSettled([
         ordersAPI.myOrders({ page_size: 5 }),
         usersAPI.myWishlist(),
         usersAPI.myAddresses(),
         fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/courses/me/enrollments/`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+        }).then(r => r.ok ? r.json() : Promise.reject(r)),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/products/downloads/`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
         }).then(r => r.ok ? r.json() : Promise.reject(r)),
       ]);
@@ -54,6 +58,10 @@ export default function AccountPage() {
       if (coursesRes.status === 'fulfilled') {
         const data = coursesRes.value as any;
         setCourseCount(Array.isArray(data) ? data.length : data.results?.length || data.count || 0);
+      }
+      if (downloadsRes.status === 'fulfilled') {
+        const data = downloadsRes.value as any;
+        setDownloadCount(Array.isArray(data) ? data.length : data.results?.length || data.count || 0);
       }
     } catch {} finally {
       setOrdersLoading(false);
@@ -114,7 +122,7 @@ export default function AccountPage() {
           </Link>
           <Link href="/account/downloads" className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-shadow">
             <Download size={24} className="text-blue-500 mb-2" />
-            <p className="text-2xl font-bold">0</p>
+            <p className="text-2xl font-bold">{downloadCount}</p>
             <p className="text-sm text-muted-foreground">Downloads</p>
           </Link>
           <Link href="/account/addresses" className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-shadow">

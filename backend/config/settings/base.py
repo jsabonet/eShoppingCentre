@@ -171,6 +171,12 @@ STORAGES = {
 
 # S3 credentials are configured in production.py when DEBUG=False
 
+# ─── File Upload Limits (Seguranca) ───
+# Maximo 500 MB para uploads (produtos digitais grandes: audio, video, ZIP)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024      # 10 MB em memoria, depois disco
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024       # 10 MB request body em memoria
+FILE_UPLOAD_MAX_SIZE = 500 * 1024 * 1024              # 500 MB maximo absoluto
+
 # ─── Email ───
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Development: prints to console
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@eshoppingcentre.co.mz')

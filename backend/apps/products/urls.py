@@ -1,10 +1,16 @@
 from django.urls import path
 from . import views
+from . import views_downloads
 
 urlpatterns = [
     path('', views.ProductListView.as_view(), name='product_list'),
     path('my/', views.MyProductListView.as_view(), name='my_products'),
     path('search/', views.ProductSearchView.as_view(), name='product_search'),
+    # ─── Downloads Digitais ───
+    path('downloads/', views_downloads.MyDownloadsView.as_view(), name='my_downloads'),
+    path('downloads/<uuid:download_id>/token/', views_downloads.DownloadTokenView.as_view(), name='download_token'),
+    path('downloads/<uuid:download_id>/file/', views_downloads.DownloadFileView.as_view(), name='download_file'),
+    # ─── Coupons ───
     path('coupons/', views.CouponListView.as_view(), name='coupon_list'),
     path('coupons/validate/', views.ValidateCouponView.as_view(), name='coupon_validate'),
     path('coupons/<uuid:pk>/', views.CouponDetailView.as_view(), name='coupon_detail'),
