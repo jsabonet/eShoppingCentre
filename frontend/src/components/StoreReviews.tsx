@@ -112,7 +112,7 @@ export default function StoreReviews({ storeSlug, storeName, storeType }: StoreR
         setShowForm(false);
         setForm({ communication: 5, shipping: 5, accuracy: 5, overall: 5, title: '', comment: '' });
         fetchReviews();
-        toast.success('Avaliacao enviada!', 'Obrigado pelo seu feedback.');
+        toast.success('Avaliacao publicada!', 'Obrigado pelo seu feedback.');
       } else {
         const err = await res.json().catch(() => ({}));
         const msg = typeof err === 'string' ? err : Object.values(err || {}).flat().join('. ');

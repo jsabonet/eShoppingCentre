@@ -369,3 +369,33 @@ class AdminStoreReviewsView(APIView):
             reviews, many=True, context={'request': request}
         ).data
         return Response({'count': len(data), 'results': data})
+
+
+class AdminStoreReviewModerateView(APIView):
+    """PATCH /api/v1/admin/reviews/{review_id}/ — Admin hides/shows a review.
+       DELETE /api/v1/admin/reviews/{review_id}/ — Admin removes a review."""
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, review_id):
+        from apps.reviews.models import StoreReview
+        from apps.reviews.serializers import StoreReviewSerializer
+
+        review = get_object_or_404(StoreReview, id=review_id)
+        action = request.data.get('action')
+
+        if action == 'hide':
+            review.is_hidden = True
+        elif action == 'show':
+            review.is_hidden = False
+        else:
+            return Response({'detail': 'Acao invalida. Use hide ou show.'}, status=400)
+
+        review.save(update_fields=['is_hidden'])
+        return Response(StoreReviewSerializer(review, context={'request': request}).data)
+
+    def delete(self, request, review_id):
+        from apps.reviews.models import StoreReview
+
+        review = get_object_or_404(StoreReview, id=review_id)
+        review.delete()
+        return Response({'deleted': True})

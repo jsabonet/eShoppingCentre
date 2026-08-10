@@ -5,6 +5,7 @@ from .views_admin import (
     AdminUserListView, AdminUserDetailView,
     AdminAllStoresView, AdminStoreManageView, AdminAllOrdersView,
     AdminStoreConversationsView, AdminStoreFollowersView, AdminStoreReviewsView,
+    AdminStoreReviewModerateView,
 )
 
 urlpatterns = [
@@ -22,4 +23,5 @@ urlpatterns = [
     path('stores/<uuid:store_id>/conversations/', AdminStoreConversationsView.as_view(), name='admin_store_conversations'),
     path('stores/<uuid:store_id>/followers/', AdminStoreFollowersView.as_view(), name='admin_store_followers'),
     path('stores/<uuid:store_id>/reviews/', AdminStoreReviewsView.as_view(), name='admin_store_reviews'),
+    path('reviews/<uuid:review_id>/', AdminStoreReviewModerateView.as_view(), name='admin_review_moderate'),
 ]

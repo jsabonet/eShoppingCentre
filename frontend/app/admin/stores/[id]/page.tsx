@@ -404,20 +404,69 @@ export default function AdminStoreDetailPage() {
                 {storeReviews.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhuma avaliação.</p>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
                     {storeReviews.map((r: any) => (
-                      <div key={r.id} className="p-2 bg-muted/20 rounded-lg text-sm">
+                      <div key={r.id} className={`p-3 rounded-lg border text-sm ${r.is_hidden ? 'border-red-200 bg-red-50' : 'bg-muted/20 border-transparent'}`}>
                         <div className="flex items-center justify-between">
-                          <span className="font-medium">{r.user_name}</span>
-                          <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">
-                            ⭐ {r.overall_rating}/5
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{r.user_name}</span>
+                            <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">
+                              ⭐ {r.overall_rating}/5
+                            </span>
+                            {r.is_verified_purchase && (
+                              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Verificada</span>
+                            )}
+                            {r.is_hidden && (
+                              <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded">Oculta</span>
+                            )}
+                            {r.report_count > 0 && (
+                              <span className="text-xs px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded">
+                                🚩 {r.report_count}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={async () => {
+                                const token = localStorage.getItem('access_token');
+                                const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+                                await fetch(`${API}/admin/reviews/${r.id}/`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                  body: JSON.stringify({ action: r.is_hidden ? 'show' : 'hide' }),
+                                });
+                                setStoreReviews(prev => prev.map(sr => sr.id === r.id ? { ...sr, is_hidden: !sr.is_hidden } : sr));
+                              }}
+                              className={`text-xs px-2 py-1 rounded transition-colors ${r.is_hidden ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
+                              title={r.is_hidden ? 'Mostrar' : 'Ocultar'}
+                            >
+                              {r.is_hidden ? 'Mostrar' : 'Ocultar'}
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!confirm('Remover esta avaliacao permanentemente?')) return;
+                                const token = localStorage.getItem('access_token');
+                                const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+                                await fetch(`${API}/admin/reviews/${r.id}/`, {
+                                  method: 'DELETE',
+                                  headers: { Authorization: `Bearer ${token}` },
+                                });
+                                setStoreReviews(prev => prev.filter(sr => sr.id !== r.id));
+                              }}
+                              className="text-xs px-2 py-1 rounded bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                              title="Remover"
+                            >
+                              🗑
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-1">
                           Com: {r.communication_rating} · Prec: {r.accuracy_rating}
                           {r.shipping_rating != null && <> · Ent: {r.shipping_rating}</>}
+                          {r.created_at && <> · {new Date(r.created_at).toLocaleDateString('pt-MZ')}</>}
                         </p>
-                        {r.comment && <p className="text-xs mt-1 italic">{r.comment.slice(0, 150)}</p>}
+                        {r.title && <p className="text-xs font-medium mt-1">{r.title}</p>}
+                        {r.comment && <p className="text-xs mt-0.5">{r.comment.slice(0, 200)}{r.comment.length > 200 ? '...' : ''}</p>}
                       </div>
                     ))}
                   </div>

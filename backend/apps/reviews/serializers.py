@@ -56,8 +56,9 @@ class StoreReviewSerializer(serializers.ModelSerializer):
             'shipping_rating', 'accuracy_rating', 'overall_rating',
             'title', 'comment', 'is_verified_purchase',
             'helpful_count', 'seller_reply', 'seller_replied_at', 'created_at',
+            'is_hidden', 'report_count',
         )
-        read_only_fields = ('is_verified_purchase', 'helpful_count', 'seller_replied_at')
+        read_only_fields = ('is_verified_purchase', 'helpful_count', 'seller_replied_at', 'is_hidden', 'report_count')
 
     def get_user_name(self, obj):
         name = obj.user.first_name

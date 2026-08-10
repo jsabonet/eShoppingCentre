@@ -49,7 +49,6 @@ class StoreReview(BaseModel):
     is_hidden = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = [['user', 'store']]
         ordering = ['-created_at']
 
     def __str__(self):

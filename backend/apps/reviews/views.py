@@ -108,13 +108,7 @@ class StoreReviewListView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         from apps.stores.models import Store
         store = get_object_or_404(Store, slug=self.kwargs['slug'])
-
-        # Se já existe review, devolve a existente (evita IntegrityError)
-        existing = StoreReview.objects.filter(user=request.user, store=store).first()
-        if existing:
-            serializer = self.get_serializer(existing)
-            return Response(serializer.data)
-
+        # Permite multiplas reviews — diferentes experiencias = diferentes reviews
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
