@@ -155,7 +155,16 @@ class CourseLearnView(APIView):
         if not enrollment.has_access:
             return Response({'detail': 'O seu acesso a este curso expirou.'}, status=403)
 
-        modules = course.modules.all().prefetch_related('lessons', 'quizzes')
+        from django.utils import timezone
+        days_since_enrollment = (timezone.now() - enrollment.created_at).days
+
+        all_modules = course.modules.all().prefetch_related('lessons', 'quizzes')
+
+        # Drip: marcar módulos bloqueados, mas sempre incluir todos
+        locked_module_ids = set()
+        for mod in all_modules:
+            if mod.drip_days is not None and days_since_enrollment < mod.drip_days:
+                locked_module_ids.add(str(mod.id))
 
         # Marcar aulas concluidas para o aluno
         completed_ids = set(
@@ -165,9 +174,22 @@ class CourseLearnView(APIView):
         )
 
         modules_data = CourseModuleSerializer(
-            modules, many=True,
+            all_modules, many=True,
             context={'request': request, 'enrollment': enrollment}
         ).data
+
+        # Inject drip info into each module
+        for mod_data in modules_data:
+            mod_id = mod_data['id']
+            if mod_id in locked_module_ids:
+                original = all_modules.get(id=mod_id)
+                mod_data['is_locked'] = True
+                mod_data['drip_days'] = original.drip_days
+                mod_data['days_until_unlock'] = original.drip_days - days_since_enrollment
+            else:
+                mod_data['is_locked'] = False
+                mod_data['drip_days'] = None
+                mod_data['days_until_unlock'] = 0
 
         # Quiz attempts status for all quizzes in this course
         quiz_attempts = {}

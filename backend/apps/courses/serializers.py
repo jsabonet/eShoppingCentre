@@ -83,13 +83,13 @@ class CourseModuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CourseModule
-        fields = ('id', 'title', 'description', 'sort_order', 'lessons', 'quizzes')
+        fields = ('id', 'title', 'description', 'sort_order', 'drip_days', 'lessons', 'quizzes')
 
 
 class CourseModuleWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = CourseModule
-        fields = ('id', 'title', 'description', 'sort_order')
+        fields = ('id', 'title', 'description', 'sort_order', 'drip_days')
 
 
 class CourseLessonWriteSerializer(serializers.ModelSerializer):

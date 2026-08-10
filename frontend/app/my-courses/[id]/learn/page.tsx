@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, PlayCircle, CheckCircle, ChevronDown, ChevronUp,
   Menu, X, BookOpen, Loader2, AlertTriangle, FileText, Download, Paperclip,
-  HelpCircle, Trophy, Star
+  HelpCircle, Trophy, Star, Lock
 } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import CourseVideoPlayer from '@/src/components/CourseVideoPlayer';
@@ -55,6 +55,9 @@ interface ModuleData {
   title: string;
   lessons: LessonData[];
   quizzes: QuizData[];
+  is_locked?: boolean;
+  drip_days?: number | null;
+  days_until_unlock?: number;
 }
 
 export default function CourseLearnPage() {
@@ -357,14 +360,40 @@ export default function CourseLearnPage() {
         )}
       </div>
       <div className="flex-1 overflow-y-auto">
-        {modules.map((mod) => (
-          <div key={mod.id} className="border-b border-border">
-            <button onClick={() => toggleModule(mod.id)}
-              className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium hover:bg-muted/50 transition-colors text-left">
-              <span className="truncate">{mod.title}</span>
-              {expandedModules[mod.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        {modules.map((mod) => {
+          const isLocked = mod.is_locked === true;
+          return (
+          <div key={mod.id} className={`border-b border-border ${isLocked ? 'opacity-60' : ''}`}>
+            <button
+              onClick={() => !isLocked && toggleModule(mod.id)}
+              disabled={isLocked}
+              className={`w-full px-4 py-3 flex items-center justify-between text-sm font-medium transition-colors text-left ${isLocked ? 'cursor-not-allowed' : 'hover:bg-muted/50'}`}>
+              <span className="truncate flex items-center gap-2">
+                {isLocked ? <Lock size={14} className="text-muted-foreground shrink-0" /> : null}
+                {mod.title}
+              </span>
+              {isLocked ? (
+                <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                  {mod.days_until_unlock && mod.days_until_unlock > 0
+                    ? `${mod.days_until_unlock}d`
+                    : ''}
+                </span>
+              ) : (
+                expandedModules[mod.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />
+              )}
             </button>
-            {expandedModules[mod.id] && (
+            {isLocked && (
+              <div className="px-4 pb-3">
+                <p className="text-xs text-muted-foreground">
+                  🔒 Disponível {mod.days_until_unlock === 1 ? 'amanhã' : `em ${mod.days_until_unlock} dias`}
+                </p>
+                <div className="w-full h-1 bg-muted rounded-full mt-1.5 overflow-hidden">
+                  <div className="h-full bg-accent/40 rounded-full"
+                    style={{ width: `${mod.drip_days ? Math.min(100, ((mod.drip_days - (mod.days_until_unlock || 0)) / mod.drip_days) * 100) : 0}%` }} />
+                </div>
+              </div>
+            )}
+            {!isLocked && expandedModules[mod.id] && (
               <div className="divide-y divide-border">
                 {mod.lessons.map((lesson) => {
                   const isCompleted = completedIds.has(lesson.id);
@@ -446,7 +475,8 @@ export default function CourseLearnPage() {
               </div>
             )}
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );

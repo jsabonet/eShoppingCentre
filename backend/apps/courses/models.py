@@ -22,6 +22,10 @@ class CourseModule(BaseModel):
     title = models.CharField(max_length=500)
     description = models.TextField(blank=True)
     sort_order = models.PositiveIntegerField(default=0)
+    drip_days = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Dias após matrícula para desbloquear este módulo. Null = imediato.'
+    )
 
     class Meta:
         ordering = ['sort_order']
