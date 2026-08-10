@@ -188,6 +188,8 @@ class AnswerOptionSerializer(serializers.ModelSerializer):
 
 
 class AnswerOptionWriteSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(required=False)  # Explicito — editable=False no modelo faz DRF tratar como read_only
+
     class Meta:
         model = AnswerOption
         fields = ('id', 'text', 'is_correct', 'sort_order')
