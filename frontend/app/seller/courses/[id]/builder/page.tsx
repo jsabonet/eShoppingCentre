@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Plus, GripVertical, Eye, EyeOff, Trash2, ChevronDown, ChevronRight,
-  Save, ArrowLeft, Play, FileText, Upload, Paperclip, Download, X
+  Save, ArrowLeft, Play, FileText, Upload, Paperclip, Download, X, Clock
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -305,7 +305,7 @@ export default function CourseBuilderPage() {
           {modules.map((mod) => (
             <div key={mod.id} className="border border-border rounded-xl bg-card overflow-hidden">
               {/* Module Header */}
-              <div className="flex items-center gap-3 p-4 hover:bg-muted/20 transition-colors">
+              <div className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 hover:bg-muted/20 transition-colors flex-wrap">
                 <button onClick={() => toggleModule(mod.id)} className="p-0.5">
                   {expandedModules.has(mod.id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
@@ -317,23 +317,26 @@ export default function CourseBuilderPage() {
                   className="flex-1 px-2 py-1 border border-transparent hover:border-border rounded bg-transparent focus:outline-none focus:ring-2 focus:ring-ring font-bold"
                   placeholder="Titulo do modulo..."
                 />
-                <span className="text-xs text-muted-foreground">{mod.lessons.length} aulas</span>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <span>🔓</span>
+                <span className="text-xs text-muted-foreground hidden sm:inline">{mod.lessons.length} aulas</span>
+                {/* Drip content */}
+                <div className={`flex items-center gap-1.5 text-xs rounded-lg px-2 py-1 shrink-0 ${(mod.drip_days ?? 0) > 0 ? 'bg-accent/10 text-accent' : 'bg-muted/40 text-muted-foreground'}`}
+                  title={(mod.drip_days ?? 0) > 0 ? `Desbloqueia ${mod.drip_days} dias após matrícula` : 'Disponível imediatamente'}>
+                  <Clock size={12} className="shrink-0" />
                   <input
                     type="number"
                     min="0"
+                    max="365"
                     defaultValue={mod.drip_days ?? ''}
                     placeholder="0"
-                    title="Dias até desbloquear (0 = imediato)"
+                    title="Drip: dias após matrícula para desbloquear (0 = imediato)"
                     onBlur={(e) => {
                       const val = e.target.value.trim();
-                      const num = val === '' || val === '0' ? null : Math.max(0, parseInt(val) || 0);
+                      const num = val === '' || val === '0' ? null : Math.max(0, Math.min(365, parseInt(val) || 0));
                       updateModuleDrip(mod.id, num);
                     }}
-                    className="w-12 px-1 py-0.5 border border-transparent hover:border-border rounded bg-transparent text-center focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="w-10 px-0.5 py-0.5 bg-transparent text-center font-medium focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span>d</span>
+                  <span className="text-muted-foreground shrink-0">dias</span>
                 </div>
                 <button onClick={() => deleteModule(mod.id)} className="p-1 text-muted-foreground hover:text-red-500 transition-colors">
                   <Trash2 size={16} />
