@@ -45,6 +45,7 @@ interface ModuleData {
   description: string;
   sort_order: number;
   lessons: LessonData[];
+  drip_days?: number | null;
 }
 
 export default function CourseBuilderPage() {
@@ -135,6 +136,16 @@ export default function CourseBuilderPage() {
       await fetch(`${API_URL}/courses/modules/${moduleId}/`, {
         method: 'PUT', headers: apiHeaders(),
         body: JSON.stringify({ title }),
+      });
+    } catch {}
+  };
+
+  const updateModuleDrip = async (moduleId: string, drip_days: number | null) => {
+    setModules(prev => prev.map(m => m.id === moduleId ? { ...m, drip_days } : m));
+    try {
+      await fetch(`${API_URL}/courses/modules/${moduleId}/`, {
+        method: 'PUT', headers: apiHeaders(),
+        body: JSON.stringify({ drip_days }),
       });
     } catch {}
   };
@@ -307,6 +318,23 @@ export default function CourseBuilderPage() {
                   placeholder="Titulo do modulo..."
                 />
                 <span className="text-xs text-muted-foreground">{mod.lessons.length} aulas</span>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span>🔓</span>
+                  <input
+                    type="number"
+                    min="0"
+                    defaultValue={mod.drip_days ?? ''}
+                    placeholder="0"
+                    title="Dias até desbloquear (0 = imediato)"
+                    onBlur={(e) => {
+                      const val = e.target.value.trim();
+                      const num = val === '' || val === '0' ? null : Math.max(0, parseInt(val) || 0);
+                      updateModuleDrip(mod.id, num);
+                    }}
+                    className="w-12 px-1 py-0.5 border border-transparent hover:border-border rounded bg-transparent text-center focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <span>d</span>
+                </div>
                 <button onClick={() => deleteModule(mod.id)} className="p-1 text-muted-foreground hover:text-red-500 transition-colors">
                   <Trash2 size={16} />
                 </button>
