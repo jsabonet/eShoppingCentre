@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, Clock, Star, Users, BookOpen, PlayCircle, CheckCircle, ShoppingCart, Loader2 } from 'lucide-react';
+import { ChevronRight, Clock, Star, Users, BookOpen, PlayCircle, CheckCircle, ShoppingCart } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import ReviewList from '@/src/components/ReviewList';
+import ReviewForm from '@/src/components/ReviewForm';
 import { useCart } from '@/src/contexts/CartContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -21,6 +23,14 @@ interface LessonData {
   description: string;
   duration: string;
   is_free_preview: boolean;
+}
+
+interface ModuleData {
+  id: string;
+  title: string;
+  description: string;
+  sort_order: number;
+  lessons: LessonData[];
 }
 
 interface ModuleData {
@@ -58,6 +68,17 @@ export default function CourseDetailPage() {
   const [notFoundErr, setNotFoundErr] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const { addToCart } = useCart();
+  // ─── Reviews ───
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewStats, setReviewStats] = useState<any>(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [activeRatingFilter, setActiveRatingFilter] = useState<number | null>(null);
+  const [enrollmentIdForReview, setEnrollmentIdForReview] = useState<string | null>(null);
+  const [alreadyReviewedCourse, setAlreadyReviewedCourse] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewFormError, setReviewFormError] = useState('');
+  const [reviewFormSuccess, setReviewFormSuccess] = useState('');
 
   useEffect(() => {
     if (!paramsSlug) return;
@@ -78,12 +99,58 @@ export default function CourseDetailPage() {
               const enrData = await enrRes.json();
               const enrollments = enrData.results || enrData || [];
               setIsEnrolled(enrollments.some((e: any) => e.course_id === data.id));
+              // Get enrollment ID for review
+              const myEnr = enrollments.find((e: any) => e.course_id === data.id);
+              if (myEnr) setEnrollmentIdForReview(myEnr.id);
+              // Check if already reviewed
+              try {
+                const revsRes = await fetch(`${API_URL}/courses/me/reviews/`, {
+                  headers: { 'Authorization': `Bearer ${token}` },
+                });
+                if (revsRes.ok) {
+                  const revsData = await revsRes.json();
+                  const myReviews = revsData.results || revsData || [];
+                  setAlreadyReviewedCourse(myReviews.some((r: any) => r.enrollment_id === myEnr?.id));
+                }
+              } catch {}
             }
           }
+          // ─── Fetch reviews ───
+          setReviewsLoading(true);
+          try {
+            const [rvRes, stRes] = await Promise.all([
+              fetch(`${API_URL}/courses/${paramsSlug}/reviews/${activeRatingFilter ? `?rating=${activeRatingFilter}` : ''}`),
+              fetch(`${API_URL}/courses/${paramsSlug}/reviews/stats/`),
+            ]);
+            if (rvRes.ok) {
+              const rvData = await rvRes.json();
+              setReviews(rvData.results || rvData || []);
+            }
+            if (stRes.ok) {
+              const stData = await stRes.json();
+              setReviewStats(stData);
+            }
+          } catch {} finally { setReviewsLoading(false); }
         }
       } catch {} finally { setLoading(false); }
     })();
   }, [paramsSlug]);
+
+  // Re-fetch reviews when filter changes
+  useEffect(() => {
+    if (!paramsSlug) return;
+    (async () => {
+      setReviewsLoading(true);
+      try {
+        const url = `${API_URL}/courses/${paramsSlug}/reviews/${activeRatingFilter ? `?rating=${activeRatingFilter}` : ''}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          setReviews(data.results || data || []);
+        }
+      } catch {} finally { setReviewsLoading(false); }
+    })();
+  }, [activeRatingFilter, paramsSlug]);
 
   if (loading) {
     return (
@@ -135,6 +202,39 @@ export default function CourseDetailPage() {
       productType: 'course' as const,
     } as any);
     window.location.href = '/checkout';
+  };
+
+  const handleReviewSubmit = async (data: { rating: number; title: string; body: string }) => {
+    if (!enrollmentIdForReview) return;
+    setReviewSubmitting(true);
+    setReviewFormError('');
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`${API_URL}/courses/reviews/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ enrollment_id: enrollmentIdForReview, ...data, is_public: true }),
+      });
+      if (res.ok) {
+        setReviewFormSuccess('Avaliação enviada! 🎉');
+        setAlreadyReviewedCourse(true);
+        setTimeout(() => setShowReviewForm(false), 1500);
+        refreshReviews();
+      } else {
+        const err = await res.json();
+        setReviewFormError(err.detail || Object.values(err).flat().join(', ') || 'Erro.');
+      }
+    } catch { setReviewFormError('Erro de rede.'); }
+    finally { setReviewSubmitting(false); }
+  };
+
+  const refreshReviews = async () => {
+    const [rvRes, stRes] = await Promise.all([
+      fetch(`${API_URL}/courses/${paramsSlug}/reviews/${activeRatingFilter ? `?rating=${activeRatingFilter}` : ''}`),
+      fetch(`${API_URL}/courses/${paramsSlug}/reviews/stats/`),
+    ]);
+    if (rvRes.ok) { const d = await rvRes.json(); setReviews(d.results || d || []); }
+    if (stRes.ok) { const d = await stRes.json(); setReviewStats(d); }
   };
 
   return (
@@ -254,6 +354,34 @@ export default function CourseDetailPage() {
           )}
         </div>
       </section>
+
+      {/* Reviews */}
+      <section className="max-w-[1500px] mx-auto px-4 py-10 border-t border-border">
+        <div className="max-w-3xl">
+          <h2 className="text-2xl font-bold mb-6">Avaliações dos Alunos</h2>
+          <ReviewList
+            reviews={reviews}
+            stats={reviewStats}
+            loading={reviewsLoading}
+            activeRatingFilter={activeRatingFilter}
+            onFilterChange={setActiveRatingFilter}
+            canReview={isEnrolled}
+            alreadyReviewed={alreadyReviewedCourse}
+            onWriteReview={() => { setShowReviewForm(true); setReviewFormError(''); setReviewFormSuccess(''); }}
+            emptyMessage="Este curso ainda não tem avaliações."
+          />
+        </div>
+      </section>
+
+      <ReviewForm
+        open={showReviewForm}
+        onClose={() => setShowReviewForm(false)}
+        onSubmit={handleReviewSubmit}
+        subjectName={course?.title || ''}
+        submitting={reviewSubmitting}
+        error={reviewFormError}
+        success={reviewFormSuccess}
+      />
     </>
   );
 }

@@ -2,10 +2,12 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from django.db import transaction
+from django.db import transaction, models
+from django.db.models import Count, Avg
 from .models import (
     Course, CourseModule, CourseLesson, Enrollment, LessonProgress, LessonAttachment,
     Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
+    CourseReview,
 )
 from .serializers import (
     CourseListSerializer, CourseDetailSerializer,
@@ -13,11 +15,15 @@ from .serializers import (
     CourseModuleSerializer, CourseModuleWriteSerializer, CourseLessonWriteSerializer,
     QuizSerializer, QuizWriteSerializer, QuizListSerializer,
     QuizAttemptSerializer, QuizAttemptListSerializer, QuizSubmitSerializer,
+    CourseReviewSerializer, CourseReviewCreateSerializer,
+    CourseReviewUpdateSerializer, SellerReplySerializer,
 )
 
 
 class CourseListView(generics.ListAPIView):
-    queryset = Course.objects.filter(product__status='active').select_related('product', 'instructor')
+    queryset = Course.objects.filter(product__status='active').select_related('product', 'instructor').annotate(
+        _real_lesson_count=Count('modules__lessons', distinct=True)
+    )
     serializer_class = CourseListSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -34,7 +40,12 @@ class MyEnrollmentsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Enrollment.objects.filter(user=self.request.user).select_related('course__product')
+        return Enrollment.objects.filter(user=self.request.user).select_related(
+            'course__product'
+        ).annotate(
+            _real_lesson_count=Count('course__modules__lessons', distinct=True),
+            _completed_lesson_count=Count('lesson_progress', filter=models.Q(lesson_progress__completed=True), distinct=True),
+        )
 
 
 class CompleteLessonView(APIView):
@@ -866,3 +877,182 @@ class QuizAttemptListView(generics.ListAPIView):
         return QuizAttempt.objects.filter(
             enrollment=enrollment, quiz=quiz
         ).order_by('-attempt_number')
+
+
+# ═══════════════════════════════════════════
+#  COURSE REVIEWS
+# ═══════════════════════════════════════════
+
+
+class CourseReviewListView(generics.ListAPIView):
+    """
+    GET /api/v1/courses/{product__slug}/reviews/
+    Lista todas as reviews públicas de um curso.
+    Aceita query params: ?rating=5 para filtrar por estrelas.
+    """
+    serializer_class = CourseReviewSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        slug = self.kwargs['product__slug']
+        qs = CourseReview.objects.filter(
+            course__product__slug=slug,
+            is_public=True,
+            is_hidden=False,
+        ).select_related('enrollment__user', 'course__product').order_by('-created_at')
+
+        rating_filter = self.request.query_params.get('rating')
+        if rating_filter:
+            try:
+                qs = qs.filter(rating=int(rating_filter))
+            except (ValueError, TypeError):
+                pass
+
+        return qs
+
+
+class CourseReviewCreateView(generics.CreateAPIView):
+    """
+    POST /api/v1/courses/reviews/
+    Cria uma nova review de curso.
+    Body: { enrollment_id, rating, title?, body, is_public? }
+
+    Permite múltiplas reviews por utilizador — sem restrição unique.
+    """
+    serializer_class = CourseReviewCreateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        _update_course_rating(instance.course)
+
+
+class CourseReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET    /api/v1/courses/reviews/{review_id}/  — Detalhe da review
+    PUT    /api/v1/courses/reviews/{review_id}/  — Editar review (autor)
+    DELETE /api/v1/courses/reviews/{review_id}/  — Remover review (autor)
+    """
+    queryset = CourseReview.objects.all().select_related('enrollment__user', 'course__product')
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+    lookup_url_kwarg = 'review_id'
+
+    def get_serializer_class(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return CourseReviewUpdateSerializer
+        return CourseReviewSerializer
+
+    def get_queryset(self):
+        # Anónimos não podem ver reviews privadas
+        qs = super().get_queryset()
+        if not self.request.user.is_authenticated:
+            qs = qs.filter(is_public=True, is_hidden=False)
+        return qs
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method in ('PUT', 'PATCH', 'DELETE'):
+            # Só o autor pode editar/remover
+            if obj.enrollment.user != request.user:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied('Apenas o autor pode modificar esta review.')
+
+    def perform_update(self, serializer):
+        instance = serializer.save(is_edited=True)
+        _update_course_rating(instance.course)
+
+    def perform_destroy(self, instance):
+        course = instance.course
+        instance.delete()
+        _update_course_rating(course)
+
+
+class CourseReviewReplyView(APIView):
+    """
+    POST /api/v1/courses/reviews/{review_id}/reply/
+    O instrutor do curso responde a uma review.
+    Body: { seller_reply: "..." }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, review_id):
+        review = get_object_or_404(CourseReview, id=review_id)
+
+        # Verificar se o request.user é o dono da loja do curso
+        if review.course.product.store.owner != request.user:
+            return Response(
+                {'detail': 'Apenas o instrutor deste curso pode responder.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = SellerReplySerializer(review, data=request.data, partial=True)
+        if serializer.is_valid():
+            from django.utils import timezone
+            serializer.save(seller_replied_at=timezone.now())
+            return Response(CourseReviewSerializer(review, context={'request': request}).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MyCourseReviewsView(generics.ListAPIView):
+    """
+    GET /api/v1/courses/me/reviews/
+    Lista todas as reviews feitas pelo utilizador autenticado.
+    """
+    serializer_class = CourseReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return CourseReview.objects.filter(
+            enrollment__user=self.request.user,
+        ).select_related('enrollment', 'course__product').order_by('-created_at')
+
+
+class CourseReviewStatsView(APIView):
+    """
+    GET /api/v1/courses/{product__slug}/reviews/stats/
+    Estatísticas agregadas: rating médio, distribuição por estrelas, total.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, product__slug):
+        from django.db.models import Count
+        course = get_object_or_404(Course, product__slug=product__slug, product__status='active')
+
+        qs = CourseReview.objects.filter(course=course, is_public=True, is_hidden=False)
+        total = qs.count()
+        avg_rating = qs.aggregate(avg=Avg('rating'))['avg'] or 0
+
+        # Distribuição por rating (1-5)
+        distribution = (
+            qs.values('rating')
+            .annotate(count=Count('id'))
+            .order_by('rating')
+        )
+        dist_map = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for d in distribution:
+            dist_map[d['rating']] = d['count']
+
+        return Response({
+            'average_rating': round(float(avg_rating), 2),
+            'total_reviews': total,
+            'distribution': [
+                {'rating': r, 'count': dist_map[r], 'percentage': round(dist_map[r] / total * 100) if total > 0 else 0}
+                for r in [5, 4, 3, 2, 1]
+            ],
+        })
+
+
+# ─── Helper ───
+
+def _update_course_rating(course):
+    """Recalcula e actualiza o rating do produto associado ao curso."""
+    from django.db.models import Avg
+    stats = CourseReview.objects.filter(
+        course=course, is_public=True, is_hidden=False
+    ).aggregate(avg=Avg('rating'), count=models.Count('id'))
+
+    product = course.product
+    product.rating = round(stats['avg'] or 0, 2)
+    product.review_count = stats['count'] or 0
+    product.save(update_fields=['rating', 'review_count'])

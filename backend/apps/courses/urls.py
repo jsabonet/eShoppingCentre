@@ -9,7 +9,16 @@ from .views_cloudflare import (
 
 urlpatterns = [
     path('', views.CourseListView.as_view(), name='course_list'),
+    # ─── Reviews (antes do <slug> genérico para evitar conflito) ───
+    path('reviews/', views.CourseReviewCreateView.as_view(), name='course_review_create'),
+    path('reviews/<uuid:review_id>/', views.CourseReviewDetailView.as_view(), name='course_review_detail'),
+    path('reviews/<uuid:review_id>/reply/', views.CourseReviewReplyView.as_view(), name='course_review_reply'),
+    path('me/reviews/', views.MyCourseReviewsView.as_view(), name='my_course_reviews'),
+    # ─── Detalhe do curso (slug) ───
     path('<slug:product__slug>/', views.CourseDetailView.as_view(), name='course_detail'),
+    # ─── Reviews de um curso ───
+    path('<slug:product__slug>/reviews/', views.CourseReviewListView.as_view(), name='course_review_list'),
+    path('<slug:product__slug>/reviews/stats/', views.CourseReviewStatsView.as_view(), name='course_review_stats'),
     # Enrollment & Progress
     path('<uuid:course_id>/enroll/', views.EnrollView.as_view(), name='enroll'),
     path('<uuid:course_id>/progress/', views.CourseProgressView.as_view(), name='course_progress'),

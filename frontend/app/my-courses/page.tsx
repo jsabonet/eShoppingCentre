@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { BookOpen, Clock, PlayCircle, Award, ChevronRight, AlertCircle } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, Award, ChevronRight, AlertCircle, Star } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import ReviewForm from '@/src/components/ReviewForm';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -36,6 +37,12 @@ function timeAgo(iso: string): string {
 export default function MyCoursesPage() {
   const [enrollments, setEnrollments] = useState<EnrollmentData[]>([]);
   const [loading, setLoading] = useState(true);
+  // ─── Review modal ───
+  const [reviewModal, setReviewModal] = useState<{ open: boolean; enrollment: EnrollmentData | null }>({ open: false, enrollment: null });
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewDone, setReviewDone] = useState<Set<string>>(new Set());
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState('');
 
   const fetchEnrollments = useCallback(async () => {
     try {
@@ -52,6 +59,30 @@ export default function MyCoursesPage() {
       }
     } catch {} finally { setLoading(false); }
   }, []);
+
+  // Fetch existing reviews to know which courses are already reviewed
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    fetch(`${API_URL}/courses/me/reviews/`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        const reviewed = new Set<string>();
+        (data.results || data || []).forEach((r: any) => {
+          if (r.enrollment_id) reviewed.add(r.enrollment_id);
+        });
+        setReviewDone(reviewed);
+      })
+      .catch(() => {});
+  }, []);
+
+  const openReviewModal = (enr: EnrollmentData) => {
+    setReviewModal({ open: true, enrollment: enr });
+    setReviewError('');
+    setReviewSuccess('');
+  };
 
   useEffect(() => { fetchEnrollments(); }, [fetchEnrollments]);
 
@@ -124,6 +155,20 @@ export default function MyCoursesPage() {
                     {enr.completed ? 'Rever' : 'Continuar'} <PlayCircle size={14} />
                   </span>
                 </div>
+                {/* Review button for completed courses */}
+                {enr.completed && !reviewDone.has(enr.id) && (
+                  <button
+                    onClick={(e) => { e.preventDefault(); openReviewModal(enr); }}
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors"
+                  >
+                    <Star size={14} /> Avaliar Curso
+                  </button>
+                )}
+                {enr.completed && reviewDone.has(enr.id) && (
+                  <p className="mt-3 text-xs text-green-600 flex items-center justify-center gap-1">
+                    <Star size={12} className="fill-green-600" /> Já avaliado
+                  </p>
+                )}
                 {enr.access_expires_at && (
                   <div className="mt-2 text-xs flex items-center gap-1 text-amber-600">
                     <AlertCircle size={12} />
@@ -135,6 +180,35 @@ export default function MyCoursesPage() {
           ))}
         </div>
       )}
+
+      <ReviewForm
+        open={reviewModal.open}
+        onClose={() => setReviewModal({ open: false, enrollment: null })}
+        onSubmit={async (data) => {
+          if (!reviewModal.enrollment) return;
+          setReviewSubmitting(true); setReviewError('');
+          try {
+            const token = localStorage.getItem('access_token');
+            const res = await fetch(`${API_URL}/courses/reviews/`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ enrollment_id: reviewModal.enrollment.id, ...data, is_public: true }),
+            });
+            if (res.ok) {
+              setReviewSuccess('Avaliação enviada! Obrigado!');
+              setReviewDone(prev => new Set(prev).add(reviewModal.enrollment!.id));
+              setTimeout(() => setReviewModal({ open: false, enrollment: null }), 1500);
+            } else {
+              const err = await res.json();
+              setReviewError(err.detail || Object.values(err).flat().join(', ') || 'Erro.');
+            }
+          } catch { setReviewError('Erro de rede.'); }
+          finally { setReviewSubmitting(false); }
+        }}
+        subjectName={reviewModal.enrollment?.course_title || ''}
+        submitting={reviewSubmitting}
+        error={reviewError}
+        success={reviewSuccess}
+      />
     </main>
   );
 }

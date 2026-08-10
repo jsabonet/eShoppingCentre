@@ -6,11 +6,12 @@ import Link from 'next/link';
 import {
   ArrowLeft, PlayCircle, CheckCircle, ChevronDown, ChevronUp,
   Menu, X, BookOpen, Loader2, AlertTriangle, FileText, Download, Paperclip,
-  HelpCircle, Trophy
+  HelpCircle, Trophy, Star
 } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import CourseVideoPlayer from '@/src/components/CourseVideoPlayer';
 import QuizTaker from '@/src/components/QuizTaker';
+import ReviewForm from '@/src/components/ReviewForm';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -74,6 +75,14 @@ export default function CourseLearnPage() {
   const [attachments, setAttachments] = useState<{ id: string; title: string; file_url: string; file_name: string; file_size: number; file_type: string; }[]>([]);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSelectedRef = useRef(false); // evita loop de fetchCourse → setCurrentLessonId
+  // ─── Course completion & review ───
+  const [courseCompleted, setCourseCompleted] = useState(false);
+  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState('');
 
   const apiHeaders = () => {
     const token = localStorage.getItem('access_token');
@@ -93,6 +102,7 @@ export default function CourseLearnPage() {
 
         // Progress
         setCompletedIds(new Set(data.completed_ids || []));
+        setCourseCompleted(data.completed || false);
 
         // Quiz attempts
         setQuizAttempts(data.quiz_attempts || {});
@@ -146,6 +156,47 @@ export default function CourseLearnPage() {
   }, [currentLessonId, watchedMap]);
 
   useEffect(() => { fetchCourse(); }, [fetchCourse]);
+
+  // Fetch enrollment ID and check if already reviewed
+  useEffect(() => {
+    if (!courseCompleted || !courseId) return;
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    (async () => {
+      try {
+        // 1. Get enrollment ID
+        const enrRes = await fetch(`${API_URL}/courses/me/enrollments/`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (enrRes.ok) {
+          const enrData = await enrRes.json();
+          const enrollments = enrData.results || enrData || [];
+          const enr = enrollments.find((e: any) => e.course_id === courseId);
+          if (enr) setEnrollmentId(enr.id);
+        }
+        // 2. Check if already reviewed
+        const revRes = await fetch(`${API_URL}/courses/me/reviews/`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (revRes.ok) {
+          const revData = await revRes.json();
+          const reviews = revData.results || revData || [];
+          const enrIdsWithReviews = new Set(reviews.map((r: any) => r.enrollment_id));
+          const enrRes2 = await fetch(`${API_URL}/courses/me/enrollments/`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (enrRes2.ok) {
+            const enrData2 = await enrRes2.json();
+            const enrollments2 = enrData2.results || enrData2 || [];
+            const myEnr = enrollments2.find((e: any) => e.course_id === courseId);
+            if (myEnr && enrIdsWithReviews.has(myEnr.id)) {
+              setAlreadyReviewed(true);
+            }
+          }
+        }
+      } catch {}
+    })();
+  }, [courseCompleted, courseId]);
 
   const toggleModule = (id: string) => {
     setExpandedModules(prev => ({ ...prev, [id]: !prev[id] }));
@@ -244,10 +295,17 @@ export default function CourseLearnPage() {
       });
       if (res.ok) {
         setCompletedIds(prev => new Set([...prev, currentLessonId]));
+        const data = await res.json();
+        // Check if course is now completed
+        if (data.completed) {
+          setCourseCompleted(true);
+          // Refresh course data to get updated state
+          fetchCourse();
+        }
         // NAO avanca automaticamente — deixa o aluno decidir
       }
     } catch {} finally { setCompleting(false); }
-  }, [currentLessonId, completing, watchedMap, saveWatchProgress]);
+  }, [currentLessonId, completing, watchedMap, saveWatchProgress, fetchCourse]);
 
   const markComplete = async () => {
     if (!currentLessonId || completing) return;
@@ -280,6 +338,23 @@ export default function CourseLearnPage() {
         <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
           <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0}%` }} />
         </div>
+        {/* Review button — appears when course is completed */}
+        {courseCompleted && (
+          <div className="mt-3">
+            {alreadyReviewed ? (
+              <p className="text-xs text-green-600 flex items-center gap-1">
+                <Star size={12} className="fill-green-600" /> Já avaliado
+              </p>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); setReviewModalOpen(true); }}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors"
+              >
+                <Star size={14} /> Avaliar Curso
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         {modules.map((mod) => (
@@ -402,6 +477,7 @@ export default function CourseLearnPage() {
   const isCompleted = currentLessonId ? completedIds.has(currentLessonId) : false;
 
   return (
+    <>
     <div className="h-[calc(100vh-64px)] flex">
       {/* Sidebar Desktop */}
       <aside className="hidden lg:block w-80 bg-card border-r border-border flex-shrink-0">
@@ -571,5 +647,35 @@ export default function CourseLearnPage() {
         )}
       </div>
     </div>
+    {/* ─── Review Modal ─── */}
+    <ReviewForm
+      open={reviewModalOpen}
+      onClose={() => setReviewModalOpen(false)}
+      onSubmit={async (data) => {
+        if (!enrollmentId) return;
+        setReviewSubmitting(true); setReviewError('');
+        try {
+          const token = localStorage.getItem('access_token');
+          const res = await fetch(`${API_URL}/courses/reviews/`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ enrollment_id: enrollmentId, ...data, is_public: true }),
+          });
+          if (res.ok) {
+            setReviewSuccess('Avaliação enviada! 🎉');
+            setAlreadyReviewed(true);
+            setTimeout(() => setReviewModalOpen(false), 1500);
+          } else {
+            const err = await res.json();
+            setReviewError(err.detail || Object.values(err).flat().join(', ') || 'Erro.');
+          }
+        } catch { setReviewError('Erro de rede.'); }
+        finally { setReviewSubmitting(false); }
+      }}
+      subjectName={courseTitle}
+      submitting={reviewSubmitting}
+      error={reviewError}
+      success={reviewSuccess}
+    />
+    </>
   );
 }

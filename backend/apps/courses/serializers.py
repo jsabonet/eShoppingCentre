@@ -1,8 +1,9 @@
 from rest_framework import serializers
-from django.db.models import Sum
+from django.db.models import Sum, Avg
 from .models import (
     Course, CourseModule, CourseLesson, Enrollment, LessonProgress,
     Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
+    CourseReview,
 )
 
 
@@ -113,6 +114,7 @@ class CourseListSerializer(serializers.ModelSerializer):
     rating = serializers.DecimalField(source='product.rating', max_digits=3, decimal_places=2, read_only=True)
     students_count = serializers.SerializerMethodField()
     instructor_name = serializers.CharField(source='instructor.first_name', read_only=True)
+    total_lessons = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -129,6 +131,14 @@ class CourseListSerializer(serializers.ModelSerializer):
 
     def get_students_count(self, obj):
         return obj.enrollments.count()
+
+    def get_total_lessons(self, obj):
+        """Conta as aulas reais. Usa campo anotado se disponivel, senao conta via DB. Fallback: total_lessons do modelo."""
+        if hasattr(obj, '_real_lesson_count') and obj._real_lesson_count is not None:
+            count = obj._real_lesson_count
+        else:
+            count = CourseLesson.objects.filter(module__course=obj).count()
+        return count if count > 0 else obj.total_lessons
 
 
 class CourseDetailSerializer(serializers.ModelSerializer):
@@ -161,7 +171,8 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source='course.product.name', read_only=True)
     course_slug = serializers.CharField(source='course.product.slug', read_only=True)
     course_id = serializers.UUIDField(source='course.id', read_only=True)
-    total_lessons = serializers.IntegerField(source='course.total_lessons', read_only=True)
+    total_lessons = serializers.SerializerMethodField()
+    progress = serializers.SerializerMethodField()
     access_duration_days = serializers.IntegerField(source='course.access_duration_days', read_only=True)
     image = serializers.SerializerMethodField()
 
@@ -177,6 +188,27 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             request = self.context.get('request')
             return request.build_absolute_uri(img.image.url) if request else img.image.url
         return None
+
+    def get_total_lessons(self, obj):
+        """Conta as aulas reais. Usa campo anotado se disponivel. Fallback: total_lessons do modelo."""
+        if hasattr(obj, '_real_lesson_count') and obj._real_lesson_count is not None:
+            count = obj._real_lesson_count
+        else:
+            count = CourseLesson.objects.filter(module__course=obj.course).count()
+        return count if count > 0 else obj.course.total_lessons
+
+    def get_progress(self, obj):
+        """Calcula o progresso real: aulas concluidas / total de aulas reais * 100."""
+        total = self.get_total_lessons(obj)
+        if total == 0:
+            return 0.0
+
+        if hasattr(obj, '_completed_lesson_count') and obj._completed_lesson_count is not None:
+            completed = obj._completed_lesson_count
+        else:
+            completed = obj.lesson_progress.filter(completed=True).count()
+
+        return round((completed / total) * 100, 2)
 
 
 # ─── Quizzes / Avaliações ───
@@ -322,3 +354,84 @@ class QuizAttemptListSerializer(serializers.ModelSerializer):
         fields = ('id', 'quiz_id', 'quiz_title', 'score', 'total_points',
                   'earned_points', 'passed', 'pass_percentage',
                   'attempt_number', 'started_at', 'completed_at')
+
+
+# ─── Course Reviews ───
+
+class CourseReviewSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_avatar = serializers.SerializerMethodField()
+    course_title = serializers.CharField(source='course.product.name', read_only=True)
+
+    class Meta:
+        model = CourseReview
+        fields = (
+            'id', 'enrollment_id', 'course_id', 'course_title',
+            'user_name', 'user_avatar', 'rating', 'title', 'body',
+            'is_public', 'is_edited', 'seller_reply', 'seller_replied_at',
+            'report_count', 'created_at', 'updated_at',
+        )
+        read_only_fields = (
+            'enrollment_id', 'course_id', 'course_title',
+            'is_edited', 'seller_replied_at', 'report_count',
+        )
+
+    def get_user_name(self, obj):
+        name = obj.enrollment.user.first_name
+        if name:
+            return name
+        email = obj.enrollment.user.email
+        return email.split('@')[0] if '@' in email else email
+
+    def get_user_avatar(self, obj):
+        user = obj.enrollment.user
+        if hasattr(user, 'avatar') and user.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(user.avatar.url)
+            return user.avatar.url
+        return None
+
+
+class CourseReviewCreateSerializer(serializers.ModelSerializer):
+    """Serializer para criação de review — enrollment_id vem do body."""
+    enrollment_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = CourseReview
+        fields = ('enrollment_id', 'rating', 'title', 'body', 'is_public')
+        extra_kwargs = {
+            'rating': {'required': True, 'min_value': 1, 'max_value': 5},
+            'body': {'required': True},
+        }
+
+    def validate_enrollment_id(self, value):
+        """Garante que o enrollment pertence ao user autenticado."""
+        user = self.context['request'].user
+        try:
+            enrollment = Enrollment.objects.get(id=value, user=user)
+        except Enrollment.DoesNotExist:
+            raise serializers.ValidationError('Matrícula não encontrada ou não pertence a este utilizador.')
+        return enrollment
+
+    def create(self, validated_data):
+        enrollment = validated_data.pop('enrollment_id')
+        validated_data['enrollment'] = enrollment
+        validated_data['course'] = enrollment.course
+        return super().create(validated_data)
+
+
+class CourseReviewUpdateSerializer(serializers.ModelSerializer):
+    """Serializer para editar a própria review (aluno) ou responder (instrutor)."""
+
+    class Meta:
+        model = CourseReview
+        fields = ('rating', 'title', 'body', 'is_public')
+
+
+class SellerReplySerializer(serializers.ModelSerializer):
+    """Serializer para o instrutor responder a uma review."""
+
+    class Meta:
+        model = CourseReview
+        fields = ('seller_reply',)

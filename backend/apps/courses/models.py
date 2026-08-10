@@ -236,3 +236,46 @@ class QuizAnswer(BaseModel):
 
     def __str__(self):
         return f'Resposta: {self.question.text[:50]}'
+
+
+# ─── Course Reviews ───
+
+class CourseReview(BaseModel):
+    """
+    Review de curso feita por um aluno.
+    Permite múltiplas reviews por utilizador (sem unique_together).
+    Ligada ao Enrollment para garantir que o aluno está matriculado.
+    """
+    enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.CASCADE, related_name='reviews',
+        help_text='Matrícula do aluno que fez a review.'
+    )
+    course = models.ForeignKey(
+        Course, on_delete=models.CASCADE, related_name='reviews',
+        help_text='Curso avaliado (denormalizado para queries mais rápidas).'
+    )
+    rating = models.PositiveSmallIntegerField(
+        help_text='Avaliação de 1 a 5 estrelas.'
+    )
+    title = models.CharField(max_length=255, blank=True, help_text='Título da review.')
+    body = models.TextField(help_text='Comentário da review.')
+    is_public = models.BooleanField(default=True, help_text='Se False, visível apenas para o autor.')
+    is_edited = models.BooleanField(default=False, help_text='Indica se a review foi editada.')
+
+    # Seller reply
+    seller_reply = models.TextField(blank=True, help_text='Resposta do instrutor.')
+    seller_replied_at = models.DateTimeField(null=True, blank=True)
+
+    # Moderation
+    report_count = models.PositiveIntegerField(default=0)
+    is_hidden = models.BooleanField(default=False, help_text='Ocultado por moderação.')
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['course', '-created_at']),
+            models.Index(fields=['enrollment']),
+        ]
+
+    def __str__(self):
+        return f'{self.enrollment.user.email} — {self.course.product.name} ({self.rating}★)'

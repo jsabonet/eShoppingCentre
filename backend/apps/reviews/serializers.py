@@ -29,6 +29,21 @@ class ReviewSerializer(serializers.ModelSerializer):
         email = obj.user.email
         return email.split('@')[0] if '@' in email else email
 
+    def validate(self, data):
+        """Só utilizadores que compraram o produto podem avaliar."""
+        user = self.context['request'].user
+        product = data.get('product')
+        if product and user:
+            has_purchased = user.orders.filter(
+                items__product=product,
+                status__in=('delivered', 'confirmed', 'processing', 'shipped'),
+            ).exists()
+            if not has_purchased:
+                raise serializers.ValidationError(
+                    {'product': 'Apenas clientes que compraram este produto podem avaliá-lo.'}
+                )
+        return data
+
     def create(self, validated_data):
         user = self.context['request'].user
         product = validated_data.get('product')

@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Course, CourseModule, CourseLesson, Enrollment,
     Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
+    CourseReview,
 )
 
 class CourseLessonInline(admin.TabularInline):
@@ -78,3 +79,17 @@ class QuizAnswerAdmin(admin.ModelAdmin):
     def question_preview(self, obj):
         return obj.question.text[:60]
     question_preview.short_description = 'Questão'
+
+
+# ─── Course Reviews ───
+
+@admin.register(CourseReview)
+class CourseReviewAdmin(admin.ModelAdmin):
+    list_display = ('enrollment', 'course_title', 'rating', 'is_public', 'is_hidden', 'created_at')
+    list_filter = ('rating', 'is_public', 'is_hidden', 'course')
+    search_fields = ('enrollment__user__email', 'body', 'course__product__name')
+    readonly_fields = ('created_at', 'updated_at', 'is_edited')
+
+    def course_title(self, obj):
+        return obj.course.product.name[:60]
+    course_title.short_description = 'Curso'
