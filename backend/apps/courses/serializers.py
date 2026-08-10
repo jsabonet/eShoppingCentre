@@ -231,7 +231,8 @@ class QuestionWriteSerializer(serializers.ModelSerializer):
                     AnswerOption.objects.filter(id=opt_id, question=instance).update(**opt_data)
                     updated_ids.add(opt_id)
                 else:
-                    AnswerOption.objects.create(question=instance, **opt_data)
+                    new_opt = AnswerOption.objects.create(question=instance, **opt_data)
+                    updated_ids.add(new_opt.id)  # Rastreia novas opcoes tambem
             # Remove options that were deleted in the frontend
             instance.options.exclude(id__in=updated_ids).delete()
         return instance
