@@ -52,6 +52,10 @@ class CreateOrderSerializer(serializers.Serializer):
     items = CreateOrderItemSerializer(many=True, min_length=1)
     shipping_address = serializers.DictField()
     payment_method = serializers.CharField()
+    shipping_selections = serializers.DictField(
+        required=False, default=dict,
+        help_text='{"store_id": "rate_id"} — método de envio escolhido por loja'
+    )
     affiliate_code = serializers.CharField(required=False, allow_blank=True)
     buyer_notes = serializers.CharField(required=False, allow_blank=True)
 
@@ -120,6 +124,36 @@ class CreateOrderSerializer(serializers.Serializer):
                         product = item['product']
                         affiliate_commission += (item['total_price'] * product.affiliate_commission) / 100
 
+        # ─── Calcular frete ───
+        shipping_cost = 0
+        shipping_method_name = ''
+        shipping_selections = validated_data.pop('shipping_selections', {})
+        if shipping_selections:
+            from apps.shipping.models import ShippingRate
+            province = validated_data.get('shipping_address', {}).get('province', '')
+            for store_id, rate_id in shipping_selections.items():
+                try:
+                    rate = ShippingRate.objects.select_related('method', 'zone').get(
+                        id=rate_id,
+                        is_active=True,
+                        method__is_active=True,
+                        zone__is_active=True,
+                    )
+                    store_data = store_orders.get(uuid.UUID(store_id))
+                    if store_data and rate.zone.covers_province(province):
+                        weight = sum(
+                            float(item['product'].weight or 0.5) * item['quantity']
+                            for item in store_data['items']
+                            if item['product'].product_type == 'physical'
+                        )
+                        calc = rate.calculate(weight, store_data['store_total'])
+                        if calc:
+                            shipping_cost += calc['price']
+                            if not shipping_method_name:
+                                shipping_method_name = rate.method.name
+                except (ValueError, ShippingRate.DoesNotExist):
+                    continue
+
         # Criar a primeira encomenda (podemos dividir por loja depois)
         first_store = list(store_orders.values())[0]
         platform_fee = (first_store['store_total'] * 8) / 100
@@ -129,7 +163,8 @@ class CreateOrderSerializer(serializers.Serializer):
             buyer=user,
             store=first_store['store'],
             subtotal=subtotal,
-            total=first_store['store_total'],
+            shipping_cost=shipping_cost,
+            total=first_store['store_total'] + shipping_cost,
             platform_fee=platform_fee,
             affiliate=affiliate,
             affiliate_commission=affiliate_commission,
@@ -137,6 +172,7 @@ class CreateOrderSerializer(serializers.Serializer):
             payment_status='completed' if is_test else 'pending',
             status='confirmed' if is_test else 'pending',
             shipping_address=validated_data['shipping_address'],
+            shipping_method=shipping_method_name,
             buyer_notes=validated_data.get('buyer_notes', ''),
         )
 

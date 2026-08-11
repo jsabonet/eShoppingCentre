@@ -124,6 +124,9 @@ export default function CheckoutContent() {
   const [paymentMethod, setPaymentMethod] = useState('test');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [shippingEstimates, setShippingEstimates] = useState<any>(null);
+  const [shippingSelections, setShippingSelections] = useState<Record<string, string>>({});
+  const [estimatingShipping, setEstimatingShipping] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -151,6 +154,44 @@ export default function CheckoutContent() {
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
+
+  // Fetch shipping estimates when province or items change
+  useEffect(() => {
+    if (!form.province || items.length === 0) return;
+
+    const hasPhysical = items.some(it => it.product.productType === 'physical');
+    if (!hasPhysical) {
+      setShippingEstimates(null);
+      return;
+    }
+
+    setEstimatingShipping(true);
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    fetch(`${API_URL}/shipping/estimate/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: items.map(it => ({ product_id: it.product.id, quantity: it.quantity })),
+        province: form.province,
+      }),
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        setShippingEstimates(data);
+        // Auto-select cheapest option for each store
+        if (data?.stores) {
+          const selections: Record<string, string> = {};
+          data.stores.forEach((s: any) => {
+            if (s.available_methods?.length > 0) {
+              selections[s.store_id] = s.available_methods[0].rate_id;
+            }
+          });
+          setShippingSelections(selections);
+        }
+      })
+      .catch(() => setShippingEstimates(null))
+      .finally(() => setEstimatingShipping(false));
+  }, [form.province, items]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,6 +223,7 @@ export default function CheckoutContent() {
           notes: form.notes,
         },
         payment_method: paymentMethod,
+        shipping_selections: shippingSelections,
         buyer_notes: form.notes,
       };
 
@@ -387,6 +429,81 @@ export default function CheckoutContent() {
               </div>
             </div>
           </div>
+
+          {/* Shipping Method */}
+          {shippingEstimates && shippingEstimates.stores?.some((s: any) => s.available_methods?.length > 0) && (
+            <div className="bg-card border border-border rounded-lg p-6">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Truck className="text-foreground" size={24} />
+                Método de Envio
+              </h2>
+              {shippingEstimates.stores.map((store: any) => (
+                <div key={store.store_id} className="mb-4 last:mb-0">
+                  <p className="text-sm font-semibold mb-2">
+                    {store.store_name}
+                    <span className="text-muted-foreground font-normal ml-2">
+                      ({(store.total_weight_kg || 0).toFixed(1)} kg · {store.subtotal.toLocaleString('pt-MZ')} MZN)
+                    </span>
+                  </p>
+                  {store.error ? (
+                    <p className="text-red-500 text-sm">{store.error}</p>
+                  ) : store.available_methods?.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">Nenhum método de envio disponível para esta região.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {store.available_methods.map((method: any) => (
+                        <label
+                          key={method.rate_id}
+                          className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                            shippingSelections[store.store_id] === method.rate_id
+                              ? 'border-accent bg-accent/5'
+                              : 'border-border hover:border-accent/50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name={`shipping_${store.store_id}`}
+                            value={method.rate_id}
+                            checked={shippingSelections[store.store_id] === method.rate_id}
+                            onChange={() =>
+                              setShippingSelections((prev) => ({ ...prev, [store.store_id]: method.rate_id }))
+                            }
+                            className="w-4 h-4 text-accent"
+                          />
+                          <div className="ml-3 flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-sm">
+                                {method.method_name}
+                                {method.is_free && (
+                                  <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-bold">
+                                    GRÁTIS
+                                  </span>
+                                )}
+                              </span>
+                              <span className={`font-bold text-sm ${method.is_free ? 'text-green-600' : ''}`}>
+                                {method.is_free ? '0 MZN' : `${method.price.toLocaleString('pt-MZ')} MZN`}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {method.estimated_days}
+                              {method.free_shipping_min && !method.is_free && (
+                                <> · Grátis acima de {method.free_shipping_min.toLocaleString('pt-MZ')} MZN</>
+                              )}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {estimatingShipping && (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 size={14} className="animate-spin" /> A calcular frete...
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Payment Method */}
           <div className="bg-card border border-border rounded-lg p-6">

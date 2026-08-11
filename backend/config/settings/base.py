@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'apps.blog',
     'apps.notifications',
     'apps.chat',
+    'apps.shipping',
 ]
 
 MIDDLEWARE = [

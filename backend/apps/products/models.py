@@ -1,5 +1,6 @@
 from django.db import models
 from apps.core.models import BaseModel
+from .storage import get_digital_file_storage
 
 
 class Category(BaseModel):
@@ -81,7 +82,8 @@ class Product(BaseModel):
     affiliate_commission = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
     tags = models.JSONField(default=list)
     specifications = models.JSONField(default=dict)
-    digital_file = models.FileField(upload_to='products/digital/', blank=True)
+    digital_file = models.FileField(upload_to='products/digital/', blank=True,
+                                     storage=get_digital_file_storage)
     digital_file_size = models.CharField(max_length=50, blank=True)
     digital_format = models.CharField(max_length=20, blank=True, help_text='Formato: PDF, ZIP, MP3, MP4, etc.')
     digital_version = models.CharField(max_length=50, blank=True, help_text='Versão do produto digital (ex: v1.0)')
