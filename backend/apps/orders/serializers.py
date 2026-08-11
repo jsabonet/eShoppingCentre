@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db import transaction
-from .models import Order, OrderItem, ReturnRequest
+from .models import Order, OrderItem, ReturnRequest, ReturnImage
 from apps.products.models import Product
 
 
@@ -11,16 +11,29 @@ class OrderItemSerializer(serializers.ModelSerializer):
         read_only_fields = ('product_name', 'product_image', 'unit_price', 'total_price')
 
 
+class ReturnImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReturnImage
+        fields = ('id', 'image', 'caption', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
 class ReturnRequestSerializer(serializers.ModelSerializer):
     order_number = serializers.CharField(source='order.order_number', read_only=True)
     buyer_name = serializers.SerializerMethodField()
     store_name = serializers.CharField(source='store.name', read_only=True)
+    images = ReturnImageSerializer(many=True, read_only=True)
+    reason_type_display = serializers.CharField(source='get_reason_type_display', read_only=True)
 
     class Meta:
         model = ReturnRequest
-        fields = ('id', 'order', 'order_number', 'reason', 'status', 'vendor_notes',
-                  'refund_amount', 'buyer_name', 'store_name', 'created_at')
-        read_only_fields = ('id', 'buyer', 'store', 'created_at')
+        fields = (
+            'id', 'order', 'order_number', 'reason', 'reason_type', 'reason_type_display',
+            'rma_number', 'status', 'vendor_notes', 'refund_amount',
+            'return_instructions', 'return_address', 'buyer_tracking_code', 'shipping_notes',
+            'buyer_name', 'store_name', 'images', 'created_at', 'disputed_at',
+        )
+        read_only_fields = ('id', 'buyer', 'store', 'rma_number', 'created_at')
 
     def get_buyer_name(self, obj):
         return obj.buyer.get_full_name() or obj.buyer.email
@@ -28,6 +41,34 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['buyer'] = self.context['request'].user
         return super().create(validated_data)
+
+
+class ReturnResolveSerializer(serializers.Serializer):
+    """Usado pelo seller para aprovar/rejeitar uma devolução."""
+    action = serializers.ChoiceField(choices=[('approved', 'Aprovar'), ('rejected', 'Rejeitar')])
+    vendor_notes = serializers.CharField(required=False, allow_blank=True)
+    refund_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    return_instructions = serializers.CharField(required=False, allow_blank=True)
+    return_address = serializers.CharField(required=False, allow_blank=True)
+
+
+class ReturnShipSerializer(serializers.Serializer):
+    """Usado pelo buyer para confirmar envio da devolução. Tracking opcional (realidade MZ)."""
+    buyer_tracking_code = serializers.CharField(required=False, allow_blank=True, default='')
+    shipping_notes = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class AdminOverrideSerializer(serializers.Serializer):
+    """Usado pelo admin para forçar uma decisão numa devolução em disputa."""
+    action = serializers.ChoiceField(choices=[
+        ('approve', 'Forçar Aprovação'),
+        ('reject', 'Forçar Rejeição'),
+        ('refund', 'Forçar Reembolso'),
+    ])
+    admin_notes = serializers.CharField(required=True, help_text='Justificação obrigatória da decisão')
+    refund_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    return_instructions = serializers.CharField(required=False, allow_blank=True, default='')
+    return_address = serializers.CharField(required=False, allow_blank=True, default='')
 
 
 class OrderSerializer(serializers.ModelSerializer):

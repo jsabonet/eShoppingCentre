@@ -12,8 +12,17 @@ function formatPrice(price: number): string {
 }
 
 const PROVINCES = [
-  'Cabo Delgado', 'Niassa', 'Nampula', 'Zambézia', 'Tete',
-  'Manica', 'Sofala', 'Inhambane', 'Gaza', 'Maputo',
+  { value: 'maputo_cidade', label: 'Maputo Cidade' },
+  { value: 'maputo_provincia', label: 'Maputo Província' },
+  { value: 'gaza', label: 'Gaza' },
+  { value: 'inhambane', label: 'Inhambane' },
+  { value: 'sofala', label: 'Sofala' },
+  { value: 'manica', label: 'Manica' },
+  { value: 'tete', label: 'Tete' },
+  { value: 'zambezia', label: 'Zambézia' },
+  { value: 'nampula', label: 'Nampula' },
+  { value: 'cabo_delgado', label: 'Cabo Delgado' },
+  { value: 'niassa', label: 'Niassa' },
 ];
 
 const PAYMENT_METHODS = [
@@ -119,6 +128,7 @@ export default function CheckoutContent() {
   const router = useRouter();
   const { items, totalPrice, clearCart } = useCart();
   const { isAuthenticated } = useAuth();
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
   const [confirmed, setConfirmed] = useState(false);
   const [orderData, setOrderData] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState('test');
@@ -151,6 +161,21 @@ export default function CheckoutContent() {
     [paymentMethod]
   );
 
+  // Calculate displayed shipping total from selections
+  const shippingTotal = useMemo(() => {
+    let total = 0;
+    if (shippingEstimates?.stores) {
+      for (const store of shippingEstimates.stores) {
+        const selectedId = shippingSelections[store.store_id];
+        const method = store.available_methods?.find((m: any) => m.rate_id === selectedId);
+        if (method) total += method.price;
+      }
+    }
+    return total;
+  }, [shippingEstimates, shippingSelections]);
+
+  const hasPhysicalItems = items.some(it => it.product.productType === 'physical');
+
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -166,7 +191,6 @@ export default function CheckoutContent() {
     }
 
     setEstimatingShipping(true);
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     fetch(`${API_URL}/shipping/estimate/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -204,7 +228,6 @@ export default function CheckoutContent() {
     setSubmitting(true);
     setError('');
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     const token = localStorage.getItem('access_token');
 
     try {
@@ -220,6 +243,7 @@ export default function CheckoutContent() {
           address: form.address,
           city: form.city,
           province: form.province,
+          province_label: PROVINCES.find(p => p.value === form.province)?.label || form.province,
           notes: form.notes,
         },
         payment_method: paymentMethod,
@@ -411,7 +435,7 @@ export default function CheckoutContent() {
                   >
                     <option value="">Selecione</option>
                     {PROVINCES.map((prov) => (
-                      <option key={prov} value={prov}>{prov}</option>
+                      <option key={prov.value} value={prov.value}>{prov.label}</option>
                     ))}
                   </select>
                 </div>
@@ -583,12 +607,20 @@ export default function CheckoutContent() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Frete:</span>
-                <span className="text-green-600 font-medium">Grátis</span>
+                {!hasPhysicalItems ? (
+                  <span className="text-muted-foreground">Não se aplica</span>
+                ) : shippingTotal === 0 && shippingEstimates ? (
+                  <span className="text-green-600 font-medium">Grátis</span>
+                ) : shippingTotal > 0 ? (
+                  <span className="font-medium">MZN {formatPrice(shippingTotal)}</span>
+                ) : (
+                  <span className="text-muted-foreground">A calcular...</span>
+                )}
               </div>
               <div className="border-t border-border pt-2">
                 <div className="flex justify-between">
                   <span className="font-bold text-lg">Total:</span>
-                  <span className="font-bold text-lg">MZN {formatPrice(totalPrice)}</span>
+                  <span className="font-bold text-lg">MZN {formatPrice(totalPrice + shippingTotal)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   ou 12x de MZN {formatPrice(totalPrice / 12)} sem juros

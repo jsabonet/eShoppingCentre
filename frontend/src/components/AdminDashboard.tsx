@@ -6,14 +6,15 @@ import Link from 'next/link';
 import {
   LayoutDashboard, Package, ShoppingCart, LogOut, Plus, Edit, Trash2,
   TrendingUp, Users, DollarSign, Eye, X, ChevronLeft, ChevronRight,
-  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen
+  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw
 } from 'lucide-react';
 import { adminAPI, productsAPI, ordersAPI, storesAPI, type Product as APIProduct } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
+import AdminReturns from './admin/AdminReturns';
 
 const BACKEND_READY = true;
 
-type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users';
+type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns';
 
 interface Product {
   id: string;
@@ -628,6 +629,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
           {([
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
             { id: 'stores', label: 'Lojas', icon: Store },
+            { id: 'returns', label: 'Devoluções', icon: RotateCcw },
             { id: 'categories', label: 'Categorias', icon: Filter },
             { id: 'blog', label: 'Blog', icon: Edit },
             { id: 'users', label: 'Utilizadores', icon: Users },
@@ -1227,6 +1229,9 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
             )}
           </div>
         )}
+
+        {/* Returns Tab (Admin) */}
+        {activeTab === 'returns' && <AdminReturns />}
 
         {/* Confirm Action Modal */}
         {confirmModal && (

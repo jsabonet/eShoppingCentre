@@ -21,16 +21,16 @@ export default function Header() {
           <div className="py-2">
             <div className="marquee-container">
               <div className="marquee-content">
-                <span className="marquee-item">🚚 Frete gratis para todo Mocambique em compras acima de 199 MZN</span>
-                <span className="marquee-item">🎁Promocoes especiais - Ate 50% de desconto em eletronicos</span>
-                <span className="marquee-item">📦 Rastreie sua encomenda em tempo real</span>
-                <span className="marquee-item">💬 Atendimento 24h - Suporte dedicado ao cliente</span>
-                <span className="marquee-item">🔒 Compra 100% segura - Protecao garantida</span>
-                <span className="marquee-item">💳 Parcele em ate 12x sem juros</span>
-                <span className="marquee-item">🚚 Frete gratis para todo Mocambique em compras acima de 199 MZN</span>
-                <span className="marquee-item">🎁 Promocoes especiais - Ate 50% de desconto em eletronicos</span>
-                <span className="marquee-item">📦 Rastreie sua encomenda em tempo real</span>
-                <span className="marquee-item">💬 Atendimento 24h - Suporte dedicado ao cliente</span>
+                <span className="marquee-item">🚚 Entrega em todas as províncias de Moçambique</span>
+                <span className="marquee-item">🎁 Promoções especiais — Até 50% de desconto</span>
+                <span className="marquee-item">📱 Pagamento via M-Pesa, e-Mola e outros</span>
+                <span className="marquee-item">💬 Suporte via WhatsApp</span>
+                <span className="marquee-item">🔒 Compra 100% segura — Proteção garantida</span>
+                <span className="marquee-item">🛍️ Compre de vendedores locais em todo o país</span>
+                <span className="marquee-item">🚚 Entrega em todas as províncias de Moçambique</span>
+                <span className="marquee-item">🎁 Promoções especiais — Até 50% de desconto</span>
+                <span className="marquee-item">📱 Pagamento via M-Pesa, e-Mola e outros</span>
+                <span className="marquee-item">💬 Suporte via WhatsApp</span>
               </div>
             </div>
           </div>

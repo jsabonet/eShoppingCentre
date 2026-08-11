@@ -22,6 +22,12 @@ const nextConfig: NextConfig = {
         hostname: 'cdn.b12.io',
       },
       {
+        // Django media (local dev)
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '8000',
+      },
+      {
         // Futuras imagens servidas pelo Django (ex: media via S3 ou local)
         protocol: 'https',
         hostname: process.env.NEXT_PUBLIC_MEDIA_HOST ?? 'localhost',

@@ -1,135 +1,498 @@
-'use client';
+﻿'use client';
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Package, MapPin, CreditCard, CheckCircle, Clock, Truck, XCircle } from 'lucide-react';
+import Image from 'next/image';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  ArrowLeft, MapPin, CreditCard, RotateCcw, Loader2, AlertCircle, XCircle,
+  Package, CheckCircle2, Circle, Truck, Clock, Ban, Undo2,
+} from 'lucide-react';
 import AccountLayout from '@/src/components/AccountLayout';
+import LoadingSpinner from '@/src/components/LoadingSpinner';
 
-const orderData = {
-  id: 'PED-0421',
-  date: '20 Julho 2026',
-  status: 'shipped' as const,
-  payment: 'M-Pesa',
-  shipping: 'Entrega Padrão',
-  address: 'Av. Julius Nyerere, 1234, Maputo',
-  total: '12.300 MZN',
-  subtotal: '11.400 MZN',
-  shippingCost: 'Grátis',
-  items: [
-    { name: 'Smartphone Pro Max 256GB', qty: 1, price: '4.999,99 MZN', image: 'https://cdn.b12.io/client_media/iKv1biKD/5aa3154d-7e6e-11f1-82d2-0242ac110002-9e8FSvH-aRUq9K6kB6vgg.jpg' },
-    { name: 'Fone de Ouvido Bluetooth Premium', qty: 2, price: '899,90 MZN', image: 'https://cdn.b12.io/client_media/iKv1biKD/5aa9c9ce-7e6e-11f1-8ce3-0242ac110002-0DDwAGMnksgDjeC51LGtD.jpg' },
-    { name: 'Caixa de Som Bluetooth Portátil', qty: 1, price: '449,90 MZN', image: 'https://cdn.b12.io/client_media/iKv1biKD/5ab2c8b3-7e6e-11f1-abb5-0242ac110002-lhtmOS_6GhLkNyuDZwvsL.jpg' },
-  ],
-  timeline: [
-    { status: 'Pedido Realizado', date: '20 Jul, 14:30', done: true },
-    { status: 'Pagamento Confirmado', date: '20 Jul, 14:32', done: true },
-    { status: 'Em Preparação', date: '20 Jul, 16:00', done: true },
-    { status: 'Enviado', date: '21 Jul, 09:15', done: true },
-    { status: 'Entregue', date: 'Previsão: 24 Jul', done: false },
-  ],
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
+
+const REASON_CHOICES = [
+  { value: 'defective', label: 'Produto com defeito' },
+  { value: 'not_as_described', label: 'Produto diferente do anunciado' },
+  { value: 'not_satisfied', label: 'Não serviu / Não gostei' },
+  { value: 'damaged', label: 'Embalagem danificada' },
+  { value: 'wrong_item', label: 'Item errado enviado' },
+  { value: 'other', label: 'Outro' },
+];
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendente', confirmed: 'Confirmada', processing: 'Em Preparação',
+  shipped: 'Enviada', delivered: 'Entregue', cancelled: 'Cancelada', refunded: 'Reembolsada',
 };
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  confirmed: 'bg-blue-100 text-blue-700',
+  processing: 'bg-indigo-100 text-indigo-700',
+  shipped: 'bg-purple-100 text-purple-700',
+  delivered: 'bg-green-100 text-green-700',
+  cancelled: 'bg-red-100 text-red-700',
+  refunded: 'bg-gray-100 text-gray-700',
+};
+
+function buildTimeline(order: any) {
+  const steps: { label: string; date: string | null; done: boolean; active: boolean; icon: any }[] = [];
+  const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
+
+  const statusOrder = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
+  const idx = statusOrder.indexOf(order.status);
+
+  steps.push({ label: 'Pedido Realizado', date: fmt(order.created_at), done: idx >= 0, active: idx === 0, icon: Package });
+  steps.push({ label: 'Pagamento Confirmado', date: order.status !== 'pending' ? fmt(order.updated_at ?? order.created_at) : null, done: idx >= 1, active: idx === 1, icon: CreditCard });
+  steps.push({ label: 'Em Preparação', date: idx >= 2 ? fmt(order.updated_at) : null, done: idx >= 2, active: idx === 2, icon: Clock });
+  steps.push({ label: 'Enviado', date: idx >= 3 ? fmt(order.updated_at) : null, done: idx >= 3, active: idx === 3, icon: Truck });
+  steps.push({ label: 'Entregue', date: order.delivered_at ? fmt(order.delivered_at) : (order.estimated_delivery ? `Previsão: ${new Date(order.estimated_delivery).toLocaleDateString('pt-MZ')}` : null), done: idx >= 4, active: idx === 4, icon: CheckCircle2 });
+
+  if (order.status === 'cancelled') {
+    steps.splice(1); steps.push({ label: 'Cancelado', date: fmt(order.updated_at), done: true, active: true, icon: Ban });
+  }
+  if (order.status === 'refunded') {
+    steps.push({ label: 'Reembolsado', date: fmt(order.updated_at), done: true, active: true, icon: Undo2 });
+  }
+  return steps;
+}
 
 export default function OrderDetailPage() {
   const params = useParams();
-  const order = orderData;
+  const id = params?.id as string;
+  const [order, setOrder] = useState<any>(null);
+  const [returns, setReturns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showShipModal, setShowShipModal] = useState(false);
+  const [returnForm, setReturnForm] = useState({ reason_type: 'defective', reason: '' });
+  const [shipForm, setShipForm] = useState({ shipping_notes: '', buyer_tracking_code: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Pedido Realizado': return Package;
-      case 'Pagamento Confirmado': return CreditCard;
-      case 'Em Preparação': return Clock;
-      case 'Enviado': return Truck;
-      case 'Entregue': return CheckCircle;
-      default: return Clock;
-    }
+  const apiHeaders = useCallback(() => {
+    const token = localStorage.getItem('access_token');
+    return { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}), };
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        const [orderRes, returnsRes] = await Promise.all([
+          fetch(API_URL + '/orders/' + id + '/', { headers: apiHeaders() }),
+          fetch(API_URL + '/orders/returns/my/', { headers: apiHeaders() }),
+        ]);
+        if (orderRes.ok) setOrder(await orderRes.json());
+        if (returnsRes.ok) {
+          const data = await returnsRes.json();
+          setReturns((data.results || data || []).filter((r: any) => r.order === id));
+        }
+      } catch {} finally { setLoading(false); }
+    })();
+  }, [id, apiHeaders]);
+
+  const handleRequestReturn = async (e: React.FormEvent) => {
+    e.preventDefault(); setSubmitting(true); setError('');
+    try {
+      const res = await fetch(API_URL + '/orders/returns/', {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({ order: id, reason_type: returnForm.reason_type, reason: returnForm.reason }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(typeof d === 'object' ? Object.values(d).flat().join('. ') : 'Erro.'); }
+      const data = await res.json();
+      setReturns(prev => [...prev, data]);
+      setShowReturnModal(false);
+    } catch (err: any) { setError(err.message); } finally { setSubmitting(false); }
   };
+
+  const handleShipReturn = async (e: React.FormEvent) => {
+    e.preventDefault(); setSubmitting(true); setError('');
+    try {
+      const res = await fetch(API_URL + '/orders/returns/' + activeReturn.id + '/ship/', {
+        method: 'PATCH', headers: apiHeaders(),
+        body: JSON.stringify({ shipping_notes: shipForm.shipping_notes, buyer_tracking_code: shipForm.buyer_tracking_code }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(typeof d.detail === 'string' ? d.detail : 'Erro.'); }
+      const data = await res.json();
+      setReturns(prev => prev.map(r => r.id === data.id ? data : r));
+      setShowShipModal(false);
+    } catch (err: any) { setError(err.message); } finally { setSubmitting(false); }
+  };
+
+  const handleDispute = async () => {
+    if (!rejectedReturn) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(API_URL + '/orders/returns/' + rejectedReturn.id + '/dispute/', {
+        method: 'POST', headers: apiHeaders(),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(typeof d.detail === 'string' ? d.detail : 'Erro.'); }
+      const data = await res.json();
+      setReturns(prev => prev.map(r => r.id === data.id ? data : r));
+    } catch (err: any) { alert(err.message); } finally { setSubmitting(false); }
+  };
+
+  if (loading) return <AccountLayout><div className="flex justify-center py-20"><LoadingSpinner size={32} /></div></AccountLayout>;
+  if (!order) return (
+    <AccountLayout>
+      <div className="text-center py-20">
+        <Package size={48} className="mx-auto text-muted-foreground mb-4" />
+        <h2 className="text-xl font-bold mb-2">Encomenda não encontrada</h2>
+        <p className="text-muted-foreground mb-6">Não foi possível localizar esta encomenda.</p>
+        <Link href="/account/orders" className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors">
+          <ArrowLeft size={16} /> Voltar às Encomendas
+        </Link>
+      </div>
+    </AccountLayout>
+  );
+
+  const canRequestReturn = ['delivered', 'shipped'].includes(order.status) && !returns.some((r: any) => ['requested', 'approved', 'shipped'].includes(r.status));
+  const activeReturn = returns.find((r: any) => ['requested', 'approved', 'shipped', 'received', 'refunded'].includes(r.status));
+  const rejectedReturn = returns.find((r: any) => r.status === 'rejected');
+  const disputedReturn = returns.find((r: any) => r.status === 'disputed');
+  const canShipReturn = activeReturn?.status === 'approved';
+  const canDispute = rejectedReturn?.status === 'rejected' && !disputedReturn;
+  const timeline = buildTimeline(order);
 
   return (
     <AccountLayout>
       <div className="space-y-6">
-        <Link href="/account/orders" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft size={16} /> Voltar às encomendas
-        </Link>
 
-        {/* Header */}
-        <div className="bg-card border border-border rounded-xl p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* Breadcrumb + Header */}
+        <div>
+          <Link href="/account/orders" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4">
+            <ArrowLeft size={15} /> Voltar às Encomendas
+          </Link>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold">{order.id}</h2>
-              <p className="text-sm text-muted-foreground">{order.date}</p>
+              <h1 className="text-2xl font-bold tracking-tight">{order.order_number}</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {new Date(order.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {order.store_name && <> · Vendido por <span className="font-medium text-foreground">{order.store_name}</span></>}
+              </p>
             </div>
-            <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium flex items-center gap-1">
-              <Truck size={16} /> Enviado
+            <span className={`self-start px-3.5 py-1.5 rounded-full text-sm font-semibold ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700'}`}>
+              {STATUS_LABELS[order.status] || order.status}
             </span>
           </div>
         </div>
 
         {/* Timeline */}
-        <div className="bg-card border border-border rounded-xl p-6">
-          <h3 className="font-bold mb-6">Acompanhamento</h3>
-          <div className="space-y-0">
-            {order.timeline.map((step, i) => {
-              const Icon = getStatusIcon(step.status);
-              return (
-                <div key={step.status} className="flex gap-4 pb-6 relative">
-                  {i < order.timeline.length - 1 && (
-                    <div className={`absolute left-[15px] top-8 w-0.5 h-full ${step.done ? 'bg-accent' : 'bg-border'}`} />
+        <div className="bg-card border border-border rounded-2xl p-5 sm:p-6">
+          <h3 className="font-bold text-base mb-5">Acompanhamento</h3>
+          <div className="relative">
+            {/* desktop: horizontal steps */}
+            <div className="hidden sm:flex items-start justify-between">
+              {timeline.map((step, i) => (
+                <div key={step.label} className="flex flex-col items-center flex-1 relative">
+                  {i < timeline.length - 1 && (
+                    <div className={`absolute top-5 left-[calc(50%+20px)] w-[calc(100%-40px)] h-0.5 ${step.done ? 'bg-accent' : 'bg-border'}`} />
                   )}
-                  <div className={`p-2 rounded-full ${step.done ? 'bg-accent/10 text-accent' : 'bg-muted text-muted-foreground'} flex-shrink-0`}>
-                    <Icon size={16} />
+                  <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                    step.active ? 'bg-accent text-accent-foreground shadow-md' :
+                    step.done ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    <step.icon size={18} />
                   </div>
-                  <div>
-                    <p className={`font-medium text-sm ${step.done ? 'text-foreground' : 'text-muted-foreground'}`}>{step.status}</p>
-                    <p className="text-xs text-muted-foreground">{step.date}</p>
-                  </div>
+                  <p className={`text-xs font-semibold text-center ${step.done ? 'text-foreground' : 'text-muted-foreground'}`}>{step.label}</p>
+                  {step.date && <p className="text-[11px] text-muted-foreground text-center mt-0.5">{step.date}</p>}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Items */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="font-bold mb-4">Itens</h3>
-            <div className="space-y-4">
-              {order.items.map((item) => (
-                <div key={item.name} className="flex gap-3">
-                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                    <img src={item.image} alt="" className="w-full h-full object-cover" />
+              ))}
+            </div>
+            {/* mobile: vertical steps */}
+            <div className="flex sm:hidden flex-col gap-0">
+              {timeline.map((step, i) => (
+                <div key={step.label} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      step.active ? 'bg-accent text-accent-foreground' :
+                      step.done ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      <step.icon size={15} />
+                    </div>
+                    {i < timeline.length - 1 && <div className={`w-0.5 flex-1 min-h-[20px] ${step.done ? 'bg-green-500' : 'bg-border'}`} />}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">Qtd: {item.qty}</p>
-                    <p className="text-sm font-semibold text-accent mt-1">{item.price}</p>
+                  <div className="pb-4">
+                    <p className={`text-sm font-semibold ${step.done ? 'text-foreground' : 'text-muted-foreground'}`}>{step.label}</p>
+                    {step.date && <p className="text-xs text-muted-foreground">{step.date}</p>}
                   </div>
                 </div>
               ))}
             </div>
-            <hr className="border-border my-4" />
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{order.subtotal}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Frete</span><span className="text-green-600">{order.shippingCost}</span></div>
-              <div className="flex justify-between font-bold text-base pt-2 border-t border-border"><span>Total</span><span className="text-accent">{order.total}</span></div>
+          </div>
+        </div>
+
+        {/* Main content: items + sidebar */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Items */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-card border border-border rounded-2xl overflow-hidden">
+              <div className="px-5 sm:px-6 py-4 border-b border-border">
+                <h3 className="font-bold">Itens da Encomenda</h3>
+              </div>
+              <div className="divide-y divide-border">
+                {(order.items || []).map((item: any) => (
+                  <div key={item.id} className="flex gap-4 p-4 sm:p-5">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-muted flex-shrink-0 overflow-hidden border border-border">
+                      {item.product_image ? (
+                        <Image src={item.product_image.startsWith('http') ? item.product_image : MEDIA_URL + item.product_image} alt={item.product_name} width={80} height={80} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Package size={28} /></div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm sm:text-base truncate">{item.product_name}</p>
+                      <p className="text-sm text-muted-foreground">Qtd: {item.quantity}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-bold text-sm sm:text-base">{Number(item.total_price).toLocaleString('pt-MZ')} MZN</p>
+                      {item.quantity > 1 && <p className="text-xs text-muted-foreground">{Number(item.unit_price).toLocaleString('pt-MZ')} MZN / un</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Delivery + Payment info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-card border border-border rounded-2xl p-5">
+                <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><MapPin size={16} className="text-accent" /> Endereço de Entrega</h3>
+                {order.shipping_address ? (
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p className="font-medium text-foreground">{order.shipping_address.full_name || order.shipping_address.name}</p>
+                    <p>{order.shipping_address.address || order.shipping_address.street}</p>
+                    <p>{order.shipping_address.city}{order.shipping_address.province ? `, ${order.shipping_address.province}` : ''}</p>
+                    {order.shipping_address.phone && <p>{order.shipping_address.phone}</p>}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">—</p>
+                )}
+                {order.tracking_code && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-xs text-muted-foreground">Código de Rastreio</p>
+                    <p className="text-sm font-mono font-semibold text-accent">{order.tracking_code}</p>
+                  </div>
+                )}
+              </div>
+              <div className="bg-card border border-border rounded-2xl p-5">
+                <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><CreditCard size={16} className="text-accent" /> Pagamento</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Método</span>
+                    <span className="font-medium">{order.payment_method || '—'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Estado</span>
+                    <span className={`font-medium capitalize ${order.payment_status === 'paid' ? 'text-green-600' : 'text-amber-600'}`}>{order.payment_status || '—'}</span>
+                  </div>
+                  {order.shipping_method && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Envio</span>
+                      <span className="font-medium">{order.shipping_method}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Details */}
-          <div className="space-y-6">
-            <div className="bg-card border border-border rounded-xl p-6">
-              <h3 className="font-bold mb-3"><MapPin size={16} className="inline mr-2" />Endereço de Entrega</h3>
-              <p className="text-sm text-muted-foreground">{order.address}</p>
-            </div>
-            <div className="bg-card border border-border rounded-xl p-6">
-              <h3 className="font-bold mb-3"><CreditCard size={16} className="inline mr-2" />Pagamento</h3>
-              <p className="text-sm text-muted-foreground">{order.payment}</p>
-            </div>
-            <div className="bg-card border border-border rounded-xl p-6">
-              <h3 className="font-bold mb-3"><Truck size={16} className="inline mr-2" />Envio</h3>
-              <p className="text-sm text-muted-foreground">{order.shipping}</p>
+          {/* Sidebar: summary */}
+          <div className="space-y-4">
+            <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 sticky top-24">
+              <h3 className="font-bold text-base mb-4">Resumo da Encomenda</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">{Number(order.subtotal).toLocaleString('pt-MZ')} MZN</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Frete</span>
+                  <span className="font-medium">{Number(order.shipping_cost || 0) > 0 ? `${Number(order.shipping_cost).toLocaleString('pt-MZ')} MZN` : 'Grátis'}</span>
+                </div>
+                {Number(order.platform_fee) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Taxa de Plataforma</span>
+                    <span className="font-medium">{Number(order.platform_fee).toLocaleString('pt-MZ')} MZN</span>
+                  </div>
+                )}
+                <div className="border-t border-border pt-3 flex justify-between">
+                  <span className="font-bold">Total</span>
+                  <span className="font-bold text-lg">{Number(order.total).toLocaleString('pt-MZ')} MZN</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Returns */}
+        {activeReturn && (
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <h3 className={`font-bold mb-2 flex items-center gap-2 ${
+              activeReturn.status === 'refunded' ? 'text-green-700' :
+              activeReturn.status === 'received' ? 'text-indigo-700' :
+              activeReturn.status === 'shipped' ? 'text-purple-700' :
+              activeReturn.status === 'approved' ? 'text-blue-700' :
+              'text-orange-700'
+            }`}>
+              {activeReturn.status === 'refunded' ? <CheckCircle2 size={18} /> :
+               activeReturn.status === 'received' ? <Package size={18} /> :
+               activeReturn.status === 'shipped' ? <Truck size={18} /> :
+               <RotateCcw size={18} />}
+              {activeReturn.status === 'refunded' ? 'Devolução Concluída' :
+               activeReturn.status === 'received' ? 'Devolução Recebida' :
+               activeReturn.status === 'shipped' ? 'Devolução em Trânsito' :
+               activeReturn.status === 'approved' ? 'Devolução Aprovada' :
+               'Devolução Solicitada'}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              RMA: <span className="font-mono font-semibold">{activeReturn.rma_number}</span>
+              {' '}·{' '}
+              Estado: <span className="font-semibold capitalize">{activeReturn.status === 'requested' ? 'Solicitada' : activeReturn.status === 'approved' ? 'Aprovada' : activeReturn.status === 'shipped' ? 'Enviada' : activeReturn.status === 'received' ? 'Recebida' : activeReturn.status === 'refunded' ? 'Reembolsada' : activeReturn.status}</span>
+            </p>
+            {activeReturn.return_instructions && (
+              <div className={`mt-3 p-3 rounded-lg text-sm ${
+                activeReturn.status === 'refunded' ? 'bg-green-50 text-green-800' : 'bg-orange-50 text-orange-800'
+              }`}>
+                <p className="font-semibold mb-1">Instruções do Vendedor:</p>
+                <p>{activeReturn.return_instructions}</p>
+                {activeReturn.return_address && <p className="mt-1"><span className="font-medium">Endereço para devolução:</span> {activeReturn.return_address}</p>}
+              </div>
+            )}
+            {activeReturn.shipping_notes && (
+              <div className={`mt-3 p-3 rounded-lg text-sm ${
+                activeReturn.status === 'refunded' ? 'bg-green-50 text-green-800' : 'bg-purple-50 text-purple-800'
+              }`}>
+                <p className="font-semibold mb-1">Enviado por:</p>
+                <p>{activeReturn.shipping_notes}</p>
+                {activeReturn.buyer_tracking_code && <p className="mt-1 text-xs text-purple-600">Ref: {activeReturn.buyer_tracking_code}</p>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Confirmar Envio (estilo MZ - informal) */}
+        {canShipReturn && (
+          <button onClick={() => { setShipForm({ shipping_notes: '', buyer_tracking_code: '' }); setShowShipModal(true); }}
+            className="w-full sm:w-auto px-6 py-3 border-2 border-purple-300 text-purple-700 bg-purple-50 rounded-xl font-semibold hover:bg-purple-100 transition-colors flex items-center justify-center gap-2">
+            <Truck size={18} /> Confirmar Envio da Devolução
+          </button>
+        )}
+
+        {rejectedReturn && (
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <h3 className="font-bold mb-2 flex items-center gap-2 text-red-700">
+              <XCircle size={18} /> Devolução Rejeitada
+            </h3>
+            <p className="text-sm text-muted-foreground">{rejectedReturn.vendor_notes || 'O vendedor rejeitou o pedido de devolução.'}</p>
+          </div>
+        )}
+
+        {/* Escalar para Admin */}
+        {canDispute && (
+          <button onClick={handleDispute} disabled={submitting}
+            className="w-full sm:w-auto px-6 py-3 border-2 border-red-300 text-red-700 bg-red-50 rounded-xl font-semibold hover:bg-red-100 transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+            {submitting ? <Loader2 size={18} className="animate-spin" /> : <AlertCircle size={18} />}
+            Escalar para o Administrador
+          </button>
+        )}
+
+        {/* Disputed */}
+        {disputedReturn && (
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <h3 className="font-bold mb-2 flex items-center gap-2 text-purple-700">
+              <AlertCircle size={18} /> Em Análise pelo Administrador
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              A sua contestação da devolução {disputedReturn.rma_number} foi enviada. Um administrador irá rever o caso.
+            </p>
+          </div>
+        )}
+
+        {canRequestReturn && (
+          <button onClick={() => setShowReturnModal(true)} className="w-full sm:w-auto px-6 py-3 border-2 border-orange-300 text-orange-700 bg-orange-50 rounded-xl font-semibold hover:bg-orange-100 transition-colors flex items-center justify-center gap-2">
+            <RotateCcw size={18} /> Solicitar Devolução
+          </button>
+        )}
+
+        {/* Return Modal */}
+        {showReturnModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowReturnModal(false)} />
+            <div className="relative bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95">
+              <h2 className="text-lg font-bold mb-1">Solicitar Devolução</h2>
+              <p className="text-sm text-muted-foreground mb-4">Preencha os detalhes abaixo para iniciar o processo de devolução.</p>
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start gap-2">
+                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />{error}
+                </div>
+              )}
+              <form onSubmit={handleRequestReturn} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Motivo da Devolução</label>
+                  <select value={returnForm.reason_type} onChange={e => setReturnForm(p => ({ ...p, reason_type: e.target.value }))} className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors">
+                    {REASON_CHOICES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Descrição do Problema</label>
+                  <textarea rows={4} placeholder="Descreva detalhadamente o problema encontrado..." value={returnForm.reason} onChange={e => setReturnForm(p => ({ ...p, reason: e.target.value }))} className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors resize-none" required />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-xl font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+                    {submitting ? 'Enviando...' : 'Enviar Pedido'}
+                  </button>
+                  <button type="button" onClick={() => setShowReturnModal(false)} className="px-5 py-2.5 border border-border rounded-xl font-medium hover:bg-muted transition-colors">
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Ship Modal (estilo MZ - informal, sem tracking obrigatório) */}
+        {showShipModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowShipModal(false)} />
+            <div className="relative bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95">
+              <h2 className="text-lg font-bold mb-1">Confirmar Envio da Devolução</h2>
+              <p className="text-sm text-muted-foreground mb-4">Informe como enviou o produto de volta ao vendedor.</p>
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start gap-2">
+                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />{error}
+                </div>
+              )}
+              <form onSubmit={handleShipReturn} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Como enviou?</label>
+                  <textarea rows={3} placeholder="Ex: Enviei pela transportadora X, contacto 84xxxxxxx. Ou: Entreguei em mão ao vendedor." value={shipForm.shipping_notes}
+                    onChange={e => setShipForm(p => ({ ...p, shipping_notes: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors resize-none" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Referência / Contacto (opcional)</label>
+                  <input type="text" placeholder="Ex: Nº de telefone do transportador, código de referência..." value={shipForm.buyer_tracking_code}
+                    onChange={e => setShipForm(p => ({ ...p, buyer_tracking_code: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors" />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    {submitting ? <Loader2 size={16} className="animate-spin" /> : <Truck size={16} />}
+                    {submitting ? 'Enviando...' : 'Confirmar Envio'}
+                  </button>
+                  <button type="button" onClick={() => setShowShipModal(false)} className="px-5 py-2.5 border border-border rounded-xl font-medium hover:bg-muted transition-colors">
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </AccountLayout>
   );
