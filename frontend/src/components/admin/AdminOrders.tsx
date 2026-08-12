@@ -16,6 +16,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   confirmed: { label: 'Confirmado', color: 'bg-blue-100 text-blue-800' },
   processing: { label: 'Processando', color: 'bg-indigo-100 text-indigo-800' },
   shipped: { label: 'Enviado', color: 'bg-purple-100 text-purple-800' },
+  ready_for_pickup: { label: 'Pronto p/ Levantar', color: 'bg-teal-100 text-teal-800' },
   delivered: { label: 'Entregue', color: 'bg-green-100 text-green-800' },
   cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-800' },
   refunded: { label: 'Reembolsado', color: 'bg-gray-100 text-gray-800' },

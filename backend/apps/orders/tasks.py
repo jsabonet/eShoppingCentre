@@ -2,6 +2,9 @@ from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
 
+# Dias sem confirmação do comprador até a entrega ser confirmada automaticamente
+AUTO_DELIVERY_DAYS = 7
+
 
 @shared_task
 def auto_refund_unprocessed_returns():
@@ -68,3 +71,55 @@ def auto_refund_unprocessed_returns():
         count += 1
 
     return f'{count} devolução(ões) reembolsada(s) automaticamente.'
+
+
+@shared_task
+def auto_confirm_delivery():
+    """
+    Confirma automaticamente a entrega de encomendas 'shipped' (envio)
+    ou 'ready_for_pickup' (levantamento) após AUTO_DELIVERY_DAYS dias sem
+    confirmação do comprador.
+    """
+    from apps.orders.models import Order, OrderStatusHistory
+    from apps.notifications.models import Notification
+
+    cutoff = timezone.now() - timedelta(days=AUTO_DELIVERY_DAYS)
+    pending = Order.objects.filter(
+        status__in=['shipped', 'ready_for_pickup'],
+        shipped_at__lte=cutoff,
+    )
+
+    count = 0
+    for order in pending:
+        previous_status = order.status
+        order.status = 'delivered'
+        order.confirmed_at = timezone.now()
+        order.delivered_at = timezone.now()
+        order.save(update_fields=['status', 'confirmed_at', 'delivered_at'])
+
+        OrderStatusHistory.objects.create(
+            order=order,
+            previous_status=previous_status,
+            new_status='delivered',
+            changed_by=None,
+            notes='Entrega confirmada automaticamente pelo sistema',
+        )
+
+        Notification.objects.create(
+            user=order.buyer,
+            title='Encomenda entregue',
+            message=f'A entrega da encomenda {order.order_number} foi confirmada automaticamente.',
+            notification_type='order_update',
+            link=f'/account/orders/{order.id}',
+        )
+        if order.store and order.store.owner:
+            Notification.objects.create(
+                user=order.store.owner,
+                title='Encomenda entregue',
+                message=f'A encomenda {order.order_number} foi marcada como entregue automaticamente.',
+                notification_type='order_update',
+                link=f'/seller/orders',
+            )
+        count += 1
+
+    return f'{count} encomenda(s) entregue(s) automaticamente.'

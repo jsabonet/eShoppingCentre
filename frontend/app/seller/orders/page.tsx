@@ -5,6 +5,7 @@ import Image from 'next/image';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
   Camera, Loader2, X, AlertCircle, ChevronDown, ChevronUp, History,
+  Store, Eye, User, Phone, Mail, MapPin,
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -20,6 +21,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
   confirmed: { label: 'Confirmado', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
   processing: { label: 'Processando', color: 'bg-indigo-100 text-indigo-700', icon: Clock },
   shipped: { label: 'Enviado', color: 'bg-purple-100 text-purple-700', icon: Truck },
+  ready_for_pickup: { label: 'Pronto p/ Levantar', color: 'bg-teal-100 text-teal-700', icon: Store },
   delivered: { label: 'Entregue', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: XCircle },
   refunded: { label: 'Reembolsado', color: 'bg-gray-100 text-gray-700', icon: XCircle },
@@ -28,9 +30,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
 // Só transições permitidas ao vendedor
 const ALLOWED_OPTIONS: Record<string, string[]> = {
   pending: ['confirmed', 'cancelled'],
-  confirmed: ['processing', 'cancelled'],
-  processing: ['shipped', 'cancelled'],
+  confirmed: ['processing', 'ready_for_pickup', 'cancelled'],
+  processing: ['shipped', 'ready_for_pickup', 'cancelled'],
   shipped: [],
+  ready_for_pickup: [],
   delivered: [],
   cancelled: [],
   refunded: [],
@@ -43,6 +46,7 @@ interface OrderItem {
   store_phone?: string;
   items?: any[]; shipping_notes?: string; tracking_code?: string;
   shipping_evidence?: string;
+  is_pickup?: boolean;
   status_history?: { id: string; previous_status: string; new_status: string; changed_by_name: string; notes: string; created_at: string }[];
 }
 
@@ -57,6 +61,7 @@ export default function SellerOrdersPage() {
   const [shipFile, setShipFile] = useState<File | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [detail, setDetail] = useState<OrderItem | null>(null);
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToast({ type, text }); setTimeout(() => setToast(null), 4000);
@@ -244,17 +249,22 @@ export default function SellerOrdersPage() {
                             </span>
                           </td>
                           <td className="py-2.5 px-2 sm:px-4 text-right">
-                            {allowed.length > 0 && (
-                              <select value="" onChange={e => handleStatusChange(order.id, e.target.value)}
-                                disabled={updating === order.id}
-                                className="text-[11px] px-2 py-1 border border-border rounded bg-background disabled:opacity-50 max-w-[120px]">
-                                <option value="">Alterar...</option>
-                                {allowed.map(s => (
-                                  <option key={s} value={s}>{s === 'shipped' ? '📦 Enviar' : s === 'processing' ? '⚙️ Processar' : s === 'confirmed' ? '✅ Confirmar' : s === 'cancelled' ? '❌ Cancelar' : STATUS_CONFIG[s]?.label}</option>
-                                ))}
-                              </select>
-                            )}
-                            {updating === order.id && <Loader2 size={14} className="animate-spin inline ml-2" />}
+                            <div className="flex items-center justify-end gap-2">
+                              {allowed.length > 0 && (
+                                <select value="" onChange={e => handleStatusChange(order.id, e.target.value)}
+                                  disabled={updating === order.id}
+                                  className="text-[11px] px-2 py-1 border border-border rounded bg-background disabled:opacity-50 max-w-[120px]">
+                                  <option value="">Alterar...</option>
+                                  {allowed.filter(s => order.is_pickup ? s !== 'shipped' : s !== 'ready_for_pickup').map(s => (
+                                    <option key={s} value={s}>{s === 'shipped' ? 'Enviar' : s === 'processing' ? 'Processar' : s === 'confirmed' ? 'Confirmar' : s === 'cancelled' ? 'Cancelar' : s === 'ready_for_pickup' ? 'Pronto p/ Levantar' : STATUS_CONFIG[s]?.label}</option>
+                                  ))}
+                                </select>
+                              )}
+                              <button onClick={() => setDetail(order)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground" title="Ver detalhes">
+                                <Eye size={14} />
+                              </button>
+                              {updating === order.id && <Loader2 size={14} className="animate-spin" />}
+                            </div>
                           </td>
                         </tr>
 
@@ -355,6 +365,104 @@ export default function SellerOrdersPage() {
                 Confirmar Envio
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDetail(null)} />
+          <div className="relative bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">{detail.order_number}</h2>
+              <button onClick={() => setDetail(null)} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+              <div className="bg-muted/30 rounded-xl p-3">
+                <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1"><User size={12} /> Cliente</div>
+                <p className="font-semibold text-xs">{detail.buyer_name || '—'}</p>
+                {detail.buyer_email && <p className="text-[11px] text-muted-foreground">{detail.buyer_email}</p>}
+                {detail.buyer_phone && <p className="text-[11px] text-accent">{detail.buyer_phone}</p>}
+              </div>
+              <div className="bg-muted/30 rounded-xl p-3">
+                <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1"><MapPin size={12} /> Entrega</div>
+                <p className="font-semibold text-xs">{detail.is_pickup ? 'Levantamento na loja' : 'Entrega ao domicílio'}</p>
+                {detail.shipping_method && <p className="text-[11px] text-muted-foreground">{detail.shipping_method}</p>}
+              </div>
+              <div className="bg-muted/30 rounded-xl p-3">
+                <span className="text-xs text-muted-foreground">Status</span>
+                <p><span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_CONFIG[detail.status]?.color}`}>{STATUS_CONFIG[detail.status]?.label}</span></p>
+              </div>
+              <div className="bg-muted/30 rounded-xl p-3">
+                <span className="text-xs text-muted-foreground">Total</span>
+                <p className="font-bold">{Number(detail.total).toLocaleString('pt-MZ')} MZN</p>
+              </div>
+            </div>
+
+            {/* Itens */}
+            {detail.items?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Itens da Encomenda</h3>
+                <div className="space-y-2">
+                  {detail.items.map((item: any, idx: number) => (
+                    <div key={item.id || idx} className="flex items-center gap-3 bg-muted/20 rounded-xl p-2.5">
+                      {item.product_image ? (
+                        <LightboxImage src={item.product_image} alt={item.product_name || 'Produto'} fill
+                          className="relative w-12 h-12 rounded-lg overflow-hidden border border-border bg-muted shrink-0"
+                          imageClassName="object-cover" caption={item.product_name} />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0"><ShoppingCart size={16} className="text-muted-foreground" /></div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate">{item.product_name}</p>
+                        <p className="text-[11px] text-muted-foreground">Qtd: {item.quantity} · {Number(item.unit_price).toLocaleString('pt-MZ')} MZN / un</p>
+                      </div>
+                      <span className="text-xs font-bold shrink-0">{Number(item.total_price).toLocaleString('pt-MZ')} MZN</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Envio */}
+            {detail.shipping_notes && (
+              <div className="bg-purple-50 rounded-xl p-3 mb-4 text-xs">
+                <span className="font-semibold text-purple-700">Envio:</span> {detail.shipping_notes}
+                {detail.tracking_code && <div className="mt-0.5 text-purple-600">Ref: {detail.tracking_code}</div>}
+              </div>
+            )}
+            {detail.shipping_evidence && (
+              <div className="mb-4">
+                <div className="text-xs font-semibold text-muted-foreground mb-2">Evidência de Envio</div>
+                <LightboxImage src={detail.shipping_evidence} alt="Evidência de envio" fill
+                  className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted"
+                  imageClassName="object-cover" caption="Evidência de envio" />
+              </div>
+            )}
+
+            {/* Histórico */}
+            {detail.status_history?.length > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Histórico de Status</h3>
+                <div className="space-y-2">
+                  {detail.status_history.map((h, i) => (
+                    <div key={h.id} className="flex gap-2 text-xs">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-accent' : 'bg-muted-foreground/30'}`} />
+                        {i < detail.status_history!.length - 1 && <div className="w-px flex-1 bg-border" />}
+                      </div>
+                      <div className="pb-2">
+                        <p><span className="font-medium">{h.changed_by_name}</span>: {STATUS_CONFIG[h.previous_status]?.label || h.previous_status} → <span className="font-semibold">{STATUS_CONFIG[h.new_status]?.label || h.new_status}</span></p>
+                        {h.notes && <p className="text-muted-foreground">{h.notes}</p>}
+                        <p className="text-muted-foreground/50">{new Date(h.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

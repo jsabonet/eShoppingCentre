@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, ChevronRight, Clock, CheckCircle, Truck, XCircle, ShoppingBag } from 'lucide-react';
+import { Search, ChevronRight, Clock, CheckCircle, Truck, XCircle, ShoppingBag, Store } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import AccountLayout from '@/src/components/AccountLayout';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -18,6 +18,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
   pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
   confirmed: { label: 'Confirmado', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
   shipped: { label: 'Enviado', color: 'bg-purple-100 text-purple-700', icon: Truck },
+  ready_for_pickup: { label: 'Pronto p/ Levantar', color: 'bg-teal-100 text-teal-700', icon: Store },
   delivered: { label: 'Entregue', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: XCircle },
 };

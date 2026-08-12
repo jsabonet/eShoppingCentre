@@ -531,7 +531,7 @@ export const ordersAPI = {
     payment_method: string;
     affiliate_code?: string;
     buyer_notes?: string;
-  }) => api.post<Order>('/orders/', data),
+  }) => api.post<Order[]>('/orders/', data),
 
   getById: (id: string) => api.get<Order>(`/orders/${id}/`),
 

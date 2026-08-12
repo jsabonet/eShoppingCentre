@@ -10,9 +10,10 @@ from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory, Suppo
 # --- Transições de status permitidas ---
 VALID_TRANSITIONS = {
     'pending': ['confirmed', 'cancelled'],
-    'confirmed': ['processing', 'cancelled'],
-    'processing': ['shipped', 'cancelled'],
+    'confirmed': ['processing', 'ready_for_pickup', 'cancelled'],
+    'processing': ['shipped', 'ready_for_pickup', 'cancelled'],
     'shipped': ['delivered'],
+    'ready_for_pickup': ['delivered'],
     'delivered': [],  # só admin pode reverter
     'cancelled': [],
     'refunded': [],
@@ -44,9 +45,10 @@ class CreateOrderView(APIView):
     def post(self, request):
         serializer = CreateOrderSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
-        order = serializer.save()
-        log_status_change(order, 'pending', request.user, 'Encomenda criada')
-        return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+        orders = serializer.save()
+        for order in orders:
+            log_status_change(order, order.status, request.user, 'Encomenda criada')
+        return Response(OrderSerializer(orders, many=True).data, status=status.HTTP_201_CREATED)
 
 
 class OrderDetailView(generics.RetrieveAPIView):
@@ -93,10 +95,10 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
 
         # Validações
         if not is_admin:
-            if new_status not in ('shipped', 'processing', 'confirmed'):
+            if new_status not in ('shipped', 'processing', 'confirmed', 'ready_for_pickup'):
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({
-                    'status': 'Só pode marcar como enviado, em processamento ou confirmado. A entrega é confirmada pelo comprador.'
+                    'status': 'Só pode marcar como enviado, pronto para levantamento, em processamento ou confirmado. A entrega é confirmada pelo comprador.'
                 })
 
             # Verificar se é downgrade proibido
@@ -118,14 +120,17 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
         evidence = None
         notes = self.request.data.get('notes', '')
 
-        if new_status == 'shipped':
+        if new_status == 'shipped' or new_status == 'ready_for_pickup':
             data['shipped_at'] = timezone.now()
-            data['shipping_notes'] = self.request.data.get('shipping_notes', '')
-            evidence = self.request.FILES.get('shipping_evidence')
-            tracking = self.request.data.get('tracking_code', '')
-            if tracking:
-                data['tracking_code'] = tracking
-            notes = notes or f'Enviado por: {data["shipping_notes"]}'[:500]
+            if new_status == 'shipped':
+                data['shipping_notes'] = self.request.data.get('shipping_notes', '')
+                evidence = self.request.FILES.get('shipping_evidence')
+                tracking = self.request.data.get('tracking_code', '')
+                if tracking:
+                    data['tracking_code'] = tracking
+                notes = notes or f'Enviado por: {data["shipping_notes"]}'[:500]
+            else:
+                notes = notes or 'Pronto para levantamento na loja'
 
         instance = serializer.save(**data)
 
@@ -143,9 +148,9 @@ class ConfirmDeliveryView(APIView):
 
     def post(self, request, pk):
         order = get_object_or_404(Order, pk=pk, buyer=request.user)
-        if order.status != 'shipped':
+        if order.status not in ('shipped', 'ready_for_pickup'):
             return Response(
-                {'detail': 'Só pode confirmar receção de encomendas enviadas.'},
+                {'detail': 'Só pode confirmar receção de encomendas enviadas ou prontas para levantamento.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         order.status = 'delivered'

@@ -130,7 +130,7 @@ export default function CheckoutContent() {
   const { isAuthenticated } = useAuth();
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
   const [confirmed, setConfirmed] = useState(false);
-  const [orderData, setOrderData] = useState<any>(null);
+  const [orderData, setOrderData] = useState<any[]>([]);
   const [paymentMethod, setPaymentMethod] = useState('test');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -266,7 +266,7 @@ export default function CheckoutContent() {
       }
 
       const data = await res.json();
-      setOrderData(data);
+      setOrderData(Array.isArray(data) ? data : [data]);
       setConfirmed(true);
       clearCart();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -278,7 +278,8 @@ export default function CheckoutContent() {
   };
 
   // Confirmation screen
-  if (confirmed && orderData) {
+  if (confirmed && orderData.length > 0) {
+    const allPaid = orderData.every((o: any) => o.payment_status === 'completed');
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center">
         <CheckCircle className="mx-auto text-green-600 mb-6" size={80} />
@@ -288,22 +289,27 @@ export default function CheckoutContent() {
             ? '🧪 Modo Teste — a sua encomenda foi criada com pagamento automático.'
             : 'Obrigado pela sua compra. Receberá um email com os detalhes.'}
         </p>
-        <div className="bg-card border border-border rounded-lg p-6 mb-6">
-          <p className="font-semibold mb-2">Número do Pedido:</p>
-          <p className="text-2xl font-bold text-accent">{orderData.order_number}</p>
-          <p className="text-sm text-muted-foreground mt-2">Estado: {orderData.status}</p>
-          {orderData.payment_status === 'completed' && (
-            <span className="inline-block mt-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-              ✅ Pago
-            </span>
-          )}
+        <div className="bg-card border border-border rounded-lg p-6 mb-6 space-y-4">
+          {orderData.map((o: any) => (
+            <div key={o.id || o.order_number} className="text-left border border-border rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-1">{o.store_name ? `Loja: ${o.store_name}` : 'Encomenda'}</p>
+              <p className="font-semibold mb-2">Número do Pedido:</p>
+              <p className="text-2xl font-bold text-accent">{o.order_number}</p>
+              <p className="text-sm text-muted-foreground mt-2">Estado: {o.status}</p>
+              {o.payment_status === 'completed' && (
+                <span className="inline-block mt-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                  ✅ Pago
+                </span>
+              )}
+            </div>
+          ))}
         </div>
         <div className="bg-muted rounded-lg p-6 mb-6 text-left">
           <h3 className="font-semibold mb-3">Próximos Passos:</h3>
           <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-            {paymentMethod === 'test' ? (
+            {allPaid ? (
               <>
-                <li>A encomenda foi processada automaticamente</li>
+                <li>A(s) encomenda(s) foram processadas automaticamente</li>
                 <li>Produtos digitais e cursos já estão disponíveis</li>
                 <li>Pode ver os seus cursos em <Link href="/my-courses" className="text-accent hover:underline">Meus Cursos</Link></li>
                 <li>Downloads disponíveis em <Link href="/account/downloads" className="text-accent hover:underline">Minha Conta → Downloads</Link></li>

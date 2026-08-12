@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, MapPin, CreditCard, RotateCcw, Loader2, AlertCircle, XCircle,
-  Package, CheckCircle2, Circle, Truck, Clock, Ban, Undo2, MessageCircle, Camera,
+  Package, CheckCircle2, Circle, Truck, Clock, Ban, Undo2, MessageCircle, Camera, Store,
 } from 'lucide-react';
 import AccountLayout from '@/src/components/AccountLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -26,7 +26,8 @@ const REASON_CHOICES = [
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendente', confirmed: 'Confirmada', processing: 'Em Preparação',
-  shipped: 'Enviada', delivered: 'Entregue', cancelled: 'Cancelada', refunded: 'Reembolsada',
+  shipped: 'Enviada', ready_for_pickup: 'Pronto para Levantamento',
+  delivered: 'Entregue', cancelled: 'Cancelada', refunded: 'Reembolsada',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,6 +35,7 @@ const STATUS_COLORS: Record<string, string> = {
   confirmed: 'bg-blue-100 text-blue-700',
   processing: 'bg-indigo-100 text-indigo-700',
   shipped: 'bg-purple-100 text-purple-700',
+  ready_for_pickup: 'bg-teal-100 text-teal-700',
   delivered: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
   refunded: 'bg-gray-100 text-gray-700',
@@ -43,13 +45,16 @@ function buildTimeline(order: any) {
   const steps: { label: string; date: string | null; done: boolean; active: boolean; icon: any }[] = [];
   const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
 
-  const statusOrder = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
+  const isPickup = order.is_pickup;
+  const statusOrder = isPickup
+    ? ['pending', 'confirmed', 'processing', 'ready_for_pickup', 'delivered']
+    : ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
   const idx = statusOrder.indexOf(order.status);
 
   steps.push({ label: 'Pedido Realizado', date: fmt(order.created_at), done: idx >= 0, active: idx === 0, icon: Package });
   steps.push({ label: 'Pagamento Confirmado', date: order.status !== 'pending' ? fmt(order.confirmed_at ?? order.created_at) : null, done: idx >= 1, active: idx === 1, icon: CreditCard });
   steps.push({ label: 'Em Preparação', date: idx >= 2 ? fmt(order.updated_at) : null, done: idx >= 2, active: idx === 2, icon: Clock });
-  steps.push({ label: 'Enviado', date: order.shipped_at ? fmt(order.shipped_at) : null, done: idx >= 3, active: idx === 3, icon: Truck });
+  steps.push({ label: isPickup ? 'Pronto p/ Levantar' : 'Enviado', date: order.shipped_at ? fmt(order.shipped_at) : null, done: idx >= 3, active: idx === 3, icon: isPickup ? Store : Truck });
   steps.push({ label: 'Entregue', date: order.confirmed_at ? fmt(order.confirmed_at) : null, done: idx >= 4, active: idx === 4, icon: CheckCircle2 });
 
   if (order.status === 'cancelled') {
@@ -192,13 +197,13 @@ export default function OrderDetailPage() {
     </AccountLayout>
   );
 
-  const canRequestReturn = ['delivered', 'shipped'].includes(order.status) && !returns.some((r: any) => ['requested', 'approved', 'shipped'].includes(r.status));
+  const canRequestReturn = ['delivered', 'shipped', 'ready_for_pickup'].includes(order.status) && !returns.some((r: any) => ['requested', 'approved', 'shipped'].includes(r.status));
   const activeReturn = returns.find((r: any) => ['requested', 'approved', 'shipped', 'received', 'refunded'].includes(r.status));
   const rejectedReturn = returns.find((r: any) => r.status === 'rejected');
   const disputedReturn = returns.find((r: any) => r.status === 'disputed');
   const canShipReturn = activeReturn?.status === 'approved';
   const canDispute = rejectedReturn?.status === 'rejected' && !disputedReturn;
-  const canConfirmDelivery = order.status === 'shipped';
+  const canConfirmDelivery = order.status === 'shipped' || order.status === 'ready_for_pickup';
 
   // Janela de devolução: 7 dias após confirmação de entrega
   const returnWindowOpen = (() => {
@@ -564,7 +569,7 @@ export default function OrderDetailPage() {
           <button onClick={handleConfirmDelivery} disabled={submitting}
             className="w-full sm:w-auto px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
             {submitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-            Confirmar Receção da Encomenda
+            {order.is_pickup ? 'Confirmar Levantamento' : 'Confirmar Receção da Encomenda'}
           </button>
         )}
 

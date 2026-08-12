@@ -9,6 +9,7 @@ class Order(BaseModel):
         ('confirmed', 'Confirmada'),
         ('processing', 'Em Processamento'),
         ('shipped', 'Enviada'),
+        ('ready_for_pickup', 'Pronto para Levantamento'),
         ('delivered', 'Entregue'),
         ('cancelled', 'Cancelada'),
         ('refunded', 'Reembolsada'),
@@ -30,6 +31,7 @@ class Order(BaseModel):
     payment_id = models.CharField(max_length=255, blank=True)
     shipping_address = models.JSONField()
     shipping_method = models.CharField(max_length=100, blank=True)
+    is_pickup = models.BooleanField(default=False, help_text='Se a encomenda usa levantamento na loja em vez de entrega')
     tracking_code = models.CharField(max_length=100, blank=True)
     estimated_delivery = models.DateField(null=True, blank=True)
     shipped_at = models.DateTimeField(null=True, blank=True, help_text='Data em que o vendedor marcou como enviado')

@@ -153,7 +153,7 @@ class CreateOrderSerializer(serializers.Serializer):
         for item in items:
             try:
                 product = Product.objects.get(id=item['product_id'], status='active')
-                if product.product_type == 'physical' and item['quantity'] > product.stock:
+                if product.product_type == 'physical' and not product.allow_backorder and item['quantity'] > product.stock:
                     raise serializers.ValidationError(
                         f'Stock insuficiente para {product.name}. Disponível: {product.stock}'
                     )
@@ -173,8 +173,10 @@ class CreateOrderSerializer(serializers.Serializer):
         user = self.context['request'].user
         items_data = validated_data.pop('items')
         affiliate_code = validated_data.pop('affiliate_code', None)
+        shipping_selections = validated_data.pop('shipping_selections', {})
+        province = validated_data.get('shipping_address', {}).get('province', '')
 
-        # Criar encomenda por loja (produtos de lojas diferentes podem ser divididos)
+        # Agrupar itens por loja (produtos de lojas diferentes geram encomendas separadas)
         store_orders = {}
         subtotal = 0
 
@@ -195,22 +197,7 @@ class CreateOrderSerializer(serializers.Serializer):
             store_orders[store.id]['store_total'] += item_total
             subtotal += item_total
 
-            # Reduzir stock
-            if product.product_type == 'physical':
-                old_stock = product.stock
-                product.stock -= item_data['quantity']
-                product.save(update_fields=['stock'])
-                from apps.products.models import StockLog
-                StockLog.objects.create(
-                    product=product, change_type='sale',
-                    quantity=-item_data['quantity'],
-                    stock_before=old_stock, stock_after=product.stock,
-                    reference=f'Order pending',
-                    changed_by=user,
-                    notes=f'Venda de {item_data["quantity"]} unidade(s)',
-                )
-
-        # Calcular comissão de afiliado
+        # Comissão de afiliado (total, repartida proporcionalmente depois)
         affiliate = None
         affiliate_commission = 0
         if affiliate_code:
@@ -220,16 +207,12 @@ class CreateOrderSerializer(serializers.Serializer):
                 affiliate = link.affiliate.user
                 for store_data in store_orders.values():
                     for item in store_data['items']:
-                        product = item['product']
-                        affiliate_commission += (item['total_price'] * product.affiliate_commission) / 100
+                        affiliate_commission += (item['total_price'] * item['product'].affiliate_commission) / 100
 
-        # ─── Calcular frete ───
-        shipping_cost = 0
-        shipping_method_name = ''
-        shipping_selections = validated_data.pop('shipping_selections', {})
+        # Frete por loja
+        store_shipping = {}  # store_id -> {'cost', 'method_name', 'is_pickup'}
         if shipping_selections:
             from apps.shipping.models import ShippingRate
-            province = validated_data.get('shipping_address', {}).get('province', '')
             for store_id, rate_id in shipping_selections.items():
                 try:
                     rate = ShippingRate.objects.select_related('method', 'zone').get(
@@ -247,50 +230,77 @@ class CreateOrderSerializer(serializers.Serializer):
                         )
                         calc = rate.calculate(weight, store_data['store_total'])
                         if calc:
-                            shipping_cost += calc['price']
-                            if not shipping_method_name:
-                                shipping_method_name = rate.method.name
+                            store_shipping[store_data['store'].id] = {
+                                'cost': calc['price'],
+                                'method_name': rate.method.name,
+                                'is_pickup': rate.method.method_type == 'pickup',
+                            }
                 except (ValueError, ShippingRate.DoesNotExist):
                     continue
 
-        # Criar a primeira encomenda (podemos dividir por loja depois)
-        first_store = list(store_orders.values())[0]
-        platform_fee = (first_store['store_total'] * 8) / 100
-
         is_test = validated_data['payment_method'] == 'test'
-        order = Order.objects.create(
-            buyer=user,
-            store=first_store['store'],
-            subtotal=subtotal,
-            shipping_cost=shipping_cost,
-            total=first_store['store_total'] + shipping_cost,
-            platform_fee=platform_fee,
-            affiliate=affiliate,
-            affiliate_commission=affiliate_commission,
-            payment_method=validated_data['payment_method'],
-            payment_status='completed' if is_test else 'pending',
-            status='confirmed' if is_test else 'pending',
-            shipping_address=validated_data['shipping_address'],
-            shipping_method=shipping_method_name,
-            buyer_notes=validated_data.get('buyer_notes', ''),
-        )
+        payment_status = 'completed' if is_test else 'pending'
+        order_status = 'confirmed' if is_test else 'pending'
 
-        for item in first_store['items']:
-            OrderItem.objects.create(
-                order=order,
-                product=item['product'],
-                product_name=item['product'].name,
-                product_image=self._get_product_image(item['product']),
-                quantity=item['quantity'],
-                unit_price=item['unit_price'],
-                total_price=item['total_price'],
+        from apps.products.models import StockLog
+
+        orders = []
+        for store_id, store_data in store_orders.items():
+            ship = store_shipping.get(store_id, {'cost': 0, 'method_name': '', 'is_pickup': False})
+            store_total = store_data['store_total']
+            platform_fee = (store_total * 8) / 100
+            store_affiliate_commission = (affiliate_commission * store_total / subtotal) if subtotal else 0
+
+            order = Order.objects.create(
+                buyer=user,
+                store=store_data['store'],
+                subtotal=store_total,
+                shipping_cost=ship['cost'],
+                total=store_total + ship['cost'],
+                platform_fee=platform_fee,
+                affiliate=affiliate,
+                affiliate_commission=round(store_affiliate_commission, 2),
+                payment_method=validated_data['payment_method'],
+                payment_status=payment_status,
+                status=order_status,
+                shipping_address=validated_data['shipping_address'],
+                shipping_method=ship['method_name'],
+                is_pickup=ship['is_pickup'],
+                buyer_notes=validated_data.get('buyer_notes', ''),
             )
 
-        # ── Processar entregas digitais e matrículas imediatamente ──
-        if order.payment_status == 'completed':
-            self._process_delivery(order)
+            for item in store_data['items']:
+                OrderItem.objects.create(
+                    order=order,
+                    product=item['product'],
+                    product_name=item['product'].name,
+                    product_image=self._get_product_image(item['product']),
+                    quantity=item['quantity'],
+                    unit_price=item['unit_price'],
+                    total_price=item['total_price'],
+                )
 
-        return order
+                # Deduzir stock e registar no histórico
+                if item['product'].product_type == 'physical':
+                    old_stock = item['product'].stock
+                    item['product'].stock -= item['quantity']
+                    item['product'].save(update_fields=['stock'])
+                    StockLog.objects.create(
+                        product=item['product'], change_type='sale',
+                        quantity=-item['quantity'],
+                        stock_before=old_stock, stock_after=item['product'].stock,
+                        reference=order.order_number,
+                        changed_by=user,
+                        notes=f'Venda de {item["quantity"]} unidade(s)',
+                    )
+
+            # Processar entregas digitais e matrículas imediatamente
+            if order.payment_status == 'completed':
+                self._process_delivery(order)
+
+            orders.append(order)
+
+        return orders
 
     def _process_delivery(self, order):
         """Liberta downloads digitais e matricula em cursos após pagamento confirmado."""
