@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
   Camera, Loader2, X, AlertCircle, ChevronDown, ChevronUp, History,
@@ -204,7 +204,7 @@ export default function SellerOrdersPage() {
                     const hasHistory = order.status_history?.length > 0;
 
                     return (
-                      <>
+                      <React.Fragment key={order.id}>
                         <tr key={order.id} className="hover:bg-muted/20 transition-colors group">
                           <td className="py-2.5 px-2">
                             {hasHistory && (
@@ -267,7 +267,7 @@ export default function SellerOrdersPage() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>

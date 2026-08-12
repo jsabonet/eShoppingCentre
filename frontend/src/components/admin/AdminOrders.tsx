@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
-  AlertCircle, ChevronDown, ChevronUp, History, Eye, User, Phone, Mail,
+  AlertCircle, ChevronDown, ChevronUp, History, Eye, User, Phone, Mail, Loader2,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -40,6 +40,12 @@ export default function AdminOrders() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<OrderItem | null>(null);
   const [detailModal, setDetailModal] = useState(false);
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToast({ type, text }); setTimeout(() => setToast(null), 4000);
+  };
 
   const headers = useCallback(() => {
     const token = localStorage.getItem('access_token');
@@ -63,6 +69,27 @@ export default function AdminOrders() {
     setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
+  const handleAdminStatusChange = async (orderId: string, newStatus: string) => {
+    if (!newStatus) return;
+    setUpdating(orderId);
+    try {
+      const res = await fetch(`${API_URL}/orders/${orderId}/update-status/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers() },
+        body: JSON.stringify({ status: newStatus, notes: `Admin alterou status para ${newStatus}` }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(typeof err.status === 'string' ? err.status : typeof err.detail === 'string' ? err.detail : 'Erro.');
+      }
+      const data = await res.json();
+      setOrders(prev => prev.map(o => o.id === orderId ? data : o));
+      showToast('success', `Status alterado para "${STATUS_CONFIG[newStatus]?.label || newStatus}".`);
+    } catch (err: any) {
+      showToast('error', err.message);
+    } finally { setUpdating(null); }
+  };
+
   const filtered = orders.filter(o => {
     const q = search.toLowerCase();
     const m = (o.buyer_email || '').toLowerCase().includes(q) || o.order_number.toLowerCase().includes(q) || (o.store_name || '').toLowerCase().includes(q);
@@ -71,6 +98,14 @@ export default function AdminOrders() {
 
   return (
     <div>
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-2 ${
+          toast.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+          {toast.text}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -118,6 +153,7 @@ export default function AdminOrders() {
                 <th className="text-left py-3 px-2 font-semibold text-muted-foreground text-[11px] uppercase">Total</th>
                 <th className="text-left py-3 px-2 font-semibold text-muted-foreground text-[11px] uppercase">Status</th>
                 <th className="text-left py-3 px-2 font-semibold text-muted-foreground text-[11px] uppercase hidden sm:table-cell">Data</th>
+                <th className="text-left py-3 px-2 font-semibold text-muted-foreground text-[11px] uppercase">Alterar</th>
                 <th className="text-right py-3 px-2 font-semibold text-muted-foreground text-[11px] uppercase w-16">Det.</th>
               </tr></thead>
               <tbody className="divide-y divide-border">
@@ -126,7 +162,7 @@ export default function AdminOrders() {
                   const isExpanded = expanded.has(order.id);
                   const hasHistory = order.status_history?.length > 0;
                   return (
-                    <>
+                    <React.Fragment key={order.id}>
                       <tr key={order.id} className="hover:bg-muted/20 transition-colors">
                         <td className="py-2.5 px-2">
                           {hasHistory && (
@@ -143,6 +179,17 @@ export default function AdminOrders() {
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${s.color}`}>{s.label}</span>
                         </td>
                         <td className="py-2.5 px-2 text-xs text-muted-foreground hidden sm:table-cell">{new Date(order.created_at).toLocaleDateString('pt-MZ')}</td>
+                        <td className="py-2.5 px-2">
+                          <select value="" onChange={e => handleAdminStatusChange(order.id, e.target.value)}
+                            disabled={updating === order.id}
+                            className="text-[11px] px-1.5 py-1 border border-border rounded bg-white disabled:opacity-50 max-w-[110px]">
+                            <option value="">Mudar...</option>
+                            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                              <option key={k} value={k} disabled={k === order.status}>{v.label}</option>
+                            ))}
+                          </select>
+                          {updating === order.id && <Loader2 size={12} className="animate-spin inline ml-1" />}
+                        </td>
                         <td className="py-2.5 px-2 text-right">
                           <button onClick={() => { setDetail(order); setDetailModal(true); }}
                             className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground"><Eye size={14} /></button>
@@ -150,7 +197,7 @@ export default function AdminOrders() {
                       </tr>
                       {isExpanded && hasHistory && (
                         <tr key={`${order.id}-hist`}>
-                          <td colSpan={8} className="bg-muted/20 px-6 py-2">
+                          <td colSpan={9} className="bg-muted/20 px-6 py-2">
                             <div className="flex items-center gap-2 mb-1 text-xs text-muted-foreground"><History size={12} /> Histórico</div>
                             <div className="space-y-1">
                               {order.status_history!.map(h => (
@@ -168,7 +215,7 @@ export default function AdminOrders() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </React.Fragment>
                   );
                 })}
               </tbody>

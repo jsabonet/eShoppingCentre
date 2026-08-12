@@ -81,6 +81,8 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        if self.request.user.is_staff:
+            return Order.objects.all()
         return self.request.user.store.orders.all()
 
     def perform_update(self, serializer):
