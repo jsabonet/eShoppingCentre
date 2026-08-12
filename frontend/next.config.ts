@@ -17,22 +17,25 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        // B12 CDN (imagens dos produtos actuais)
         protocol: 'https',
         hostname: 'cdn.b12.io',
       },
       {
-        // Django media (local dev)
         protocol: 'http',
         hostname: 'localhost',
         port: '8000',
       },
       {
-        // Futuras imagens servidas pelo Django (ex: media via S3 ou local)
+        protocol: 'https',
+        hostname: 'e-shoppingcentre.com',
+      },
+      {
         protocol: 'https',
         hostname: process.env.NEXT_PUBLIC_MEDIA_HOST ?? 'localhost',
       },
     ],
+    // Não otimizar imagens do próprio servidor (evita redirect loop)
+    unoptimized: process.env.NODE_ENV === 'production' ? true : false,
   },
 };
 
