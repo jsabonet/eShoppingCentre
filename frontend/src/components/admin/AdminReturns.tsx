@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import LightboxImage from '@/src/components/LightboxImage';
 import {
   RotateCcw, CheckCircle, XCircle, Truck, Package, Search, RefreshCw,
-  DollarSign, AlertCircle, Eye, Shield, Ban, Undo2,
+  DollarSign, AlertCircle, Eye, Shield, Ban, Undo2, Camera,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -26,6 +27,13 @@ const REASON_LABELS: Record<string, string> = {
   wrong_item: 'Item errado', other: 'Outro',
 };
 
+interface ReturnImage {
+  id: string;
+  image: string;
+  caption: string;
+  created_at: string;
+}
+
 interface ReturnItem {
   id: string; rma_number: string; order_number: string;
   reason: string; reason_type: string; status: string;
@@ -37,6 +45,7 @@ interface ReturnItem {
   created_at: string;
   product_names: string[];
   product_image: string | null;
+  images: ReturnImage[];
 }
 
 export default function AdminReturns() {
@@ -250,6 +259,20 @@ export default function AdminReturns() {
               <div><span className="text-muted-foreground">Estado atual:</span> <span className={`font-semibold ${STATUS_CONFIG[selected.status]?.color}`}>{STATUS_CONFIG[selected.status]?.label}</span></div>
               {selected.refund_amount && <div><span className="text-muted-foreground">Reembolso:</span> {Number(selected.refund_amount).toLocaleString('pt-MZ')} MZN</div>}
             </div>
+
+            {/* Evidências (fotos do comprador) */}
+            {selected.images?.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2"><Camera size={14} className="text-muted-foreground" /> <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evidências ({selected.images.length})</span></div>
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                  {selected.images.map((img: ReturnImage) => (
+                    <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Evidência'} fill
+                      className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted"
+                      imageClassName="object-cover" caption={img.caption} />
+                  ))}
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleOverride} className="space-y-4">
               <div>

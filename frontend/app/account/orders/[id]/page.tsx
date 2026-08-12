@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import AccountLayout from '@/src/components/AccountLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import LightboxImage from '@/src/components/LightboxImage';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -410,9 +411,11 @@ export default function OrderDetailPage() {
                   <p className="text-sm text-purple-800">{order.shipping_notes}</p>
                   {order.tracking_code && <p className="text-xs text-purple-600 mt-1">Ref: {order.tracking_code}</p>}
                   {order.shipping_evidence && (
-                    <Image src={order.shipping_evidence.startsWith('http') ? order.shipping_evidence : MEDIA_URL + order.shipping_evidence}
-                      alt="Evidência de envio" width={120} height={120}
-                      className="mt-2 rounded-lg border border-purple-200 object-cover" />
+                    <div className="mt-2">
+                      <LightboxImage src={order.shipping_evidence} alt="Evidência de envio" fill
+                        className="relative w-32 h-32 rounded-lg overflow-hidden border border-purple-200"
+                        imageClassName="object-cover" caption="Evidência de envio" />
+                    </div>
                   )}
                 </div>
               )}
@@ -488,6 +491,18 @@ export default function OrderDetailPage() {
                 <p className="font-semibold mb-1">Enviado por:</p>
                 <p>{activeReturn.shipping_notes}</p>
                 {activeReturn.buyer_tracking_code && <p className="mt-1 text-xs text-purple-600">Ref: {activeReturn.buyer_tracking_code}</p>}
+              </div>
+            )}
+            {activeReturn.images?.length > 0 && (
+              <div className="mt-3">
+                <p className="font-semibold mb-2 text-sm">Fotos enviadas:</p>
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                  {activeReturn.images.map((img: any) => (
+                    <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Evidência'} fill
+                      className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted"
+                      imageClassName="object-cover" caption={img.caption} />
+                  ))}
+                </div>
               </div>
             )}
           </div>

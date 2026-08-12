@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import LightboxImage from '@/src/components/LightboxImage';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
   AlertCircle, ChevronDown, ChevronUp, History, Eye, User, Phone, Mail, Loader2,
@@ -31,6 +32,7 @@ interface OrderItem {
   buyer_email?: string; buyer_phone?: string; buyer_name?: string;
   store_name?: string; store_phone?: string;
   items?: any[]; shipping_notes?: string; tracking_code?: string;
+  shipping_evidence?: string;
   status_history?: StatusEntry[];
 }
 
@@ -271,6 +273,15 @@ export default function AdminOrders() {
             {detail.shipping_notes && (
               <div className="bg-purple-50 rounded-xl p-3 mb-4 text-xs">
                 <span className="font-semibold text-purple-700">Envio:</span> {detail.shipping_notes}
+              </div>
+            )}
+
+            {detail.shipping_evidence && (
+              <div className="mb-4">
+                <div className="text-xs font-semibold text-muted-foreground mb-2">Evidência de Envio</div>
+                <LightboxImage src={detail.shipping_evidence} alt="Evidência de envio" fill
+                  className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted"
+                  imageClassName="object-cover" caption="Evidência de envio" />
               </div>
             )}
 

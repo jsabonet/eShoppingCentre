@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import LightboxImage from '@/src/components/LightboxImage';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -409,9 +410,9 @@ export default function SellerReturnsPage() {
                 {selectedReturn.images?.length > 0 && (
                   <div className="flex gap-2 pt-2 border-t border-border mt-2">
                     {selectedReturn.images.map((img: ReturnImage) => (
-                      <Image key={img.id} src={img.image.startsWith('http') ? img.image : MEDIA_URL + img.image}
-                        alt={img.caption || 'Evidência'} width={60} height={60}
-                        className="w-14 h-14 rounded-lg object-cover border border-border" />
+                      <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Evidência'} fill
+                        className="relative w-14 h-14 rounded-lg overflow-hidden border border-border shrink-0"
+                        imageClassName="object-cover" caption={img.caption} />
                     ))}
                   </div>
                 )}
@@ -583,11 +584,11 @@ export default function SellerReturnsPage() {
                   <div className="flex items-center gap-2 mb-3"><Camera size={14} className="text-muted-foreground" /> <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evidências ({selectedReturn.images.length})</span></div>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {selectedReturn.images.map((img: ReturnImage) => (
-                      <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden border border-border bg-muted">
-                        <Image src={img.image.startsWith('http') ? img.image : MEDIA_URL + img.image}
-                          alt={img.caption || 'Evidência'} fill className="object-cover" />
+                      <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Evidência'} fill
+                        className="relative aspect-square rounded-xl overflow-hidden border border-border bg-muted"
+                        imageClassName="object-cover" caption={img.caption}>
                         {img.caption && <div className="absolute bottom-0 inset-x-0 bg-black/60 p-1"><p className="text-[10px] text-white truncate">{img.caption}</p></div>}
-                      </div>
+                      </LightboxImage>
                     ))}
                   </div>
                 </div>

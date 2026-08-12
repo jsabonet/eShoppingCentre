@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import LightboxImage from '@/src/components/LightboxImage';
 import { ordersAPI } from '@/src/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -264,6 +265,21 @@ export default function SellerOrdersPage() {
                               <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
                                 <History size={13} /> Histórico de Status
                               </div>
+                              {(order.shipping_evidence || order.shipping_notes) && (
+                                <div className="mb-3 flex items-start gap-3">
+                                  {order.shipping_evidence && (
+                                    <LightboxImage src={order.shipping_evidence} alt="Evidência de envio" fill
+                                      className="relative w-20 h-20 rounded-lg overflow-hidden border border-border bg-muted shrink-0"
+                                      imageClassName="object-cover" caption="Evidência de envio" />
+                                  )}
+                                  {order.shipping_notes && (
+                                    <div className="text-xs text-muted-foreground">
+                                      <span className="font-semibold text-foreground">Envio:</span> {order.shipping_notes}
+                                      {order.tracking_code && <div className="mt-0.5 text-muted-foreground">Ref: {order.tracking_code}</div>}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                               <div className="space-y-2">
                                 {order.status_history!.map(h => (
                                   <div key={h.id} className="flex items-start gap-2 text-xs">
@@ -324,6 +340,14 @@ export default function SellerOrdersPage() {
                   <input type="file" accept="image/*" capture="environment" className="hidden"
                     onChange={e => setShipFile(e.target.files?.[0] || null)} />
                 </label>
+                {shipFile && (
+                  <div className="mt-2 flex items-center gap-3">
+                    <img src={URL.createObjectURL(shipFile)} alt="Pré-visualização do pacote"
+                      className="w-16 h-16 rounded-lg object-cover border border-border" />
+                    <button type="button" onClick={() => setShipFile(null)}
+                      className="text-xs text-red-600 hover:underline">Remover foto</button>
+                  </div>
+                )}
               </div>
               <button type="submit" disabled={updating === shipModal.orderId}
                 className="w-full px-4 py-2.5 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
