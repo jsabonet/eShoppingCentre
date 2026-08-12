@@ -210,16 +210,20 @@ class CreateOrderSerializer(serializers.Serializer):
         affiliate_profile = None
         affiliate_link = None
         affiliate_commission = 0
+        effective_rate = None
         if affiliate_code:
             from apps.affiliates.models import AffiliateLink
+            from apps.affiliates.services import get_tier_multiplier
             link = AffiliateLink.objects.filter(code=affiliate_code).select_related('affiliate', 'product').first()
             if link and link.affiliate.is_active and link.affiliate.user != user:  # anti auto-referência
                 affiliate = link.affiliate.user
                 affiliate_profile = link.affiliate
                 affiliate_link = link
+                multiplier = get_tier_multiplier(link.affiliate)
+                effective_rate = link.product.affiliate_commission * multiplier
                 for store_data in store_orders.values():
                     for item in store_data['items']:
-                        affiliate_commission += (item['total_price'] * item['product'].affiliate_commission) / 100
+                        affiliate_commission += (item['total_price'] * item['product'].affiliate_commission * multiplier) / 100
 
         # Frete por loja
         store_shipping = {}  # store_id -> {'cost', 'method_name', 'is_pickup'}
@@ -381,6 +385,7 @@ class CreateOrderSerializer(serializers.Serializer):
         if affiliate_profile and affiliate_link:
             from django.db.models import F
             from apps.affiliates.models import AffiliateCommission, AffiliateProfile
+            from apps.affiliates.services import update_tier
             for order in orders:
                 if order.affiliate_commission > 0:
                     AffiliateCommission.objects.create(
@@ -388,11 +393,14 @@ class CreateOrderSerializer(serializers.Serializer):
                         order=order,
                         product=affiliate_link.product,
                         amount=order.affiliate_commission,
-                        commission_rate=affiliate_link.product.affiliate_commission,
+                        commission_rate=round(effective_rate or affiliate_link.product.affiliate_commission, 2),
                         status='pending',
                     )
             AffiliateLink.objects.filter(pk=affiliate_link.pk).update(conversions=F('conversions') + len(orders))
             AffiliateProfile.objects.filter(pk=affiliate_profile.pk).update(total_sales=F('total_sales') + len(orders))
+            # Recalcular tier com base no novo volume de vendas
+            fresh_profile = AffiliateProfile.objects.get(pk=affiliate_profile.pk)
+            update_tier(fresh_profile)
 
         return orders
 

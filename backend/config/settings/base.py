@@ -161,6 +161,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.orders.tasks.recover_abandoned_carts',
         'schedule': 3600.0,  # a cada hora
     },
+    'auto-approve-affiliate-commissions': {
+        'task': 'apps.affiliates.tasks.auto_approve_affiliate_commissions',
+        'schedule': 3600.0,  # a cada hora
+    },
 }
 
 CHANNEL_LAYERS = {

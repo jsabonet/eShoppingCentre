@@ -8,9 +8,9 @@ class AffiliateProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = AffiliateProfile
         fields = ('id', 'user_email', 'referral_code', 'total_clicks',
-                  'total_sales', 'total_commission', 'is_active')
+                  'total_sales', 'total_commission', 'is_active', 'commission_tier')
         read_only_fields = ('total_clicks', 'total_sales', 'total_commission',
-                           'is_active', 'referral_code')
+                           'is_active', 'referral_code', 'commission_tier')
 
 
 class AffiliateLinkSerializer(serializers.ModelSerializer):
@@ -34,5 +34,5 @@ class AffiliateCommissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AffiliateCommission
         fields = ('id', 'product_name', 'order_number', 'amount',
-                  'commission_rate', 'status', 'created_at')
-        read_only_fields = ('amount', 'commission_rate', 'status')
+                  'commission_rate', 'status', 'rejection_reason', 'created_at')
+        read_only_fields = ('amount', 'commission_rate', 'status', 'rejection_reason')

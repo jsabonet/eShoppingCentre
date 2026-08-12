@@ -64,6 +64,10 @@ def auto_refund_unprocessed_returns():
             return_req.admin_notes = f'Reembolsado automaticamente pelo sistema em {timezone.now().date()}'
             return_req.save()
 
+        # Reverter comissão de afiliado (se existir)
+        from apps.affiliates.services import reject_commissions_for_order
+        reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada automaticamente')
+
         Notification.objects.create(
             user=return_req.buyer,
             title='Reembolso processado',

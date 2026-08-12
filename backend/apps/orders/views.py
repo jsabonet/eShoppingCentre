@@ -203,6 +203,9 @@ class CancelOrderView(APIView):
                             changed_by=request.user,
                             notes='Stock restaurado por cancelamento',
                         )
+                # Reverter comissão de afiliado (se existir)
+                from apps.affiliates.services import reject_commissions_for_order
+                reject_commissions_for_order(order, 'Encomenda cancelada')
                 return Response({'detail': 'Encomenda cancelada.'})
             return Response({'detail': 'Não é possível cancelar esta encomenda.'},
                           status=status.HTTP_400_BAD_REQUEST)
@@ -439,6 +442,10 @@ class RefundReturnView(APIView):
             return_req.status = 'refunded'
             return_req.save()
 
+        # Reverter comissão de afiliado (se existir)
+        from apps.affiliates.services import reject_commissions_for_order
+        reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada')
+
         from apps.notifications.models import Notification
         Notification.objects.create(
             user=return_req.buyer,
@@ -544,6 +551,11 @@ class AdminOverrideView(APIView):
             return_req.status = 'refunded'
 
         return_req.save()
+
+        # Reverter comissão de afiliado em caso de reembolso
+        if action == 'refund':
+            from apps.affiliates.services import reject_commissions_for_order
+            reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada pelo admin')
 
         from apps.notifications.models import Notification
         Notification.objects.create(
