@@ -114,11 +114,11 @@ export default function InventoryPage() {
           ].map(s => (
             <button key={s.key} onClick={() => setStockFilter(stockFilter === s.key ? 'all' : s.key)}
               className={`p-3 rounded-xl border text-center transition-colors ${s.color} ${stockFilter === s.key ? 'ring-2 ring-accent' : ''}`}>
-              <div className="flex items-center justify-center gap-1.5">
-                <s.icon size={16} />
+              <div className="flex flex-col items-center gap-1">
+                <s.icon size={22} />
                 <span className="text-2xl font-bold">{s.count}</span>
               </div>
-              <div className="text-xs text-muted-foreground">{s.label}</div>
+              <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
             </button>
           ))}
         </div>
