@@ -68,7 +68,7 @@ export default function CartContent() {
                         {item.product.name}
                       </Link>
                       <p className="text-lg font-bold mt-2">MZN {formatPrice(item.product.price)}</p>
-                      <p className="text-sm text-green-600 font-medium">Frete grátis</p>
+                      <p className="text-xs text-muted-foreground">{(item.product as any).storeName || ''}</p>
                       <div className="flex items-center gap-3 mt-3">
                         <div className="flex items-center border border-border rounded-md">
                           <button
@@ -118,7 +118,7 @@ export default function CartContent() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Frete:</span>
-                <span className="text-green-600 font-medium">Grátis</span>
+                <span className="text-muted-foreground">Calculado no checkout</span>
               </div>
               <div className="border-t border-border pt-3">
                 <div className="flex justify-between">
@@ -126,7 +126,7 @@ export default function CartContent() {
                   <span className="font-bold text-lg">MZN {formatPrice(subtotal)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  ou 12x de MZN {formatPrice(subtotal / 12)} sem juros
+                  Pagamento via M-Pesa, e-Mola e outros
                 </p>
               </div>
             </div>
@@ -147,7 +147,7 @@ export default function CartContent() {
             <div className="mt-6 pt-4 border-t border-border space-y-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Truck size={14} className="text-foreground" />
-                <span>Frete grátis em compras acima de 199 MZN</span>
+                <span>Entrega em todas as províncias</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield size={14} className="text-foreground" />
@@ -155,7 +155,7 @@ export default function CartContent() {
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <CreditCard size={14} className="text-foreground" />
-                <span>Parcele em até 12x sem juros</span>
+                <span>Pagamento via M-Pesa e e-Mola</span>
               </div>
             </div>
           </div>

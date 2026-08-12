@@ -42,8 +42,8 @@ class ShippingMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShippingMethod
         fields = (
-            'id', 'name', 'description', 'estimated_days_min',
-            'estimated_days_max', 'estimated_days_display',
+            'id', 'name', 'method_type', 'description', 'pickup_address',
+            'estimated_days_min', 'estimated_days_max', 'estimated_days_display',
             'is_active', 'rates', 'zones_count',
         )
         read_only_fields = ('id',)
@@ -56,8 +56,8 @@ class ShippingMethodWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShippingMethod
         fields = (
-            'id', 'name', 'description', 'estimated_days_min',
-            'estimated_days_max', 'is_active',
+            'id', 'name', 'method_type', 'description', 'pickup_address',
+            'estimated_days_min', 'estimated_days_max', 'is_active',
         )
 
 

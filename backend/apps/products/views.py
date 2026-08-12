@@ -1,9 +1,10 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
-from .models import Category, Product, ProductImage, ProductVariant, Coupon, WishlistItem
+from .models import Category, Product, ProductImage, ProductVariant, Coupon, WishlistItem, StockLog
 from .serializers import (
     CategorySerializer, ProductListSerializer, ProductDetailSerializer,
     ProductImageSerializer, ProductVariantSerializer, SellerProductSerializer, WishlistItemSerializer,
@@ -177,6 +178,31 @@ class ProductDeleteView(generics.DestroyAPIView):
     def perform_destroy(self, instance):
         instance.status = 'deleted'
         instance.save()
+
+
+class RestockProductView(APIView):
+    """POST /api/v1/products/{pk}/restock/ — Adiciona stock a um produto."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        product = get_object_or_404(Product, pk=pk, store=request.user.store, product_type='physical')
+        quantity = int(request.data.get('quantity', 0))
+        if quantity <= 0:
+            return Response({'detail': 'Quantidade deve ser positiva.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        old_stock = product.stock
+        product.stock += quantity
+        product.save(update_fields=['stock'])
+
+        StockLog.objects.create(
+            product=product, change_type='restock', quantity=quantity,
+            stock_before=old_stock, stock_after=product.stock,
+            reference=f'Reposição manual',
+            changed_by=request.user,
+            notes=request.data.get('notes', '') or f'Adicionadas {quantity} unidade(s)',
+        )
+
+        return Response(SellerProductSerializer(product, context={'request': request}).data)
 
 
 class ProductImageView(generics.CreateAPIView):

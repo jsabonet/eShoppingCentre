@@ -192,6 +192,8 @@ class ShippingEstimateView(APIView):
                         available.append({
                             'rate_id': str(rate.id),
                             'method_name': rate.method.name,
+                            'method_type': rate.method.method_type,
+                            'pickup_address': rate.method.pickup_address,
                             'zone_name': zone.name,
                             'price': calc['price'],
                             'is_free': calc['is_free'],

@@ -21,4 +21,5 @@ urlpatterns = [
     path('<uuid:product_id>/images/<uuid:pk>/', views.ProductImageDeleteView.as_view(), name='product_image_delete'),
     path('<uuid:product_id>/variants/', views.ProductVariantListView.as_view(), name='product_variants'),
     path('<uuid:product_id>/variants/<uuid:pk>/', views.ProductVariantDetailView.as_view(), name='product_variant_detail'),
+    path('<uuid:pk>/restock/', views.RestockProductView.as_view(), name='product_restock'),
 ]

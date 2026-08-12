@@ -47,11 +47,18 @@ class ShippingZone(BaseModel):
 class ShippingMethod(BaseModel):
     """
     Método de envio oferecido pelo vendedor.
-    Ex: "Standard", "Expresso", "Transportadora Própria"
+    Ex: "Standard", "Expresso", "Transportadora Própria", "Levantamento em Loja"
     """
+    METHOD_TYPES = [
+        ('delivery', 'Entrega ao Domicílio'),
+        ('pickup', 'Levantamento em Loja'),
+    ]
+
     store = models.ForeignKey('stores.Store', on_delete=models.CASCADE, related_name='shipping_methods')
     name = models.CharField(max_length=255, help_text='Nome do método (ex: "Standard", "Expresso")')
+    method_type = models.CharField(max_length=20, choices=METHOD_TYPES, default='delivery', help_text='Tipo: entrega ou levantamento')
     description = models.TextField(blank=True, help_text='Descrição visível para o cliente')
+    pickup_address = models.TextField(blank=True, help_text='Morada de levantamento (se method_type=pickup)')
     estimated_days_min = models.PositiveIntegerField(default=1, help_text='Prazo mínimo em dias')
     estimated_days_max = models.PositiveIntegerField(default=7, help_text='Prazo máximo em dias')
     is_active = models.BooleanField(default=True)

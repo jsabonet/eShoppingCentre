@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Package, ShoppingCart, Users, DollarSign, Settings, Store,
   ChevronLeft, ChevronRight, LogOut, Plus, ExternalLink, TrendingUp, Gift, Menu, X, AlertCircle,
-  GraduationCap, Award, MessageCircle, Truck, RotateCcw
+  GraduationCap, Award, MessageCircle, Truck, RotateCcw, ClipboardList
 } from 'lucide-react';
 import { storesAPI } from '@/src/lib/api';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -51,7 +51,7 @@ function getBaseNav(productType: string) {
     { href: '/seller/products', label: 'Produtos', icon: Package },
     { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart },
     { href: '/seller/returns', label: 'Devoluções', icon: RotateCcw },
-    ...(productType === 'physical' ? [{ href: '/seller/shipping' as const, label: 'Envios', icon: Truck }] : []),
+    ...(productType === 'physical' ? [{ href: '/seller/shipping' as const, label: 'Envios', icon: Truck }, { href: '/seller/inventory' as const, label: 'Inventário', icon: ClipboardList }] : []),
     { href: '/seller/messages', label: 'Mensagens', icon: MessageCircle },
     { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
     { href: '/seller/settings', label: 'Configurações', icon: Settings },

@@ -457,10 +457,13 @@ export default function CheckoutContent() {
           {/* Shipping Method */}
           {shippingEstimates && shippingEstimates.stores?.some((s: any) => s.available_methods?.length > 0) && (
             <div className="bg-card border border-border rounded-lg p-6">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
                 <Truck className="text-foreground" size={24} />
                 Método de Envio
               </h2>
+              {shippingEstimates.stores.length > 1 && (
+                <p className="text-xs text-muted-foreground mb-4">Produtos de {shippingEstimates.stores.length} lojas diferentes — cada loja tem o seu frete</p>
+              )}
               {shippingEstimates.stores.map((store: any) => (
                 <div key={store.store_id} className="mb-4 last:mb-0">
                   <p className="text-sm font-semibold mb-2">
@@ -497,6 +500,7 @@ export default function CheckoutContent() {
                           <div className="ml-3 flex-1">
                             <div className="flex items-center justify-between">
                               <span className="font-medium text-sm">
+                                {method.method_type === 'pickup' ? '🏪 ' : ''}
                                 {method.method_name}
                                 {method.is_free && (
                                   <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-bold">
@@ -505,13 +509,19 @@ export default function CheckoutContent() {
                                 )}
                               </span>
                               <span className={`font-bold text-sm ${method.is_free ? 'text-green-600' : ''}`}>
-                                {method.is_free ? '0 MZN' : `${method.price.toLocaleString('pt-MZ')} MZN`}
+                                {method.is_free || method.method_type === 'pickup' ? '0 MZN' : `${method.price.toLocaleString('pt-MZ')} MZN`}
                               </span>
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {method.estimated_days}
-                              {method.free_shipping_min && !method.is_free && (
-                                <> · Grátis acima de {method.free_shipping_min.toLocaleString('pt-MZ')} MZN</>
+                              {method.method_type === 'pickup' ? (
+                                <>📍 {method.pickup_address || 'Levantamento em loja'}</>
+                              ) : (
+                                <>
+                                  {method.estimated_days}
+                                  {method.free_shipping_min && !method.is_free && (
+                                    <> · Grátis acima de {method.free_shipping_min.toLocaleString('pt-MZ')} MZN</>
+                                  )}
+                                </>
                               )}
                             </p>
                           </div>
@@ -623,7 +633,7 @@ export default function CheckoutContent() {
                   <span className="font-bold text-lg">MZN {formatPrice(totalPrice + shippingTotal)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  ou 12x de MZN {formatPrice(totalPrice / 12)} sem juros
+                  Total com frete incluído
                 </p>
               </div>
             </div>
@@ -645,12 +655,19 @@ export default function CheckoutContent() {
             <div className="mt-4 pt-4 border-t border-border space-y-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield size={14} className="text-foreground" />
-                <span>Compra 100% segura</span>
+                <span>Compra 100% segura — Proteção ao comprador</span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Truck size={14} className="text-foreground" />
-                <span>Entrega em todo Moçambique</span>
-              </div>
+              {hasPhysicalItems ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Truck size={14} className="text-foreground" />
+                  <span>Entrega em todas as províncias de Moçambique</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <CheckCircle size={14} className="text-foreground" />
+                  <span>Acesso imediato após confirmação do pagamento</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

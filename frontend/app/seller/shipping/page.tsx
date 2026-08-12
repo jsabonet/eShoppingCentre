@@ -40,7 +40,7 @@ export default function SellerShippingPage() {
   const [showZoneForm, setShowZoneForm] = useState(false);
   const [zoneForm, setZoneForm] = useState({ id: '', name: '', provinces: [] as string[] });
   const [showMethodForm, setShowMethodForm] = useState(false);
-  const [methodForm, setMethodForm] = useState({ id: '', name: '', description: '', estimated_days_min: '1', estimated_days_max: '7' });
+  const [methodForm, setMethodForm] = useState({ id: '', name: '', description: '', method_type: 'delivery', pickup_address: '', estimated_days_min: '1', estimated_days_max: '7' });
   const [showRateForm, setShowRateForm] = useState(false);
   const [rateForm, setRateForm] = useState({ method: '', zone: '', base_price: '', per_kg_price: '', free_shipping_min: '', max_weight_kg: '' });
 
@@ -108,7 +108,7 @@ export default function SellerShippingPage() {
   };
 
   const openMethodForm = (m?: any) => {
-    setMethodForm(m ? { id: m.id, name: m.name, description: m.description || '', estimated_days_min: String(m.estimated_days_min), estimated_days_max: String(m.estimated_days_max) } : { id: '', name: '', description: '', estimated_days_min: '1', estimated_days_max: '7' });
+    setMethodForm(m ? { id: m.id, name: m.name, description: m.description || '', method_type: m.method_type || 'delivery', pickup_address: m.pickup_address || '', estimated_days_min: String(m.estimated_days_min), estimated_days_max: String(m.estimated_days_max) } : { id: '', name: '', description: '', method_type: 'delivery', pickup_address: '', estimated_days_min: '1', estimated_days_max: '7' });
     setShowMethodForm(true);
   };
 
@@ -117,7 +117,7 @@ export default function SellerShippingPage() {
     if (!methodForm.name.trim()) return;
     setSaving('method');
     try {
-      const body = JSON.stringify({ name: methodForm.name, description: methodForm.description, estimated_days_min: parseInt(methodForm.estimated_days_min) || 1, estimated_days_max: parseInt(methodForm.estimated_days_max) || 7, is_active: true });
+      const body = JSON.stringify({ name: methodForm.name, description: methodForm.description, method_type: methodForm.method_type, pickup_address: methodForm.method_type === 'pickup' ? methodForm.pickup_address : '', estimated_days_min: parseInt(methodForm.estimated_days_min) || 1, estimated_days_max: parseInt(methodForm.estimated_days_max) || 7, is_active: true });
       const url = methodForm.id ? `${API_URL}/shipping/methods/${methodForm.id}/` : `${API_URL}/shipping/methods/`;
       const res = await fetch(url, { method: methodForm.id ? 'PUT' : 'POST', headers: apiHeaders(), body });
       if (!res.ok) throw new Error('Erro ao guardar.');
@@ -394,6 +394,23 @@ export default function SellerShippingPage() {
                       value={methodForm.description} onChange={e => setMethodForm(p => ({ ...p, description: e.target.value }))}
                       className="w-full px-4 py-2.5 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent" />
                   </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Tipo</label>
+                    <select value={methodForm.method_type}
+                      onChange={e => setMethodForm(p => ({ ...p, method_type: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent">
+                      <option value="delivery">🚚 Entrega ao Domicílio</option>
+                      <option value="pickup">🏪 Levantamento em Loja</option>
+                    </select>
+                  </div>
+                  {methodForm.method_type === 'pickup' && (
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Morada de Levantamento *</label>
+                      <textarea rows={2} placeholder="Ex: Av. 24 de Julho, 1234, Maputo" value={methodForm.pickup_address}
+                        onChange={e => setMethodForm(p => ({ ...p, pickup_address: e.target.value }))}
+                        className="w-full px-4 py-2.5 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent resize-none" />
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-muted-foreground mb-1.5">Prazo mínimo (dias)</label>
