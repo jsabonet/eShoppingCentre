@@ -27,7 +27,8 @@ const REASON_LABELS: Record<string, string> = {
 interface ReturnItem {
   id: string; rma_number: string; order_number: string;
   reason: string; reason_type: string; status: string;
-  buyer_name: string; store_name: string;
+  buyer_name: string; buyer_email: string; buyer_phone: string;
+  store_name: string;
   refund_amount: number | null; vendor_notes: string;
   admin_notes: string; disputed_at: string | null;
   buyer_tracking_code: string; shipping_notes: string;
@@ -224,6 +225,10 @@ export default function AdminReturns() {
 
             {/* Info */}
             <div className="bg-muted/30 rounded-xl p-3 mb-4 text-xs space-y-1">
+              <div><span className="text-muted-foreground">Comprador:</span> {selected.buyer_name}</div>
+              {selected.buyer_email && <div><span className="text-muted-foreground">Email:</span> {selected.buyer_email}</div>}
+              {selected.buyer_phone && <div><span className="text-muted-foreground">Tel:</span> {selected.buyer_phone}</div>}
+              <div><span className="text-muted-foreground">Loja:</span> {selected.store_name}</div>
               <div><span className="text-muted-foreground">Motivo:</span> {REASON_LABELS[selected.reason_type]} — {selected.reason}</div>
               <div><span className="text-muted-foreground">Estado atual:</span> <span className={`font-semibold ${STATUS_CONFIG[selected.status]?.color}`}>{STATUS_CONFIG[selected.status]?.label}</span></div>
               {selected.refund_amount && <div><span className="text-muted-foreground">Reembolso:</span> {Number(selected.refund_amount).toLocaleString('pt-MZ')} MZN</div>}

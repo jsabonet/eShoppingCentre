@@ -32,7 +32,11 @@ class Order(BaseModel):
     shipping_method = models.CharField(max_length=100, blank=True)
     tracking_code = models.CharField(max_length=100, blank=True)
     estimated_delivery = models.DateField(null=True, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True, help_text='Data em que o vendedor marcou como enviado')
+    confirmed_at = models.DateTimeField(null=True, blank=True, help_text='Data em que o comprador confirmou a receção')
     delivered_at = models.DateTimeField(null=True, blank=True)
+    shipping_notes = models.TextField(blank=True, help_text='Descrição de como/quem entregou (ex: "motorista João, tel 84xxx")')
+    shipping_evidence = models.ImageField(upload_to='orders/evidence/', blank=True, help_text='Foto do pacote/envio como prova')
     buyer_notes = models.TextField(blank=True)
     seller_notes = models.TextField(blank=True)
 
@@ -52,6 +56,25 @@ class Order(BaseModel):
 
     def __str__(self):
         return self.order_number
+
+
+class OrderStatusHistory(BaseModel):
+    """Regista cada mudança de status de uma encomenda (auditoria)."""
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='status_history')
+    previous_status = models.CharField(max_length=20, choices=Order.STATUS_CHOICES)
+    new_status = models.CharField(max_length=20, choices=Order.STATUS_CHOICES)
+    changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, related_name='status_changes')
+    notes = models.CharField(max_length=500, blank=True, help_text='Motivo/nota da mudança')
+
+    class Meta:
+        verbose_name_plural = 'Order status histories'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['order', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.order.order_number}: {self.previous_status} → {self.new_status}'
 
 
 class OrderItem(BaseModel):

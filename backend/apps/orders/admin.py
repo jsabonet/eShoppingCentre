@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Order, OrderItem, ReturnRequest
+from .models import Order, OrderItem, ReturnRequest, OrderStatusHistory
 
 
 class OrderItemInline(admin.TabularInline):
@@ -9,13 +9,32 @@ class OrderItemInline(admin.TabularInline):
     readonly_fields = ('product_name', 'unit_price', 'total_price')
 
 
+class OrderStatusHistoryInline(admin.TabularInline):
+    model = OrderStatusHistory
+    extra = 0
+    readonly_fields = ('previous_status', 'new_status', 'changed_by', 'notes', 'created_at')
+    can_delete = False
+    ordering = ('-created_at',)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = ('order_number', 'buyer', 'store', 'status', 'total', 'payment_method', 'created_at')
     list_filter = ('status', 'payment_method', 'created_at')
     search_fields = ('order_number', 'buyer__email', 'store__name')
-    inlines = [OrderItemInline]
+    inlines = [OrderItemInline, OrderStatusHistoryInline]
     readonly_fields = ('order_number', 'subtotal', 'shipping_cost', 'platform_fee', 'total')
+
+
+@admin.register(OrderStatusHistory)
+class OrderStatusHistoryAdmin(admin.ModelAdmin):
+    list_display = ('order', 'previous_status', 'new_status', 'changed_by', 'notes', 'created_at')
+    list_filter = ('new_status', 'created_at')
+    search_fields = ('order__order_number', 'changed_by__email', 'notes')
+    readonly_fields = ('order', 'previous_status', 'new_status', 'changed_by', 'notes', 'created_at')
 
 
 @admin.register(ReturnRequest)

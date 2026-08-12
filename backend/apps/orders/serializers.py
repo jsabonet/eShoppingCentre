@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db import transaction
-from .models import Order, OrderItem, ReturnRequest, ReturnImage
+from .models import Order, OrderItem, ReturnRequest, ReturnImage, OrderStatusHistory
 from apps.products.models import Product
 
 
@@ -18,9 +18,24 @@ class ReturnImageSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at')
 
 
+class OrderStatusHistorySerializer(serializers.ModelSerializer):
+    changed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderStatusHistory
+        fields = ('id', 'previous_status', 'new_status', 'changed_by_name', 'notes', 'created_at')
+
+    def get_changed_by_name(self, obj):
+        if obj.changed_by:
+            return obj.changed_by.get_full_name() or obj.changed_by.email
+        return 'Sistema'
+
+
 class ReturnRequestSerializer(serializers.ModelSerializer):
     order_number = serializers.CharField(source='order.order_number', read_only=True)
     buyer_name = serializers.SerializerMethodField()
+    buyer_email = serializers.SerializerMethodField()
+    buyer_phone = serializers.SerializerMethodField()
     store_name = serializers.CharField(source='store.name', read_only=True)
     images = ReturnImageSerializer(many=True, read_only=True)
     reason_type_display = serializers.CharField(source='get_reason_type_display', read_only=True)
@@ -31,12 +46,18 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
             'id', 'order', 'order_number', 'reason', 'reason_type', 'reason_type_display',
             'rma_number', 'status', 'vendor_notes', 'refund_amount',
             'return_instructions', 'return_address', 'buyer_tracking_code', 'shipping_notes',
-            'buyer_name', 'store_name', 'images', 'created_at', 'disputed_at',
+            'buyer_name', 'buyer_email', 'buyer_phone', 'store_name', 'images', 'created_at', 'disputed_at',
         )
         read_only_fields = ('id', 'buyer', 'store', 'rma_number', 'created_at')
 
     def get_buyer_name(self, obj):
         return obj.buyer.get_full_name() or obj.buyer.email
+
+    def get_buyer_email(self, obj):
+        return obj.buyer.email
+
+    def get_buyer_phone(self, obj):
+        return obj.buyer.phone
 
     def create(self, validated_data):
         validated_data['buyer'] = self.context['request'].user
@@ -74,13 +95,29 @@ class AdminOverrideSerializer(serializers.Serializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     buyer_email = serializers.CharField(source='buyer.email', read_only=True)
+    buyer_phone = serializers.SerializerMethodField()
+    buyer_name = serializers.SerializerMethodField()
     store_name = serializers.CharField(source='store.name', read_only=True)
+    store_phone = serializers.SerializerMethodField()
+    status_history = OrderStatusHistorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
         fields = '__all__'
         read_only_fields = ('buyer', 'order_number', 'subtotal', 'shipping_cost',
-                           'platform_fee', 'total', 'affiliate_commission')
+                           'platform_fee', 'total', 'affiliate_commission',
+                           'shipped_at', 'confirmed_at', 'shipping_notes', 'shipping_evidence')
+
+    def get_buyer_phone(self, obj):
+        return obj.buyer.phone
+
+    def get_buyer_name(self, obj):
+        return obj.buyer.get_full_name() or obj.buyer.email
+
+    def get_store_phone(self, obj):
+        if obj.store:
+            return obj.store.phone
+        return ''
 
 
 class CreateOrderItemSerializer(serializers.Serializer):

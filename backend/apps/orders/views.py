@@ -4,7 +4,37 @@ from django.db import transaction
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Order, ReturnRequest, ReturnImage
+from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory
+
+
+# --- Transições de status permitidas ---
+VALID_TRANSITIONS = {
+    'pending': ['confirmed', 'cancelled'],
+    'confirmed': ['processing', 'cancelled'],
+    'processing': ['shipped', 'cancelled'],
+    'shipped': ['delivered'],
+    'delivered': [],  # só admin pode reverter
+    'cancelled': [],
+    'refunded': [],
+}
+
+# Transições que NÃO são permitidas ao vendedor (só admin)
+ADMIN_ONLY_TRANSITIONS = [
+    ('delivered', 'processing'), ('delivered', 'confirmed'),
+    ('shipped', 'confirmed'), ('shipped', 'processing'),
+    ('processing', 'confirmed'), ('refunded', 'shipped'),
+]
+
+
+def log_status_change(order, new_status, user, notes=''):
+    """Regista mudança de status no histórico de auditoria."""
+    OrderStatusHistory.objects.create(
+        order=order,
+        previous_status=order.status,
+        new_status=new_status,
+        changed_by=user,
+        notes=notes,
+    )
 from .serializers import OrderSerializer, CreateOrderSerializer, ReturnRequestSerializer, ReturnResolveSerializer, ReturnShipSerializer, ReturnImageSerializer, AdminOverrideSerializer
 
 
@@ -15,6 +45,7 @@ class CreateOrderView(APIView):
         serializer = CreateOrderSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         order = serializer.save()
+        log_status_change(order, 'pending', request.user, 'Encomenda criada')
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 
@@ -44,6 +75,8 @@ class StoreOrdersView(generics.ListAPIView):
 
 
 class UpdateOrderStatusView(generics.UpdateAPIView):
+    """PATCH /api/v1/orders/{pk}/update-status/ — Seller updates order status.
+    Só pode marcar como 'shipped'. 'delivered' requer confirmação do comprador."""
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -52,11 +85,85 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
 
     def perform_update(self, serializer):
         new_status = self.request.data.get('status')
-        tracking_code = self.request.data.get('tracking_code')
+        order = self.get_object()
+        old_status = order.status
+        is_admin = self.request.user.is_staff
+
+        # Validações
+        if not is_admin:
+            if new_status not in ('shipped', 'processing', 'confirmed'):
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'status': 'Só pode marcar como enviado, em processamento ou confirmado. A entrega é confirmada pelo comprador.'
+                })
+
+            # Verificar se é downgrade proibido
+            if (old_status, new_status) in ADMIN_ONLY_TRANSITIONS:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'status': f'Não é permitido voltar de "{old_status}" para "{new_status}". Contacte um administrador.'
+                })
+
+            # Verificar transição válida
+            allowed = VALID_TRANSITIONS.get(old_status, [])
+            if new_status not in allowed:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'status': f'Transição de "{old_status}" para "{new_status}" não é permitida.'
+                })
+
         data = {'status': new_status}
-        if tracking_code:
-            data['tracking_code'] = tracking_code
-        serializer.save(**data)
+        evidence = None
+        notes = self.request.data.get('notes', '')
+
+        if new_status == 'shipped':
+            data['shipped_at'] = timezone.now()
+            data['shipping_notes'] = self.request.data.get('shipping_notes', '')
+            evidence = self.request.FILES.get('shipping_evidence')
+            tracking = self.request.data.get('tracking_code', '')
+            if tracking:
+                data['tracking_code'] = tracking
+            notes = notes or f'Enviado por: {data["shipping_notes"]}'[:500]
+
+        instance = serializer.save(**data)
+
+        if evidence:
+            instance.shipping_evidence = evidence
+            instance.save(update_fields=['shipping_evidence'])
+
+        # Auditoria
+        log_status_change(instance, new_status, self.request.user, notes)
+
+
+class ConfirmDeliveryView(APIView):
+    """POST /api/v1/orders/{pk}/confirm-delivery/ — Buyer confirms they received the order."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        order = get_object_or_404(Order, pk=pk, buyer=request.user)
+        if order.status != 'shipped':
+            return Response(
+                {'detail': 'Só pode confirmar receção de encomendas enviadas.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        order.status = 'delivered'
+        order.confirmed_at = timezone.now()
+        order.delivered_at = timezone.now()
+        order.save()
+
+        log_status_change(order, 'delivered', request.user, 'Comprador confirmou receção')
+
+        from apps.notifications.models import Notification
+        if order.store and order.store.owner:
+            Notification.objects.create(
+                user=order.store.owner,
+                title='Encomenda entregue',
+                message=f'O comprador confirmou a receção da encomenda {order.order_number}.',
+                notification_type='order_update',
+                link=f'/seller/orders/{order.id}',
+            )
+
+        return Response(OrderSerializer(order).data)
 
 
 class CancelOrderView(APIView):
@@ -111,6 +218,17 @@ class AdminAllReturnsView(generics.ListAPIView):
 
     def get_queryset(self):
         return ReturnRequest.objects.select_related('order', 'buyer', 'store').prefetch_related('images').order_by('-created_at')
+
+
+class AdminAllOrdersView(generics.ListAPIView):
+    """Admin views ALL orders across all stores with status history."""
+    serializer_class = OrderSerializer
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return Order.objects.select_related('buyer', 'store').prefetch_related(
+            'items', 'status_history'
+        ).order_by('-created_at')
 
 
 class ResolveReturnView(APIView):

@@ -10,6 +10,7 @@ urlpatterns = [
     path('returns/my/', views.MyReturnsView.as_view(), name='my_returns'),
     path('returns/store/', views.StoreReturnsView.as_view(), name='store_returns'),
     path('returns/admin/', views.AdminAllReturnsView.as_view(), name='admin_all_returns'),
+    path('admin/', views.AdminAllOrdersView.as_view(), name='admin_all_orders'),
     path('returns/<uuid:pk>/resolve/', views.ResolveReturnView.as_view(), name='return_resolve'),
     path('returns/<uuid:pk>/ship/', views.ShipReturnView.as_view(), name='return_ship'),
     path('returns/<uuid:pk>/receive/', views.ReceiveReturnView.as_view(), name='return_receive'),
@@ -21,4 +22,5 @@ urlpatterns = [
     path('<uuid:pk>/', views.OrderDetailView.as_view(), name='order_detail'),
     path('<uuid:pk>/cancel/', views.CancelOrderView.as_view(), name='order_cancel'),
     path('<uuid:pk>/update-status/', views.UpdateOrderStatusView.as_view(), name='order_update_status'),
+    path('<uuid:pk>/confirm-delivery/', views.ConfirmDeliveryView.as_view(), name='order_confirm_delivery'),
 ]

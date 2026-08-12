@@ -63,6 +63,8 @@ interface ReturnItem {
   reason_type_display: string;
   status: string;
   buyer_name: string;
+  buyer_email: string;
+  buyer_phone: string;
   store_name: string;
   refund_amount: number | null;
   vendor_notes: string;
@@ -375,7 +377,10 @@ export default function SellerReturnsPage() {
                   <XCircle size={18} />
                 </button>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">{selectedReturn.rma_number} · {selectedReturn.buyer_name}</p>
+              <p className="text-sm text-muted-foreground mb-4">{selectedReturn.rma_number} · {selectedReturn.buyer_name}
+                {selectedReturn.buyer_email && <> · {selectedReturn.buyer_email}</>}
+                {selectedReturn.buyer_phone && <> · {selectedReturn.buyer_phone}</>}
+              </p>
 
               {/* Reason */}
               <div className="bg-muted/50 rounded-xl p-4 mb-5 space-y-2 text-sm">
@@ -515,6 +520,8 @@ export default function SellerReturnsPage() {
                 <div className="bg-muted/50 rounded-xl p-4 space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground"><User size={14} /> <span className="text-xs">Cliente</span></div>
                   <p className="font-semibold">{selectedReturn.buyer_name}</p>
+                  {selectedReturn.buyer_email && <p className="text-xs text-muted-foreground">{selectedReturn.buyer_email}</p>}
+                  {selectedReturn.buyer_phone && <p className="text-xs text-accent font-medium">{selectedReturn.buyer_phone}</p>}
                 </div>
                 <div className="bg-muted/50 rounded-xl p-4 space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground"><FileText size={14} /> <span className="text-xs">Motivo</span></div>

@@ -11,10 +11,11 @@ import {
 import { adminAPI, productsAPI, ordersAPI, storesAPI, type Product as APIProduct } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
 import AdminReturns from './admin/AdminReturns';
+import AdminOrders from './admin/AdminOrders';
 
 const BACKEND_READY = true;
 
-type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns';
+type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns' | 'orders';
 
 interface Product {
   id: string;
@@ -630,6 +631,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
             { id: 'stores', label: 'Lojas', icon: Store },
             { id: 'returns', label: 'Devoluções', icon: RotateCcw },
+            { id: 'orders', label: 'Encomendas', icon: ShoppingCart },
             { id: 'categories', label: 'Categorias', icon: Filter },
             { id: 'blog', label: 'Blog', icon: Edit },
             { id: 'users', label: 'Utilizadores', icon: Users },
@@ -1232,6 +1234,9 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
 
         {/* Returns Tab (Admin) */}
         {activeTab === 'returns' && <AdminReturns />}
+
+        {/* Orders Tab (Admin) */}
+        {activeTab === 'orders' && <AdminOrders />}
 
         {/* Confirm Action Modal */}
         {confirmModal && (
