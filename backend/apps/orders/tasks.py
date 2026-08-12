@@ -5,6 +5,9 @@ from datetime import timedelta
 # Dias sem confirmação do comprador até a entrega ser confirmada automaticamente
 AUTO_DELIVERY_DAYS = 7
 
+# Horas sem atividade até o carrinho ser considerado abandonado
+ABANDONED_CART_HOURS = 24
+
 
 @shared_task
 def auto_refund_unprocessed_returns():
@@ -123,3 +126,71 @@ def auto_confirm_delivery():
         count += 1
 
     return f'{count} encomenda(s) entregue(s) automaticamente.'
+
+
+@shared_task
+def recover_abandoned_carts():
+    """
+    Envia email + notificação a utilizadores com carrinhos abandonados
+    (sem atividade há mais de ABANDONED_CART_HOURS horas e ainda não notificados).
+    """
+    from apps.orders.models import AbandonedCart
+    from apps.notifications.models import Notification
+    from django.core.mail import send_mail
+    from django.conf import settings
+
+    cutoff = timezone.now() - timedelta(hours=ABANDONED_CART_HOURS)
+    carts = AbandonedCart.objects.filter(
+        recovered=False,
+        notified_at__isnull=True,
+        last_activity__lte=cutoff,
+    ).select_related('user')
+
+    count = 0
+    for cart in carts:
+        items = cart.items or []
+        if not items:
+            continue
+        user = cart.user
+        if not user.email:
+            continue
+
+        # Resumo simples dos itens
+        item_names = ', '.join(
+            (it.get('name') or 'Produto') for it in items[:3]
+        )
+        if len(items) > 3:
+            item_names += f' e mais {len(items) - 3}'
+
+        message = (
+            f'Olá {user.get_full_name() or user.email},\n\n'
+            f'Ainda tem {len(items)} item(ns) no seu carrinho: {item_names}.\n'
+            f'Volte ao eShoppingCentre para concluir a sua compra!\n\n'
+            f'https://e-shoppingcentre.com/cart'
+        )
+
+        try:
+            send_mail(
+                subject='O seu carrinho está à sua espera 🛒',
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                html_message=f'<p>{message.replace(chr(10), "<br>")}</p>',
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+        Notification.objects.create(
+            user=user,
+            title='Carrinho abandonado',
+            message=f'Ainda tem {len(items)} item(ns) no carrinho. Conclua a sua compra!',
+            notification_type='order_update',
+            link='/cart',
+        )
+
+        cart.notified_at = timezone.now()
+        cart.save(update_fields=['notified_at'])
+        count += 1
+
+    return f'{count} carrinho(s) abandonado(s) notificado(s).'

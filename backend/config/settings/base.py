@@ -156,6 +156,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.orders.tasks.auto_confirm_delivery',
         'schedule': 3600.0,  # a cada hora
     },
+    'recover-abandoned-carts': {
+        'task': 'apps.orders.tasks.recover_abandoned_carts',
+        'schedule': 3600.0,  # a cada hora
+    },
 }
 
 CHANNEL_LAYERS = {

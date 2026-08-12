@@ -22,6 +22,8 @@ class Order(BaseModel):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     subtotal = models.DecimalField(max_digits=12, decimal_places=2)
     shipping_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    coupon_code = models.CharField(max_length=50, blank=True)
     platform_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2)
     affiliate = models.ForeignKey('users.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='affiliate_orders')
@@ -224,3 +226,20 @@ class SupportTicketImage(BaseModel):
 
     def __str__(self):
         return f'Imagem para ticket #{self.ticket_id}'
+
+
+class AbandonedCart(BaseModel):
+    """Carrinho sincronizado do frontend para recuperação de carrinhos abandonados."""
+    user = models.OneToOneField('users.User', on_delete=models.CASCADE, related_name='abandoned_cart')
+    items = models.JSONField(default=list, blank=True)
+    last_activity = models.DateTimeField(auto_now=True)
+    recovered = models.BooleanField(default=False)
+    recovered_at = models.DateTimeField(null=True, blank=True)
+    notified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-last_activity']
+        indexes = [models.Index(fields=['recovered', 'last_activity'])]
+
+    def __str__(self):
+        return f'Carrinho de {self.user.email}'

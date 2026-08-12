@@ -322,3 +322,35 @@ class ValidateCouponView(APIView):
             })
         except Coupon.DoesNotExist:
             return Response({'valid': False, 'detail': 'Cupão inválido.'}, status=404)
+
+
+class AdminCouponListView(generics.ListCreateAPIView):
+    """Admin: lista todos os cupões e cria cupões globais (ou por loja)."""
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get_serializer_class(self):
+        from .serializers import CouponSerializer
+        return CouponSerializer
+
+    def get_queryset(self):
+        return Coupon.objects.select_related('store').order_by('-created_at')
+
+    def perform_create(self, serializer):
+        store_id = self.request.data.get('store')
+        store = None
+        if store_id:
+            from apps.stores.models import Store
+            store = get_object_or_404(Store, pk=store_id)
+        serializer.save(store=store)
+
+
+class AdminCouponToggleView(APIView):
+    """Admin: ativa/desativa um cupão de qualquer loja."""
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def patch(self, request, pk):
+        coupon = get_object_or_404(Coupon, pk=pk)
+        coupon.is_active = not coupon.is_active
+        coupon.save(update_fields=['is_active'])
+        from .serializers import CouponSerializer
+        return Response(CouponSerializer(coupon).data)

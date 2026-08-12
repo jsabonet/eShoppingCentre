@@ -13,6 +13,8 @@ urlpatterns = [
     # ─── Coupons ───
     path('coupons/', views.CouponListView.as_view(), name='coupon_list'),
     path('coupons/validate/', views.ValidateCouponView.as_view(), name='coupon_validate'),
+    path('coupons/admin/', views.AdminCouponListView.as_view(), name='admin_coupon_list'),
+    path('coupons/<uuid:pk>/toggle/', views.AdminCouponToggleView.as_view(), name='admin_coupon_toggle'),
     path('coupons/<uuid:pk>/', views.CouponDetailView.as_view(), name='coupon_detail'),
     path('<slug:slug>/', views.ProductDetailView.as_view(), name='product_detail'),
     path('<uuid:pk>/update/', views.ProductUpdateView.as_view(), name='product_update'),

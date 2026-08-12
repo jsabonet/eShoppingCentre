@@ -1,3 +1,4 @@
+import uuid
 from rest_framework import serializers
 from django.db import transaction
 from .models import Order, OrderItem, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket, SupportTicketImage
@@ -146,6 +147,7 @@ class CreateOrderSerializer(serializers.Serializer):
         help_text='{"store_id": "rate_id"} — método de envio escolhido por loja'
     )
     affiliate_code = serializers.CharField(required=False, allow_blank=True)
+    coupon_code = serializers.CharField(required=False, allow_blank=True)
     buyer_notes = serializers.CharField(required=False, allow_blank=True)
 
     def validate_items(self, items):
@@ -173,6 +175,7 @@ class CreateOrderSerializer(serializers.Serializer):
         user = self.context['request'].user
         items_data = validated_data.pop('items')
         affiliate_code = validated_data.pop('affiliate_code', None)
+        coupon_code = validated_data.pop('coupon_code', '').strip().upper()
         shipping_selections = validated_data.pop('shipping_selections', {})
         province = validated_data.get('shipping_address', {}).get('province', '')
 
@@ -238,6 +241,56 @@ class CreateOrderSerializer(serializers.Serializer):
                 except (ValueError, ShippingRate.DoesNotExist):
                     continue
 
+        # ─── Cupão / desconto ───
+        discounts = {}  # store_id -> Decimal (valor do desconto aplicado)
+        applied_coupon = None
+        if coupon_code:
+            from apps.products.models import Coupon, CouponUsage
+            try:
+                coupon = Coupon.objects.get(code=coupon_code)
+            except Coupon.DoesNotExist:
+                raise serializers.ValidationError({'coupon_code': 'Cupão inválido.'})
+            if not coupon.is_valid:
+                raise serializers.ValidationError({'coupon_code': 'Cupão expirado ou esgotado.'})
+
+            # Valor elegível por loja (respeitando restrições de produto/categoria)
+            eligible = {}  # store_id -> total elegível
+            for sid, sd in store_orders.items():
+                if coupon.store and coupon.store.id != sid:
+                    continue
+                total = 0
+                for item in sd['items']:
+                    p = item['product']
+                    if coupon.product and p.id != coupon.product.id:
+                        continue
+                    if coupon.category and p.category_id != coupon.category.id:
+                        continue
+                    total += item['total_price']
+                if total > 0:
+                    eligible[sid] = total
+
+            if not eligible:
+                raise serializers.ValidationError({'coupon_code': 'Este cupão não se aplica aos produtos do carrinho.'})
+
+            eligible_total = sum(eligible.values())
+            if eligible_total < coupon.min_purchase:
+                raise serializers.ValidationError(
+                    {'coupon_code': f'Este cupão exige um mínimo de {coupon.min_purchase} MZN.'}
+                )
+
+            if coupon.max_per_user > 0:
+                if CouponUsage.objects.filter(coupon=coupon, user=user).count() >= coupon.max_per_user:
+                    raise serializers.ValidationError({'coupon_code': 'Já usou este cupão o número máximo de vezes.'})
+
+            if coupon.discount_type == 'percentage':
+                discount_total = eligible_total * coupon.discount_value / 100
+            else:
+                discount_total = min(coupon.discount_value, eligible_total)
+
+            for sid, e_total in eligible.items():
+                discounts[sid] = (discount_total * e_total / eligible_total) if eligible_total else 0
+            applied_coupon = coupon
+
         is_test = validated_data['payment_method'] == 'test'
         payment_status = 'completed' if is_test else 'pending'
         order_status = 'confirmed' if is_test else 'pending'
@@ -248,6 +301,7 @@ class CreateOrderSerializer(serializers.Serializer):
         for store_id, store_data in store_orders.items():
             ship = store_shipping.get(store_id, {'cost': 0, 'method_name': '', 'is_pickup': False})
             store_total = store_data['store_total']
+            order_discount = discounts.get(store_id, 0)
             platform_fee = (store_total * 8) / 100
             store_affiliate_commission = (affiliate_commission * store_total / subtotal) if subtotal else 0
 
@@ -256,7 +310,9 @@ class CreateOrderSerializer(serializers.Serializer):
                 store=store_data['store'],
                 subtotal=store_total,
                 shipping_cost=ship['cost'],
-                total=store_total + ship['cost'],
+                discount=order_discount,
+                coupon_code=(coupon_code if order_discount > 0 else ''),
+                total=store_total + ship['cost'] - order_discount,
                 platform_fee=platform_fee,
                 affiliate=affiliate,
                 affiliate_commission=round(store_affiliate_commission, 2),
@@ -299,6 +355,18 @@ class CreateOrderSerializer(serializers.Serializer):
                 self._process_delivery(order)
 
             orders.append(order)
+
+        # Registar utilização do cupão
+        if applied_coupon:
+            applied_coupon.used_count += 1
+            applied_coupon.save(update_fields=['used_count'])
+            from apps.products.models import CouponUsage
+            for order in orders:
+                if order.discount > 0:
+                    CouponUsage.objects.create(
+                        coupon=applied_coupon, user=user, order=order,
+                        discount_applied=order.discount,
+                    )
 
         return orders
 

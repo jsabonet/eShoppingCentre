@@ -4,7 +4,7 @@ from django.db import transaction
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket, SupportTicketImage
+from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket, SupportTicketImage, AbandonedCart
 
 
 # --- Transições de status permitidas ---
@@ -48,6 +48,12 @@ class CreateOrderView(APIView):
         orders = serializer.save()
         for order in orders:
             log_status_change(order, order.status, request.user, 'Encomenda criada')
+
+        # Marcar carrinho como recuperado
+        AbandonedCart.objects.filter(user=request.user).update(
+            recovered=True, recovered_at=timezone.now(), items=[]
+        )
+
         return Response(OrderSerializer(orders, many=True).data, status=status.HTTP_201_CREATED)
 
 
@@ -633,3 +639,49 @@ class UploadTicketImageView(APIView):
         caption = request.data.get('caption', '')
         image = SupportTicketImage.objects.create(ticket=ticket, image=file, caption=caption)
         return Response(SupportTicketImageSerializer(image).data, status=201)
+
+
+class CartSyncView(APIView):
+    """Sincroniza o carrinho do frontend (para recuperação de carrinhos abandonados)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        cart = AbandonedCart.objects.filter(user=request.user).first()
+        if cart and not cart.recovered:
+            return Response({'items': cart.items, 'last_activity': cart.last_activity})
+        return Response({'items': [], 'last_activity': None})
+
+    def post(self, request):
+        items = request.data.get('items', []) or []
+        cart, _ = AbandonedCart.objects.get_or_create(user=request.user)
+        cart.items = items
+        cart.recovered = False
+        cart.save(update_fields=['items', 'recovered', 'last_activity'])
+        return Response({'ok': True})
+
+
+class AdminAbandonedCartListView(APIView):
+    """Admin: lista carrinhos abandonados (para estatísticas de recuperação)."""
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get(self, request):
+        carts = AbandonedCart.objects.filter(recovered=False).select_related('user').order_by('-last_activity')
+        items = []
+        for c in carts:
+            if not c.items:
+                continue
+            items.append({
+                'id': str(c.id),
+                'user_email': c.user.email,
+                'user_name': c.user.get_full_name() or c.user.email,
+                'items_count': len(c.items),
+                'items': c.items,
+                'last_activity': c.last_activity.isoformat(),
+                'notified_at': c.notified_at.isoformat() if c.notified_at else None,
+            })
+        recovered = AbandonedCart.objects.filter(recovered=True).count()
+        return Response({
+            'abandoned_count': len(items),
+            'recovered_count': recovered,
+            'results': items,
+        })

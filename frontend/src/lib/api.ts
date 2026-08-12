@@ -530,6 +530,7 @@ export const ordersAPI = {
     shipping_address: Record<string, string>;
     payment_method: string;
     affiliate_code?: string;
+    coupon_code?: string;
     buyer_notes?: string;
   }) => api.post<Order[]>('/orders/', data),
 

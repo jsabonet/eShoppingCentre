@@ -50,6 +50,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [items]);
 
+  // Sincronizar carrinho com o backend (para recuperação de carrinhos abandonados)
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const payload = items.map((i) => ({
+      product_id: i.product.id,
+      name: i.product.name,
+      price: i.product.price,
+      quantity: i.quantity,
+      image: i.product.image || '',
+    }));
+    const t = setTimeout(() => {
+      fetch(`${API_URL}/orders/cart/sync/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ items: payload }),
+      }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [items]);
+
   const addToCart = useCallback((product: CartProduct, quantity = 1) => {
     setItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);

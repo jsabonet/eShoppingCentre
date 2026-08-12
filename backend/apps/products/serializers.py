@@ -255,7 +255,7 @@ class WishlistItemSerializer(serializers.ModelSerializer):
 
 class CouponSerializer(serializers.ModelSerializer):
     is_valid = serializers.BooleanField(read_only=True)
-    store_name = serializers.CharField(source='store.name', read_only=True)
+    store_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Coupon
@@ -263,3 +263,6 @@ class CouponSerializer(serializers.ModelSerializer):
                   'max_uses', 'used_count', 'max_per_user', 'starts_at', 'ends_at',
                   'is_active', 'is_valid', 'product', 'category', 'store_name', 'created_at')
         read_only_fields = ('id', 'used_count', 'store', 'created_at')
+
+    def get_store_name(self, obj):
+        return obj.store.name if obj.store else 'Plataforma (global)'

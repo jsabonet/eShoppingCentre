@@ -5,6 +5,8 @@ urlpatterns = [
     path('', views.CreateOrderView.as_view(), name='order_create'),
     path('my/', views.MyOrdersView.as_view(), name='my_orders'),
     path('store/', views.StoreOrdersView.as_view(), name='store_orders'),
+    path('cart/sync/', views.CartSyncView.as_view(), name='cart_sync'),
+    path('cart/abandoned/admin/', views.AdminAbandonedCartListView.as_view(), name='admin_abandoned_carts'),
     # Returns
     path('returns/', views.CreateReturnView.as_view(), name='return_create'),
     path('returns/my/', views.MyReturnsView.as_view(), name='my_returns'),

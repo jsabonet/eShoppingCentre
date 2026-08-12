@@ -222,7 +222,8 @@ class Coupon(BaseModel):
         ('percentage', 'Percentagem (%)'),
         ('fixed', 'Valor Fixo (MZN)'),
     ]
-    store = models.ForeignKey('stores.Store', on_delete=models.CASCADE, related_name='coupons')
+    store = models.ForeignKey('stores.Store', on_delete=models.CASCADE, related_name='coupons', null=True, blank=True,
+                              help_text='Loja dona do cupão. Null = cupão global da plataforma')
     code = models.CharField(max_length=50, unique=True)
     discount_type = models.CharField(max_length=20, choices=DISCOUNT_TYPE_CHOICES, default='percentage')
     discount_value = models.DecimalField(max_digits=10, decimal_places=2)
@@ -251,6 +252,23 @@ class Coupon(BaseModel):
         now = timezone.now()
         return (self.is_active and self.starts_at <= now <= self.ends_at and
                 (self.max_uses == 0 or self.used_count < self.max_uses))
+
+
+class CouponUsage(BaseModel):
+    """Regista cada utilização de um cupão (para impor max_per_user e auditoria)."""
+    coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, related_name='usages')
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='coupon_usages')
+    order = models.ForeignKey('orders.Order', on_delete=models.SET_NULL, null=True, blank=True, related_name='coupon_usages')
+    discount_applied = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['coupon', 'user']),
+        ]
+
+    def __str__(self):
+        return f'{self.coupon.code} — {self.user.email}'
 
 # Ensure DigitalDownload is registered with Django
 from .models_digital import DigitalDownload  # noqa

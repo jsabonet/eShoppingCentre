@@ -137,6 +137,9 @@ export default function CheckoutContent() {
   const [shippingEstimates, setShippingEstimates] = useState<any>(null);
   const [shippingSelections, setShippingSelections] = useState<Record<string, string>>({});
   const [estimatingShipping, setEstimatingShipping] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponInfo, setCouponInfo] = useState<any>(null);
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -175,6 +178,38 @@ export default function CheckoutContent() {
   }, [shippingEstimates, shippingSelections]);
 
   const hasPhysicalItems = items.some(it => it.product.productType === 'physical');
+
+  const discountAmount = useMemo(() => {
+    if (!couponInfo) return 0;
+    if (couponInfo.discount_type === 'percentage') return totalPrice * (couponInfo.discount_value / 100);
+    return Math.min(Number(couponInfo.discount_value), totalPrice);
+  }, [couponInfo, totalPrice]);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setApplyingCoupon(true);
+    try {
+      const res = await fetch(`${API_URL}/products/coupons/validate/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: couponCode.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCouponInfo(data);
+        setError('');
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setCouponInfo(null);
+        setError(d.detail || 'Cupão inválido.');
+      }
+    } catch {
+      setCouponInfo(null);
+      setError('Erro ao validar cupão.');
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
 
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -249,6 +284,7 @@ export default function CheckoutContent() {
         payment_method: paymentMethod,
         shipping_selections: shippingSelections,
         buyer_notes: form.notes,
+        ...(couponInfo?.code ? { coupon_code: couponInfo.code } : {}),
       };
 
       const res = await fetch(`${API_URL}/orders/`, {
@@ -617,10 +653,40 @@ export default function CheckoutContent() {
             </div>
 
             <div className="border-t border-border pt-4 space-y-2">
+              {/* Cupão */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Cupão de desconto"
+                  value={couponCode}
+                  onChange={e => setCouponCode(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  disabled={applyingCoupon || !couponCode.trim()}
+                  className="px-3 py-2 border border-border rounded-md text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+                >
+                  {applyingCoupon ? '...' : 'Aplicar'}
+                </button>
+              </div>
+              {couponInfo && (
+                <button type="button" onClick={() => { setCouponInfo(null); setCouponCode(''); }}
+                  className="flex items-center gap-1 text-xs text-green-600 font-medium hover:underline">
+                  ✅ {couponInfo.code} — {couponInfo.discount_description}
+                </button>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal:</span>
                 <span className="font-medium">MZN {formatPrice(totalPrice)}</span>
               </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-green-600">Desconto:</span>
+                  <span className="text-green-600 font-medium">- MZN {formatPrice(discountAmount)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Frete:</span>
                 {!hasPhysicalItems ? (
@@ -636,7 +702,7 @@ export default function CheckoutContent() {
               <div className="border-t border-border pt-2">
                 <div className="flex justify-between">
                   <span className="font-bold text-lg">Total:</span>
-                  <span className="font-bold text-lg">MZN {formatPrice(totalPrice + shippingTotal)}</span>
+                  <span className="font-bold text-lg">MZN {formatPrice(Math.max(0, totalPrice + shippingTotal - discountAmount))}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Total com frete incluído
