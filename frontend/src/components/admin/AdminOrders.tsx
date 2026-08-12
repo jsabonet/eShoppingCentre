@@ -270,6 +270,31 @@ export default function AdminOrders() {
               </div>
             </div>
 
+            {/* Itens da Encomenda */}
+            {detail.items?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Itens da Encomenda</h3>
+                <div className="space-y-2">
+                  {detail.items.map((item: any, idx: number) => (
+                    <div key={item.id || idx} className="flex items-center gap-3 bg-muted/20 rounded-xl p-2.5">
+                      {item.product_image ? (
+                        <LightboxImage src={item.product_image} alt={item.product_name || 'Produto'} fill
+                          className="relative w-12 h-12 rounded-lg overflow-hidden border border-border bg-muted shrink-0"
+                          imageClassName="object-cover" caption={item.product_name} />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0"><ShoppingCart size={16} className="text-muted-foreground" /></div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate">{item.product_name}</p>
+                        <p className="text-[11px] text-muted-foreground">Qtd: {item.quantity} · {Number(item.unit_price).toLocaleString('pt-MZ')} MZN / un</p>
+                      </div>
+                      <span className="text-xs font-bold shrink-0">{Number(item.total_price).toLocaleString('pt-MZ')} MZN</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {detail.shipping_notes && (
               <div className="bg-purple-50 rounded-xl p-3 mb-4 text-xs">
                 <span className="font-semibold text-purple-700">Envio:</span> {detail.shipping_notes}
