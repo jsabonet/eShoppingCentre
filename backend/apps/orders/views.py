@@ -569,6 +569,17 @@ class AdminTicketListView(generics.ListAPIView):
         return SupportTicket.objects.select_related('order', 'buyer').order_by('-created_at')
 
 
+class SellerTicketListView(generics.ListAPIView):
+    """Vendedor vê os tickets das encomendas da sua loja."""
+    serializer_class = SupportTicketSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return SupportTicket.objects.filter(
+            order__store__owner=self.request.user
+        ).select_related('order', 'buyer').order_by('-created_at')
+
+
 class ResolveTicketView(APIView):
     """Admin/vendedor resolve um ticket."""
     permission_classes = [permissions.IsAuthenticated]

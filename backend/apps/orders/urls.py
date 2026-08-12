@@ -21,6 +21,7 @@ urlpatterns = [
     # Support Tickets
     path('tickets/', views.TicketListCreateView.as_view(), name='ticket_list_create'),
     path('tickets/admin/', views.AdminTicketListView.as_view(), name='admin_ticket_list'),
+    path('tickets/seller/', views.SellerTicketListView.as_view(), name='seller_ticket_list'),
     path('tickets/<uuid:pk>/resolve/', views.ResolveTicketView.as_view(), name='ticket_resolve'),
     # Orders
     path('<uuid:pk>/', views.OrderDetailView.as_view(), name='order_detail'),
