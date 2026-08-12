@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { TicketPercent, Plus, Trash2, Pencil, RefreshCw, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { TicketPercent, Plus, Trash2, Pencil, RefreshCw, X, Loader2, CheckCircle, AlertCircle, Percent, Coins, Calendar, Dices, Tag, Info } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -16,6 +16,19 @@ interface Coupon {
 const emptyForm = {
   code: '', discount_type: 'percentage', discount_value: '', min_purchase: '0',
   max_uses: '0', max_per_user: '1', starts_at: '', ends_at: '', is_active: true,
+};
+
+const toLocalInput = (d: Date) => {
+  const dd = new Date(d);
+  dd.setMinutes(dd.getMinutes() - dd.getTimezoneOffset());
+  return dd.toISOString().slice(0, 16);
+};
+
+const generateCode = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
 };
 
 export default function SellerCouponsPage() {
@@ -49,7 +62,16 @@ export default function SellerCouponsPage() {
 
   useEffect(() => { fetchCoupons(); }, [fetchCoupons]);
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setModal(true); };
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      ...emptyForm,
+      code: generateCode(),
+      starts_at: toLocalInput(new Date()),
+      ends_at: toLocalInput(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
+    });
+    setModal(true);
+  };
   const openEdit = (c: Coupon) => {
     setEditing(c);
     setForm({
@@ -176,65 +198,137 @@ export default function SellerCouponsPage() {
         {modal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setModal(false)} />
-            <div className="relative bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border border-border">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">{editing ? 'Editar Cupão' : 'Novo Cupão'}</h2>
-                <button onClick={() => setModal(false)} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
+            <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-2xl border border-border">
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-border px-6 py-4 flex items-center gap-3 z-10">
+                <div className="p-2.5 bg-accent/10 rounded-xl">
+                  <TicketPercent size={20} className="text-accent" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-lg font-bold leading-tight">{editing ? 'Editar Cupão' : 'Criar Cupão de Desconto'}</h2>
+                  <p className="text-xs text-muted-foreground">{editing ? 'Actualize os detalhes do cupão' : 'Configure o desconto para a sua loja'}</p>
+                </div>
+                <button onClick={() => setModal(false)} className="p-2 hover:bg-muted rounded-lg text-muted-foreground"><X size={18} /></button>
               </div>
-              <form onSubmit={handleSubmit} className="space-y-3">
+
+              <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                {/* Código */}
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Código</label>
-                  <input type="text" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))}
-                    className="w-full px-3 py-2 border border-border rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-accent/20" required />
+                  <label className="flex items-center gap-1.5 text-sm font-semibold mb-1.5"><Tag size={14} className="text-muted-foreground" /> Código do cupão</label>
+                  <div className="flex gap-2">
+                    <input type="text" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
+                      placeholder="EX: PROMO20" maxLength={30}
+                      className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm font-mono font-semibold uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-accent/20" required />
+                    <button type="button" onClick={() => setForm(p => ({ ...p, code: generateCode() }))}
+                      className="px-3 py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted flex items-center gap-1.5" title="Gerar código aleatório">
+                      <Dices size={15} /> Gerar
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1.5">O cliente digita este código no checkout.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Tipo</label>
-                    <select value={form.discount_type} onChange={e => setForm(p => ({ ...p, discount_type: e.target.value }))}
-                      className="w-full px-3 py-2 border border-border rounded-lg text-sm">
-                      <option value="percentage">Percentagem (%)</option>
-                      <option value="fixed">Valor Fixo (MZN)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Valor</label>
-                    <input type="number" step="0.01" min="0" value={form.discount_value} onChange={e => setForm(p => ({ ...p, discount_value: e.target.value }))}
-                      className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/20" required />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Compra mínima (MZN)</label>
-                    <input type="number" step="0.01" min="0" value={form.min_purchase} onChange={e => setForm(p => ({ ...p, min_purchase: e.target.value }))}
-                      className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Usos máx. (0=ilimitado)</label>
-                    <input type="number" min="0" value={form.max_uses} onChange={e => setForm(p => ({ ...p, max_uses: e.target.value }))}
-                      className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
+
+                {/* Tipo de desconto */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-semibold mb-1.5"><Percent size={14} className="text-muted-foreground" /> Tipo de desconto</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setForm(p => ({ ...p, discount_type: 'percentage' }))}
+                      className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${form.discount_type === 'percentage' ? 'border-accent bg-accent/5 text-accent' : 'border-border text-muted-foreground hover:border-muted-foreground/40'}`}>
+                      <Percent size={15} /> Percentagem
+                    </button>
+                    <button type="button" onClick={() => setForm(p => ({ ...p, discount_type: 'fixed' }))}
+                      className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${form.discount_type === 'fixed' ? 'border-accent bg-accent/5 text-accent' : 'border-border text-muted-foreground hover:border-muted-foreground/40'}`}>
+                      <Coins size={15} /> Valor Fixo
+                    </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Início</label>
-                    <input type="datetime-local" value={form.starts_at} onChange={e => setForm(p => ({ ...p, starts_at: e.target.value }))}
-                      className="w-full px-3 py-2 border border-border rounded-lg text-sm" required />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Fim</label>
-                    <input type="datetime-local" value={form.ends_at} onChange={e => setForm(p => ({ ...p, ends_at: e.target.value }))}
-                      className="w-full px-3 py-2 border border-border rounded-lg text-sm" required />
+
+                {/* Valor */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5">{form.discount_type === 'percentage' ? 'Percentagem de desconto' : 'Valor do desconto (MZN)'}</label>
+                  <div className="relative">
+                    <input type="number" step="0.01" min="0" max={form.discount_type === 'percentage' ? '100' : undefined}
+                      value={form.discount_value} onChange={e => setForm(p => ({ ...p, discount_value: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-border rounded-xl text-sm pr-12 focus:outline-none focus:ring-2 focus:ring-accent/20" required />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
+                      {form.discount_type === 'percentage' ? '%' : 'MZN'}
+                    </span>
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={form.is_active} onChange={e => setForm(p => ({ ...p, is_active: e.target.checked }))} />
-                  Activo
+
+                {/* Condições */}
+                <div className="bg-muted/30 rounded-xl p-4 space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Info size={13} /> Condições</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Compra mínima (MZN)</label>
+                      <input type="number" step="0.01" min="0" value={form.min_purchase} onChange={e => setForm(p => ({ ...p, min_purchase: e.target.value }))}
+                        className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Limite de usos</label>
+                      <input type="number" min="0" value={form.max_uses} onChange={e => setForm(p => ({ ...p, max_uses: e.target.value }))}
+                        className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white" />
+                      <p className="text-[10px] text-muted-foreground mt-0.5">0 = ilimitado</p>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Usos por cliente</label>
+                      <input type="number" min="1" value={form.max_per_user} onChange={e => setForm(p => ({ ...p, max_per_user: e.target.value }))}
+                        className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Validade */}
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5"><Calendar size={13} /> Validade</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Início</label>
+                      <input type="datetime-local" value={form.starts_at} onChange={e => setForm(p => ({ ...p, starts_at: e.target.value }))}
+                        className="w-full px-3 py-2 border border-border rounded-lg text-sm" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Fim</label>
+                      <input type="datetime-local" value={form.ends_at} onChange={e => setForm(p => ({ ...p, ends_at: e.target.value }))}
+                        className="w-full px-3 py-2 border border-border rounded-lg text-sm" required />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pré-visualização */}
+                <div className="rounded-xl border-2 border-dashed border-accent/40 bg-accent/5 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-accent font-semibold mb-1">Pré-visualização</p>
+                  {form.discount_value ? (
+                    <p className="text-sm font-semibold">
+                      {form.discount_type === 'percentage' ? `${form.discount_value}% de desconto` : `${Number(form.discount_value).toLocaleString('pt-MZ')} MZN de desconto`}
+                      {Number(form.min_purchase || 0) > 0 && <span className="font-normal text-muted-foreground"> em compras a partir de {Number(form.min_purchase).toLocaleString('pt-MZ')} MZN</span>}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Defina o valor do desconto para ver a pré-visualização.</p>
+                  )}
+                </div>
+
+                {/* Activo */}
+                <label className="flex items-center justify-between p-3 bg-muted/30 rounded-xl cursor-pointer">
+                  <span className="text-sm font-medium">Cupão activo</span>
+                  <button type="button" onClick={() => setForm(p => ({ ...p, is_active: !p.is_active }))}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${form.is_active ? 'bg-green-500' : 'bg-gray-300'}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-5' : ''}`} />
+                  </button>
                 </label>
-                <button type="submit" disabled={saving}
-                  className="w-full px-4 py-2.5 bg-accent text-accent-foreground rounded-xl font-semibold hover:bg-accent/90 disabled:opacity-50 flex items-center justify-center gap-2">
-                  {saving ? <Loader2 size={15} className="animate-spin" /> : null}
-                  {editing ? 'Guardar' : 'Criar Cupão'}
-                </button>
+
+                {/* Acções */}
+                <div className="flex gap-3 pt-1">
+                  <button type="button" onClick={() => setModal(false)}
+                    className="px-5 py-2.5 border border-border rounded-xl font-medium text-sm hover:bg-muted transition-colors">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={saving}
+                    className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-xl font-semibold text-sm hover:bg-accent/90 disabled:opacity-50 flex items-center justify-center gap-2">
+                    {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                    {editing ? 'Guardar Alterações' : 'Criar Cupão'}
+                  </button>
+                </div>
               </form>
             </div>
           </div>
