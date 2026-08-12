@@ -175,6 +175,11 @@ class CreateOrderSerializer(serializers.Serializer):
         user = self.context['request'].user
         items_data = validated_data.pop('items')
         affiliate_code = validated_data.pop('affiliate_code', None)
+        # Fallback: ler o cookie de atribuição (definido no clique /r/{code})
+        if not affiliate_code:
+            request = self.context.get('request')
+            if request:
+                affiliate_code = request.COOKIES.get('ref')
         coupon_code = validated_data.pop('coupon_code', '').strip().upper()
         shipping_selections = validated_data.pop('shipping_selections', {})
         province = validated_data.get('shipping_address', {}).get('province', '')
@@ -202,12 +207,16 @@ class CreateOrderSerializer(serializers.Serializer):
 
         # Comissão de afiliado (total, repartida proporcionalmente depois)
         affiliate = None
+        affiliate_profile = None
+        affiliate_link = None
         affiliate_commission = 0
         if affiliate_code:
             from apps.affiliates.models import AffiliateLink
-            link = AffiliateLink.objects.filter(code=affiliate_code).first()
-            if link:
+            link = AffiliateLink.objects.filter(code=affiliate_code).select_related('affiliate', 'product').first()
+            if link and link.affiliate.is_active and link.affiliate.user != user:  # anti auto-referência
                 affiliate = link.affiliate.user
+                affiliate_profile = link.affiliate
+                affiliate_link = link
                 for store_data in store_orders.values():
                     for item in store_data['items']:
                         affiliate_commission += (item['total_price'] * item['product'].affiliate_commission) / 100
@@ -367,6 +376,23 @@ class CreateOrderSerializer(serializers.Serializer):
                         coupon=applied_coupon, user=user, order=order,
                         discount_applied=order.discount,
                     )
+
+        # Registar comissão de afiliado + incrementar conversões
+        if affiliate_profile and affiliate_link:
+            from django.db.models import F
+            from apps.affiliates.models import AffiliateCommission, AffiliateProfile
+            for order in orders:
+                if order.affiliate_commission > 0:
+                    AffiliateCommission.objects.create(
+                        affiliate=affiliate_profile,
+                        order=order,
+                        product=affiliate_link.product,
+                        amount=order.affiliate_commission,
+                        commission_rate=affiliate_link.product.affiliate_commission,
+                        status='pending',
+                    )
+            AffiliateLink.objects.filter(pk=affiliate_link.pk).update(conversions=F('conversions') + len(orders))
+            AffiliateProfile.objects.filter(pk=affiliate_profile.pk).update(total_sales=F('total_sales') + len(orders))
 
         return orders
 

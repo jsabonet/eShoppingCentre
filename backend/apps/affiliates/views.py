@@ -3,6 +3,9 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db import models
+from django.db.models import F
+from django.conf import settings
+from django.shortcuts import redirect
 from .models import AffiliateProfile, AffiliateLink, AffiliateCommission
 from .serializers import AffiliateProfileSerializer, AffiliateLinkSerializer, AffiliateCommissionSerializer
 
@@ -130,3 +133,18 @@ class StoreAffiliatesView(APIView):
             'total_sales': total_sales,
             'total_commission': total_commission,
         })
+
+
+def affiliate_click(request, code):
+    """GET /r/{code}/ — regista o clique, define cookie de atribuição e redireciona."""
+    link = AffiliateLink.objects.filter(code=code).select_related('product', 'affiliate').first()
+    if link and link.affiliate.is_active:
+        AffiliateLink.objects.filter(pk=link.pk).update(clicks=F('clicks') + 1)
+        AffiliateProfile.objects.filter(pk=link.affiliate_id).update(total_clicks=F('total_clicks') + 1)
+
+        target = f'{settings.FRONTEND_URL}/product/{link.product.slug}'
+        response = redirect(target)
+        # Cookie de atribuição: 30 dias (padrão internacional)
+        response.set_cookie('ref', link.code, max_age=30 * 24 * 60 * 60, samesite='Lax')
+        return response
+    return redirect(settings.FRONTEND_URL)

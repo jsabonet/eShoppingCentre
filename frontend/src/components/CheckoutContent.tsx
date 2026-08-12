@@ -11,6 +11,12 @@ function formatPrice(price: number): string {
   return price.toFixed(2).replace('.', ',');
 }
 
+function getCookie(name: string): string {
+  if (typeof document === 'undefined') return '';
+  const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]*)'));
+  return m ? decodeURIComponent(m[2]) : '';
+}
+
 const PROVINCES = [
   { value: 'maputo_cidade', label: 'Maputo Cidade' },
   { value: 'maputo_provincia', label: 'Maputo Província' },
@@ -285,6 +291,7 @@ export default function CheckoutContent() {
         shipping_selections: shippingSelections,
         buyer_notes: form.notes,
         ...(couponInfo?.code ? { coupon_code: couponInfo.code } : {}),
+        ...(getCookie('ref') ? { affiliate_code: getCookie('ref') } : {}),
       };
 
       const res = await fetch(`${API_URL}/orders/`, {
