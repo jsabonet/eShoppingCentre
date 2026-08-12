@@ -4,7 +4,7 @@ from django.db import transaction
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket
+from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket, SupportTicketImage
 
 
 # --- Transições de status permitidas ---
@@ -36,7 +36,7 @@ def log_status_change(order, new_status, user, notes=''):
         changed_by=user,
         notes=notes,
     )
-from .serializers import OrderSerializer, CreateOrderSerializer, ReturnRequestSerializer, ReturnResolveSerializer, ReturnShipSerializer, ReturnImageSerializer, AdminOverrideSerializer, SupportTicketSerializer
+from .serializers import OrderSerializer, CreateOrderSerializer, ReturnRequestSerializer, ReturnResolveSerializer, ReturnShipSerializer, ReturnImageSerializer, AdminOverrideSerializer, SupportTicketSerializer, SupportTicketImageSerializer
 
 
 class CreateOrderView(APIView):
@@ -559,7 +559,7 @@ class TicketListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return SupportTicket.objects.filter(buyer=self.request.user).order_by('-created_at')
+        return SupportTicket.objects.filter(buyer=self.request.user).prefetch_related('images').order_by('-created_at')
 
     def perform_create(self, serializer):
         serializer.save(buyer=self.request.user)
@@ -571,7 +571,7 @@ class AdminTicketListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
 
     def get_queryset(self):
-        return SupportTicket.objects.select_related('order', 'buyer').order_by('-created_at')
+        return SupportTicket.objects.select_related('order', 'buyer').prefetch_related('images').order_by('-created_at')
 
 
 class SellerTicketListView(generics.ListAPIView):
@@ -582,7 +582,7 @@ class SellerTicketListView(generics.ListAPIView):
     def get_queryset(self):
         return SupportTicket.objects.filter(
             order__store__owner=self.request.user
-        ).select_related('order', 'buyer').order_by('-created_at')
+        ).select_related('order', 'buyer').prefetch_related('images').order_by('-created_at')
 
 
 class ResolveTicketView(APIView):
@@ -612,3 +612,24 @@ class ResolveTicketView(APIView):
         )
 
         return Response(SupportTicketSerializer(ticket).data)
+
+
+class UploadTicketImageView(APIView):
+    """POST /api/v1/orders/tickets/{pk}/images/ — Anexa foto a um ticket."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        ticket = get_object_or_404(SupportTicket, pk=pk)
+
+        is_owner = ticket.buyer == request.user
+        is_seller = ticket.order.store and ticket.order.store.owner == request.user
+        if not is_owner and not request.user.is_staff and not is_seller:
+            return Response({'detail': 'Sem permissão.'}, status=status.HTTP_403_FORBIDDEN)
+
+        file = request.FILES.get('image')
+        if not file:
+            return Response({'detail': 'Imagem obrigatória.'}, status=400)
+
+        caption = request.data.get('caption', '')
+        image = SupportTicketImage.objects.create(ticket=ticket, image=file, caption=caption)
+        return Response(SupportTicketImageSerializer(image).data, status=201)

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { LifeBuoy, Search, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, MessageCircle, Loader2 } from 'lucide-react';
+import LightboxImage from '@/src/components/LightboxImage';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -17,9 +18,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   payment: 'Pagamento', other: 'Outro',
 };
 
+interface TicketImage {
+  id: string; image: string; caption: string;
+}
+
 interface Ticket {
   id: string; subject: string; order_number: string; category: string;
   description: string; status: string; buyer_name: string; resolution: string; created_at: string;
+  images?: TicketImage[];
 }
 
 export default function AdminTickets() {
@@ -128,6 +134,15 @@ export default function AdminTickets() {
               </div>
               <p className="text-xs text-muted-foreground">{t.buyer_name} · {t.order_number} · {CATEGORY_LABELS[t.category]} · {new Date(t.created_at).toLocaleDateString('pt-MZ')}</p>
               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{t.description}</p>
+              {t.images?.length > 0 && (
+                <div className="flex gap-1.5 mt-2" onClick={e => e.stopPropagation()}>
+                  {t.images.map(img => (
+                    <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Anexo'} fill
+                      className="relative w-10 h-10 rounded-lg overflow-hidden border border-border bg-muted"
+                      imageClassName="object-cover" caption={img.caption} />
+                  ))}
+                </div>
+              )}
             </button>
           ))}
         </div>
@@ -141,6 +156,15 @@ export default function AdminTickets() {
             <h2 className="text-lg font-bold mb-1">{selected.subject}</h2>
             <p className="text-sm text-muted-foreground mb-4">{selected.buyer_name} · {selected.order_number}</p>
             <p className="text-sm mb-4 p-3 bg-muted/30 rounded-xl">{selected.description}</p>
+            {selected.images?.length > 0 && (
+              <div className="flex gap-2 mb-4">
+                {selected.images.map(img => (
+                  <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Anexo'} fill
+                    className="relative w-16 h-16 rounded-lg overflow-hidden border border-border bg-muted"
+                    imageClassName="object-cover" caption={img.caption} />
+                ))}
+              </div>
+            )}
             <textarea rows={3} placeholder="Resolução..." value={selected.resolution}
               onChange={e => setSelected({ ...selected, resolution: e.target.value })}
               className="w-full px-4 py-2.5 border border-border rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-accent/20 resize-none" />

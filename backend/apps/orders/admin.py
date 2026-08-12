@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Order, OrderItem, ReturnRequest, OrderStatusHistory, SupportTicket
+from .models import Order, OrderItem, ReturnRequest, OrderStatusHistory, SupportTicket, SupportTicketImage
 
 
 class OrderItemInline(admin.TabularInline):
@@ -132,3 +132,9 @@ class SupportTicketAdmin(admin.ModelAdmin):
     list_filter = ('status', 'category', 'created_at')
     search_fields = ('subject', 'description', 'buyer__email', 'order__order_number')
     readonly_fields = ('buyer', 'order', 'created_at', 'resolved_at')
+
+
+@admin.register(SupportTicketImage)
+class SupportTicketImageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'ticket', 'caption', 'created_at')
+    search_fields = ('ticket__subject', 'caption')

@@ -81,6 +81,7 @@ export default function OrderDetailPage() {
   const [error, setError] = useState('');
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [ticketForm, setTicketForm] = useState({ subject: '', category: 'other', description: '' });
+  const [ticketImages, setTicketImages] = useState<File[]>([]);
 
   const apiHeaders = useCallback(() => {
     const token = localStorage.getItem('access_token');
@@ -177,6 +178,19 @@ export default function OrderDetailPage() {
         body: JSON.stringify({ order: id, subject: ticketForm.subject, category: ticketForm.category, description: ticketForm.description }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(typeof d === 'object' ? Object.values(d).flat().join('. ') : 'Erro.'); }
+      const data = await res.json();
+      // Upload das fotos anexadas
+      for (const file of ticketImages) {
+        const fd = new FormData();
+        fd.append('image', file);
+        fd.append('caption', 'Anexo do ticket');
+        await fetch(API_URL + '/orders/tickets/' + data.id + '/images/', {
+          method: 'POST',
+          headers: { Authorization: apiHeaders().Authorization },
+          body: fd,
+        });
+      }
+      setTicketImages([]);
       setShowTicketModal(false);
       setTicketForm({ subject: '', category: 'other', description: '' });
       alert('Ticket criado com sucesso. A nossa equipa irá responder em breve.');
@@ -614,6 +628,24 @@ export default function OrderDetailPage() {
                   <textarea rows={4} placeholder="Descreva o problema..." value={ticketForm.description}
                     onChange={e => setTicketForm(p => ({ ...p, description: e.target.value }))}
                     className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 resize-none" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Fotos (opcional)</label>
+                  <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent/30 transition-colors">
+                    <Camera size={18} className="text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      {ticketImages.length > 0 ? `${ticketImages.length} foto(s) selecionada(s)` : 'Adicionar foto'}
+                    </span>
+                    <input type="file" accept="image/*" capture="environment" multiple className="hidden"
+                      onChange={e => setTicketImages(Array.from(e.target.files || []))} />
+                  </label>
+                  {ticketImages.length > 0 && (
+                    <div className="flex gap-2 mt-2">
+                      {ticketImages.map((f, i) => (
+                        <img key={i} src={URL.createObjectURL(f)} alt="" className="w-14 h-14 rounded-lg object-cover border border-border" />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-xl font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">

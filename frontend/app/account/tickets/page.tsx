@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { LifeBuoy, AlertCircle, MessageCircle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import AccountLayout from '@/src/components/AccountLayout';
 import { useAuth } from '@/src/hooks/useAuth';
+import LightboxImage from '@/src/components/LightboxImage';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -20,9 +21,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   payment: 'Pagamento', other: 'Outro',
 };
 
+interface TicketImage {
+  id: string; image: string; caption: string;
+}
+
 interface Ticket {
   id: string; subject: string; order_number: string; order: string; category: string;
   description: string; status: string; resolution: string; created_at: string;
+  images?: TicketImage[];
 }
 
 export default function AccountTicketsPage() {
@@ -89,6 +95,15 @@ export default function AccountTicketsPage() {
                     {t.order_number} · {CATEGORY_LABELS[t.category]} · {new Date(t.created_at).toLocaleDateString('pt-MZ')}
                   </p>
                   <p className="text-sm text-foreground/80">{t.description}</p>
+                  {t.images?.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {t.images.map(img => (
+                        <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Anexo'} fill
+                          className="relative w-16 h-16 rounded-lg overflow-hidden border border-border bg-muted"
+                          imageClassName="object-cover" caption={img.caption} />
+                      ))}
+                    </div>
+                  )}
                   {t.resolution && (
                     <div className="mt-3 p-3 bg-muted/40 rounded-xl text-sm">
                       <span className="font-semibold text-xs text-muted-foreground">Resposta da equipa:</span>

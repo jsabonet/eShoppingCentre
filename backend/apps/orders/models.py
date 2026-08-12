@@ -209,3 +209,18 @@ class SupportTicket(BaseModel):
 
     def __str__(self):
         return f'Ticket #{self.id} — {self.subject}'
+
+
+class SupportTicketImage(BaseModel):
+    """Fotos anexadas a um ticket de suporte."""
+    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='tickets/%Y/%m/')
+    caption = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Imagem do Ticket'
+        verbose_name_plural = 'Imagens dos Tickets'
+
+    def __str__(self):
+        return f'Imagem para ticket #{self.ticket_id}'
