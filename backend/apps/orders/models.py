@@ -170,3 +170,40 @@ class ReturnImage(BaseModel):
 
     def __str__(self):
         return f'Imagem para {self.return_request.rma_number}'
+
+
+class SupportTicket(BaseModel):
+    """Ticket de suporte pós-venda (comprador abre, admin/vendedor resolve)."""
+    STATUS_CHOICES = [
+        ('open', 'Aberto'),
+        ('in_progress', 'Em Resolução'),
+        ('resolved', 'Resolvido'),
+        ('closed', 'Fechado'),
+    ]
+    CATEGORY_CHOICES = [
+        ('not_received', 'Não recebi a encomenda'),
+        ('defective', 'Produto com defeito'),
+        ('wrong_item', 'Item errado'),
+        ('payment', 'Problema de pagamento'),
+        ('other', 'Outro'),
+    ]
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='tickets')
+    buyer = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='tickets')
+    subject = models.CharField(max_length=255)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default='other')
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    assigned_to = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
+    resolution = models.TextField(blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['buyer', 'status']),
+        ]
+
+    def __str__(self):
+        return f'Ticket #{self.id} — {self.subject}'

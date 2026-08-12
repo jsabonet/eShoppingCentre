@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Package, Plus, Search, Edit, Trash2, RefreshCw, Layers, Download, FileText, GraduationCap, History, X, AlertCircle } from 'lucide-react';
+import { Package, Plus, Search, Edit, Trash2, RefreshCw, Layers, Download, FileText, GraduationCap, History, X, AlertCircle, ShoppingBag, Undo2, RotateCcw, Pencil } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { productsAPI, storesAPI } from '@/src/lib/api';
@@ -266,7 +266,7 @@ export default function SellerProductsPage() {
                         <span className={`font-semibold ${log.quantity > 0 ? 'text-green-700' : 'text-red-700'}`}>
                           {log.quantity > 0 ? '+' : ''}{log.quantity}
                         </span>
-                        {' '}· {log.change_type === 'sale' ? '🛒 Venda' : log.change_type === 'cancel' ? '🔙 Cancelamento' : log.change_type === 'return' ? '🔄 Devolução' : log.change_type === 'restock' ? '📦 Reposição' : '✏️ Ajuste'}
+                        {' '}· <span className="inline-flex items-center gap-1">{log.change_type === 'sale' ? <><ShoppingBag size={12} /> Venda</> : log.change_type === 'cancel' ? <><Undo2 size={12} /> Cancelamento</> : log.change_type === 'return' ? <><RotateCcw size={12} /> Devolução</> : log.change_type === 'restock' ? <><Plus size={12} /> Reposição</> : <><Pencil size={12} /> Ajuste</>}</span>
                         {' '}· <span className="text-muted-foreground">{log.stock_before} → {log.stock_after}</span>
                       </p>
                       <p className="text-muted-foreground">{log.reference} · {log.changed_by_name}</p>

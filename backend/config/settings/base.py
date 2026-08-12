@@ -147,6 +147,13 @@ AUTHENTICATION_BACKENDS = [
 CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 
+CELERY_BEAT_SCHEDULE = {
+    'auto-refund-unprocessed-returns': {
+        'task': 'apps.orders.tasks.auto_refund_unprocessed_returns',
+        'schedule': 3600.0,  # a cada hora
+    },
+}
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',

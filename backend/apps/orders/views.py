@@ -4,7 +4,7 @@ from django.db import transaction
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory
+from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket
 
 
 # --- Transições de status permitidas ---
@@ -35,7 +35,7 @@ def log_status_change(order, new_status, user, notes=''):
         changed_by=user,
         notes=notes,
     )
-from .serializers import OrderSerializer, CreateOrderSerializer, ReturnRequestSerializer, ReturnResolveSerializer, ReturnShipSerializer, ReturnImageSerializer, AdminOverrideSerializer
+from .serializers import OrderSerializer, CreateOrderSerializer, ReturnRequestSerializer, ReturnResolveSerializer, ReturnShipSerializer, ReturnImageSerializer, AdminOverrideSerializer, SupportTicketSerializer
 
 
 class CreateOrderView(APIView):
@@ -209,6 +209,15 @@ class CreateReturnView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         order = serializer.validated_data['order']
+        # Janela de devolução: 7 dias após confirmação de entrega
+        if order.status == 'delivered':
+            return_window = timezone.timedelta(days=7)
+            delivered_date = order.confirmed_at or order.delivered_at
+            if delivered_date and (timezone.now() - delivered_date) > return_window:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'order': 'O prazo de devolução (7 dias) já expirou para esta encomenda.'
+                })
         serializer.save(buyer=self.request.user, store=order.store)
 
 
@@ -535,3 +544,55 @@ class AdminOverrideView(APIView):
         )
 
         return Response(ReturnRequestSerializer(return_req).data)
+
+
+# ─── Support Tickets ───
+
+class TicketListCreateView(generics.ListCreateAPIView):
+    """Comprador cria e lista os seus tickets."""
+    serializer_class = SupportTicketSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return SupportTicket.objects.filter(buyer=self.request.user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(buyer=self.request.user)
+
+
+class AdminTicketListView(generics.ListAPIView):
+    """Admin vê todos os tickets."""
+    serializer_class = SupportTicketSerializer
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return SupportTicket.objects.select_related('order', 'buyer').order_by('-created_at')
+
+
+class ResolveTicketView(APIView):
+    """Admin/vendedor resolve um ticket."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        ticket = get_object_or_404(SupportTicket, pk=pk)
+        if not request.user.is_staff and ticket.order.store.owner != request.user:
+            return Response({'detail': 'Sem permissão.'}, status=status.HTTP_403_FORBIDDEN)
+
+        new_status = request.data.get('status', 'resolved')
+        ticket.status = new_status
+        ticket.resolution = request.data.get('resolution', '')
+        if new_status == 'resolved':
+            ticket.resolved_at = timezone.now()
+        ticket.assigned_to = request.user
+        ticket.save()
+
+        from apps.notifications.models import Notification
+        Notification.objects.create(
+            user=ticket.buyer,
+            title='Ticket actualizado',
+            message=f'O seu ticket "{ticket.subject}" foi {ticket.get_status_display().lower()}.',
+            notification_type='support',
+            link=f'/account/orders/{ticket.order_id}',
+        )
+
+        return Response(SupportTicketSerializer(ticket).data)

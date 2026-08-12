@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Order, OrderItem, ReturnRequest, OrderStatusHistory
+from .models import Order, OrderItem, ReturnRequest, OrderStatusHistory, SupportTicket
 
 
 class OrderItemInline(admin.TabularInline):
@@ -124,3 +124,11 @@ class ReturnRequestAdmin(admin.ModelAdmin):
             r.save()
             count += 1
         self.message_user(request, f'{count} devolução(ões) reembolsada(s).')
+
+
+@admin.register(SupportTicket)
+class SupportTicketAdmin(admin.ModelAdmin):
+    list_display = ('id', 'subject', 'buyer', 'order', 'category', 'status', 'assigned_to', 'created_at')
+    list_filter = ('status', 'category', 'created_at')
+    search_fields = ('subject', 'description', 'buyer__email', 'order__order_number')
+    readonly_fields = ('buyer', 'order', 'created_at', 'resolved_at')

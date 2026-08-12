@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Package, Search, RefreshCw, Plus, Loader2, AlertCircle, CheckCircle, History, X } from 'lucide-react';
+import { Package, Search, RefreshCw, Plus, Loader2, AlertCircle, CheckCircle, History, X, Circle, PackageX, AlertTriangle, ShoppingBag, Undo2, RotateCcw, Pencil } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { productsAPI } from '@/src/lib/api';
@@ -67,10 +67,10 @@ export default function InventoryPage() {
     finally { setSaving(false); }
   };
 
-  const stockLevel = (stock: number): { color: string; label: string; dot: string } => {
-    if (stock === 0) return { color: 'bg-red-100 text-red-700', label: 'Esgotado', dot: '🔴' };
-    if (stock <= 5) return { color: 'bg-yellow-100 text-yellow-700', label: 'Baixo', dot: '🟡' };
-    return { color: 'bg-green-100 text-green-700', label: 'Normal', dot: '🟢' };
+  const stockLevel = (stock: number): { color: string; label: string; icon: any } => {
+    if (stock === 0) return { color: 'bg-red-100 text-red-700', label: 'Esgotado', icon: PackageX };
+    if (stock <= 5) return { color: 'bg-yellow-100 text-yellow-700', label: 'Baixo', icon: AlertTriangle };
+    return { color: 'bg-green-100 text-green-700', label: 'Normal', icon: Circle };
   };
 
   const filtered = products.filter(p => {
@@ -105,16 +105,19 @@ export default function InventoryPage() {
         </div>
 
         {/* Quick stats */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            { key: 'all', label: 'Total', count: products.length, color: 'bg-card border-border' },
-            { key: 'normal', label: '🟢 Normal', count: products.filter(p => p.stock > 5).length, color: 'bg-green-50 border-green-200' },
-            { key: 'low', label: '🟡 Baixo', count: products.filter(p => p.stock > 0 && p.stock <= 5).length, color: 'bg-yellow-50 border-yellow-200' },
-            { key: 'out', label: '🔴 Esgotado', count: products.filter(p => p.stock === 0).length, color: 'bg-red-50 border-red-200' },
+            { key: 'all', label: 'Total', count: products.length, color: 'bg-card border-border', icon: Package },
+            { key: 'normal', label: 'Normal', count: products.filter(p => p.stock > 5).length, color: 'bg-green-50 border-green-200', icon: Circle },
+            { key: 'low', label: 'Baixo', count: products.filter(p => p.stock > 0 && p.stock <= 5).length, color: 'bg-yellow-50 border-yellow-200', icon: AlertTriangle },
+            { key: 'out', label: 'Esgotado', count: products.filter(p => p.stock === 0).length, color: 'bg-red-50 border-red-200', icon: PackageX },
           ].map(s => (
             <button key={s.key} onClick={() => setStockFilter(stockFilter === s.key ? 'all' : s.key)}
               className={`p-3 rounded-xl border text-center transition-colors ${s.color} ${stockFilter === s.key ? 'ring-2 ring-accent' : ''}`}>
-              <div className="text-2xl font-bold">{s.count}</div>
+              <div className="flex items-center justify-center gap-1.5">
+                <s.icon size={16} />
+                <span className="text-2xl font-bold">{s.count}</span>
+              </div>
               <div className="text-xs text-muted-foreground">{s.label}</div>
             </button>
           ))}
@@ -164,7 +167,7 @@ export default function InventoryPage() {
                         <td className="py-2.5 px-3 text-center font-bold text-sm">{p.stock}</td>
                         <td className="py-2.5 px-3 text-center">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${level.color}`}>
-                            {level.dot} {level.label}
+                            <level.icon size={12} /> {level.label}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-center text-xs text-muted-foreground hidden sm:table-cell">{p.sales_count || 0}</td>
@@ -239,7 +242,7 @@ export default function InventoryPage() {
                       <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${log.quantity > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
                       <div className="flex-1">
                         <p><span className={`font-semibold ${log.quantity > 0 ? 'text-green-700' : 'text-red-700'}`}>{log.quantity > 0 ? '+' : ''}{log.quantity}</span>
-                          {' '}· {log.change_type === 'sale' ? '🛒 Venda' : log.change_type === 'cancel' ? '🔙 Cancel' : log.change_type === 'return' ? '🔄 Devolução' : log.change_type === 'restock' ? '📦 Reposição' : '✏️ Ajuste'}
+                          {' '}· <span className="inline-flex items-center gap-1">{log.change_type === 'sale' ? <><ShoppingBag size={12} /> Venda</> : log.change_type === 'cancel' ? <><Undo2 size={12} /> Cancel.</> : log.change_type === 'return' ? <><RotateCcw size={12} /> Devolução</> : log.change_type === 'restock' ? <><Plus size={12} /> Reposição</> : <><Pencil size={12} /> Ajuste</>}</span>
                           {' '}· <span className="text-muted-foreground">{log.stock_before} → {log.stock_after}</span>
                         </p>
                         <p className="text-muted-foreground">{log.reference} · {log.changed_by_name}</p>

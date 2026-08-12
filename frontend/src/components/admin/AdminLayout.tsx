@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Store, Filter,
   Edit, Users, LogOut, ChevronLeft, ChevronRight,
-  Menu, X, Settings, Bell, RotateCcw, ShoppingCart
+  Menu, X, Settings, Bell, RotateCcw, ShoppingCart, LifeBuoy
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 
@@ -15,6 +15,7 @@ const adminNavItems = [
   { href: '/admin?tab=stores', label: 'Lojas', icon: Store },
   { href: '/admin?tab=orders', label: 'Encomendas', icon: ShoppingCart },
   { href: '/admin?tab=returns', label: 'Devoluções', icon: RotateCcw },
+  { href: '/admin?tab=tickets', label: 'Suporte', icon: LifeBuoy },
   { href: '/admin?tab=categories', label: 'Categorias', icon: Filter },
   { href: '/admin?tab=blog', label: 'Blog', icon: Edit },
   { href: '/admin?tab=users', label: 'Utilizadores', icon: Users },

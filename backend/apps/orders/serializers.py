@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db import transaction
-from .models import Order, OrderItem, ReturnRequest, ReturnImage, OrderStatusHistory
+from .models import Order, OrderItem, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket
 from apps.products.models import Product
 
 
@@ -329,3 +329,24 @@ class CreateOrderSerializer(serializers.Serializer):
             request = self.context.get('request')
             return request.build_absolute_uri(img.image.url) if request else ''
         return ''
+
+
+class SupportTicketSerializer(serializers.ModelSerializer):
+    order_number = serializers.CharField(source='order.order_number', read_only=True)
+    buyer_name = serializers.SerializerMethodField()
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = SupportTicket
+        fields = ('id', 'order', 'order_number', 'subject', 'category', 'category_display',
+                  'description', 'status', 'status_display', 'resolution', 'resolved_at',
+                  'buyer_name', 'created_at')
+        read_only_fields = ('id', 'buyer', 'resolved_at', 'created_at')
+
+    def get_buyer_name(self, obj):
+        return obj.buyer.get_full_name() or obj.buyer.email
+
+    def create(self, validated_data):
+        validated_data['buyer'] = self.context['request'].user
+        return super().create(validated_data)

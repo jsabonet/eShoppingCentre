@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, MapPin, CreditCard, RotateCcw, Loader2, AlertCircle, XCircle,
-  Package, CheckCircle2, Circle, Truck, Clock, Ban, Undo2, MessageCircle,
+  Package, CheckCircle2, Circle, Truck, Clock, Ban, Undo2, MessageCircle, Camera,
 } from 'lucide-react';
 import AccountLayout from '@/src/components/AccountLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
@@ -69,9 +69,12 @@ export default function OrderDetailPage() {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showShipModal, setShowShipModal] = useState(false);
   const [returnForm, setReturnForm] = useState({ reason_type: 'defective', reason: '' });
+  const [returnImages, setReturnImages] = useState<File[]>([]);
   const [shipForm, setShipForm] = useState({ shipping_notes: '', buyer_tracking_code: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [ticketForm, setTicketForm] = useState({ subject: '', category: 'other', description: '' });
 
   const apiHeaders = useCallback(() => {
     const token = localStorage.getItem('access_token');
@@ -97,6 +100,7 @@ export default function OrderDetailPage() {
 
   const handleRequestReturn = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError('');
+    if (returnImages.length === 0) { setError('Envie pelo menos uma foto do produto para comprovar o problema.'); setSubmitting(false); return; }
     try {
       const res = await fetch(API_URL + '/orders/returns/', {
         method: 'POST', headers: apiHeaders(),
@@ -104,7 +108,19 @@ export default function OrderDetailPage() {
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(typeof d === 'object' ? Object.values(d).flat().join('. ') : 'Erro.'); }
       const data = await res.json();
+      // Upload photos
+      for (const file of returnImages) {
+        const fd = new FormData();
+        fd.append('image', file);
+        fd.append('caption', 'Evidência da devolução');
+        await fetch(API_URL + '/orders/returns/' + data.id + '/images/', {
+          method: 'POST',
+          headers: { Authorization: apiHeaders().Authorization },
+          body: fd,
+        });
+      }
       setReturns(prev => [...prev, data]);
+      setReturnImages([]);
       setShowReturnModal(false);
     } catch (err: any) { setError(err.message); } finally { setSubmitting(false); }
   };
@@ -147,6 +163,20 @@ export default function OrderDetailPage() {
     } catch (err: any) { alert(err.message); } finally { setSubmitting(false); }
   };
 
+  const handleTicketSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); setSubmitting(true); setError('');
+    try {
+      const res = await fetch(API_URL + '/orders/tickets/', {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({ order: id, subject: ticketForm.subject, category: ticketForm.category, description: ticketForm.description }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(typeof d === 'object' ? Object.values(d).flat().join('. ') : 'Erro.'); }
+      setShowTicketModal(false);
+      setTicketForm({ subject: '', category: 'other', description: '' });
+      alert('Ticket criado com sucesso. A nossa equipa irá responder em breve.');
+    } catch (err: any) { setError(err.message); } finally { setSubmitting(false); }
+  };
+
   if (loading) return <AccountLayout><div className="flex justify-center py-20"><LoadingSpinner size={32} /></div></AccountLayout>;
   if (!order) return (
     <AccountLayout>
@@ -168,6 +198,17 @@ export default function OrderDetailPage() {
   const canShipReturn = activeReturn?.status === 'approved';
   const canDispute = rejectedReturn?.status === 'rejected' && !disputedReturn;
   const canConfirmDelivery = order.status === 'shipped';
+
+  // Janela de devolução: 7 dias após confirmação de entrega
+  const returnWindowOpen = (() => {
+    if (order.status !== 'delivered') return true;
+    const delivered = order.confirmed_at || order.delivered_at;
+    if (!delivered) return true;
+    const daysSince = (Date.now() - new Date(delivered).getTime()) / (1000 * 60 * 60 * 24);
+    return daysSince <= 7;
+  })();
+  const canRequestReturnFinal = canRequestReturn && returnWindowOpen;
+
   const timeline = buildTimeline(order);
 
   return (
@@ -490,10 +531,17 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {canRequestReturn && (
+        {canRequestReturnFinal && (
           <button onClick={() => setShowReturnModal(true)} className="w-full sm:w-auto px-6 py-3 border-2 border-orange-300 text-orange-700 bg-orange-50 rounded-xl font-semibold hover:bg-orange-100 transition-colors flex items-center justify-center gap-2">
             <RotateCcw size={18} /> Solicitar Devolução
           </button>
+        )}
+
+        {canRequestReturn && !returnWindowOpen && (
+          <div className="bg-card border border-border rounded-2xl p-4 text-sm text-muted-foreground">
+            <AlertCircle size={16} className="inline mr-2 text-amber-500" />
+            O prazo de devolução (7 dias após entrega) já expirou para esta encomenda.
+          </div>
         )}
 
         {/* Confirmar Receção */}
@@ -503,6 +551,62 @@ export default function OrderDetailPage() {
             {submitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
             Confirmar Receção da Encomenda
           </button>
+        )}
+
+        {/* Preciso de Ajuda */}
+        <button onClick={() => { setShowTicketModal(true); setError(''); }}
+          className="w-full sm:w-auto px-6 py-3 border border-border text-muted-foreground rounded-xl font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2">
+          <MessageCircle size={18} /> Preciso de Ajuda
+        </button>
+
+        {/* Ticket Modal */}
+        {showTicketModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowTicketModal(false)} />
+            <div className="relative bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95">
+              <h2 className="text-lg font-bold mb-1">Preciso de Ajuda</h2>
+              <p className="text-sm text-muted-foreground mb-4">Descreva o problema e a nossa equipa de suporte irá ajudar.</p>
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start gap-2">
+                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />{error}
+                </div>
+              )}
+              <form onSubmit={handleTicketSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Assunto</label>
+                  <input type="text" placeholder="Ex: Não recebi a minha encomenda" value={ticketForm.subject}
+                    onChange={e => setTicketForm(p => ({ ...p, subject: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Categoria</label>
+                  <select value={ticketForm.category} onChange={e => setTicketForm(p => ({ ...p, category: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20">
+                    <option value="not_received">Não recebi a encomenda</option>
+                    <option value="defective">Produto com defeito</option>
+                    <option value="wrong_item">Item errado</option>
+                    <option value="payment">Problema de pagamento</option>
+                    <option value="other">Outro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Descrição</label>
+                  <textarea rows={4} placeholder="Descreva o problema..." value={ticketForm.description}
+                    onChange={e => setTicketForm(p => ({ ...p, description: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 resize-none" required />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-xl font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+                    {submitting ? 'Enviando...' : 'Enviar'}
+                  </button>
+                  <button type="button" onClick={() => setShowTicketModal(false)} className="px-5 py-2.5 border border-border rounded-xl font-medium hover:bg-muted transition-colors">
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
 
         {/* Return Modal */}
@@ -527,6 +631,24 @@ export default function OrderDetailPage() {
                 <div>
                   <label className="block text-sm font-semibold mb-2">Descrição do Problema</label>
                   <textarea rows={4} placeholder="Descreva detalhadamente o problema encontrado..." value={returnForm.reason} onChange={e => setReturnForm(p => ({ ...p, reason: e.target.value }))} className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors resize-none" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Fotos do Produto <span className="text-red-500">*</span></label>
+                  <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent/30 transition-colors">
+                    <Camera size={18} className="text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      {returnImages.length > 0 ? `${returnImages.length} foto(s) selecionada(s)` : 'Tirar/Adicionar foto (obrigatório)'}
+                    </span>
+                    <input type="file" accept="image/*" capture="environment" multiple className="hidden"
+                      onChange={e => setReturnImages(Array.from(e.target.files || []))} />
+                  </label>
+                  {returnImages.length > 0 && (
+                    <div className="flex gap-2 mt-2">
+                      {returnImages.map((f, i) => (
+                        <img key={i} src={URL.createObjectURL(f)} alt="" className="w-14 h-14 rounded-lg object-cover border border-border" />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-xl font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">

@@ -18,6 +18,10 @@ urlpatterns = [
     path('returns/<uuid:pk>/dispute/', views.DisputeReturnView.as_view(), name='return_dispute'),
     path('returns/<uuid:pk>/admin-override/', views.AdminOverrideView.as_view(), name='return_admin_override'),
     path('returns/<uuid:pk>/images/', views.UploadReturnImageView.as_view(), name='return_upload_image'),
+    # Support Tickets
+    path('tickets/', views.TicketListCreateView.as_view(), name='ticket_list_create'),
+    path('tickets/admin/', views.AdminTicketListView.as_view(), name='admin_ticket_list'),
+    path('tickets/<uuid:pk>/resolve/', views.ResolveTicketView.as_view(), name='ticket_resolve'),
     # Orders
     path('<uuid:pk>/', views.OrderDetailView.as_view(), name='order_detail'),
     path('<uuid:pk>/cancel/', views.CancelOrderView.as_view(), name='order_cancel'),
