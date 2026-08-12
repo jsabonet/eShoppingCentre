@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import {
   RotateCcw, CheckCircle, XCircle, Truck, Package, Search, RefreshCw,
   DollarSign, AlertCircle, Eye, Shield, Ban, Undo2,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   requested: { label: 'Solicitada', color: 'bg-yellow-100 text-yellow-800' },
@@ -33,6 +35,8 @@ interface ReturnItem {
   admin_notes: string; disputed_at: string | null;
   buyer_tracking_code: string; shipping_notes: string;
   created_at: string;
+  product_names: string[];
+  product_image: string | null;
 }
 
 export default function AdminReturns() {
@@ -162,8 +166,8 @@ export default function AdminReturns() {
               <thead>
                 <tr className="border-b-2 border-border bg-muted/20">
                   <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">RMA</th>
+                  <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Produto</th>
                   <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Comprador</th>
-                  <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase hidden md:table-cell">Loja</th>
                   <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase hidden sm:table-cell">Motivo</th>
                   <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Estado</th>
                   <th className="text-right py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase w-28">Acção</th>
@@ -175,8 +179,21 @@ export default function AdminReturns() {
                   return (
                     <tr key={r.id} className={`hover:bg-muted/20 transition-colors ${r.status === 'disputed' ? 'bg-purple-50/50' : ''}`}>
                       <td className="py-2.5 px-3 font-mono text-xs font-semibold">{r.rma_number}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2">
+                          {r.product_image ? (
+                            <Image src={r.product_image.startsWith('http') ? r.product_image : MEDIA_URL + r.product_image}
+                              alt="" width={32} height={32} className="w-8 h-8 rounded-lg object-cover border border-border flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0"><Package size={14} className="text-muted-foreground" /></div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium truncate">{(r.product_names || [])[0] || '—'}</p>
+                            <p className="text-[10px] text-muted-foreground">{r.order_number}</p>
+                          </div>
+                        </div>
+                      </td>
                       <td className="py-2.5 px-3 text-xs font-medium">{r.buyer_name}</td>
-                      <td className="py-2.5 px-3 text-xs text-muted-foreground hidden md:table-cell">{r.store_name}</td>
                       <td className="py-2.5 px-3 hidden sm:table-cell">
                         <span className="text-xs">{REASON_LABELS[r.reason_type] || r.reason}</span>
                       </td>

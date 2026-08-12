@@ -175,6 +175,36 @@ class ProductVariation(BaseModel):
         return f'{self.product.name} - {self.name}'
 
 
+class StockLog(BaseModel):
+    """Regista cada alteração de stock de um produto (auditoria de inventário)."""
+    TYPE_CHOICES = [
+        ('sale', 'Venda'),
+        ('restock', 'Reposição'),
+        ('cancel', 'Cancelamento'),
+        ('return', 'Devolução'),
+        ('adjustment', 'Ajuste Manual'),
+    ]
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_logs')
+    change_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    quantity = models.IntegerField(help_text='Positivo = entrada, Negativo = saída')
+    stock_before = models.PositiveIntegerField()
+    stock_after = models.PositiveIntegerField()
+    reference = models.CharField(max_length=255, blank=True, help_text='Ex: Order #PED-123, Ajuste manual')
+    changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, related_name='stock_changes')
+    notes = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['product', '-created_at']),
+            models.Index(fields=['change_type']),
+        ]
+
+    def __str__(self):
+        return f'{self.product.name}: {self.get_change_type_display()} ({self.quantity:+d})'
+
+
 class WishlistItem(BaseModel):
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='wishlist')
     product = models.ForeignKey(Product, on_delete=models.CASCADE)

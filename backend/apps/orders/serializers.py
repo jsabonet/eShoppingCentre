@@ -39,6 +39,8 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
     store_name = serializers.CharField(source='store.name', read_only=True)
     images = ReturnImageSerializer(many=True, read_only=True)
     reason_type_display = serializers.CharField(source='get_reason_type_display', read_only=True)
+    product_names = serializers.SerializerMethodField()
+    product_image = serializers.SerializerMethodField()
 
     class Meta:
         model = ReturnRequest
@@ -46,7 +48,8 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
             'id', 'order', 'order_number', 'reason', 'reason_type', 'reason_type_display',
             'rma_number', 'status', 'vendor_notes', 'refund_amount',
             'return_instructions', 'return_address', 'buyer_tracking_code', 'shipping_notes',
-            'buyer_name', 'buyer_email', 'buyer_phone', 'store_name', 'images', 'created_at', 'disputed_at',
+            'buyer_name', 'buyer_email', 'buyer_phone', 'store_name', 'images',
+            'product_names', 'product_image', 'created_at', 'disputed_at',
         )
         read_only_fields = ('id', 'buyer', 'store', 'rma_number', 'created_at')
 
@@ -58,6 +61,14 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
 
     def get_buyer_phone(self, obj):
         return obj.buyer.phone
+
+    def get_product_names(self, obj):
+        items = obj.order.items.all()
+        return [item.product_name for item in items]
+
+    def get_product_image(self, obj):
+        first = obj.order.items.first()
+        return first.product_image if first else None
 
     def create(self, validated_data):
         validated_data['buyer'] = self.context['request'].user
@@ -186,8 +197,18 @@ class CreateOrderSerializer(serializers.Serializer):
 
             # Reduzir stock
             if product.product_type == 'physical':
+                old_stock = product.stock
                 product.stock -= item_data['quantity']
                 product.save(update_fields=['stock'])
+                from apps.products.models import StockLog
+                StockLog.objects.create(
+                    product=product, change_type='sale',
+                    quantity=-item_data['quantity'],
+                    stock_before=old_stock, stock_after=product.stock,
+                    reference=f'Order pending',
+                    changed_by=user,
+                    notes=f'Venda de {item_data["quantity"]} unidade(s)',
+                )
 
         # Calcular comissão de afiliado
         affiliate = None

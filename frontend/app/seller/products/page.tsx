@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Package, Plus, Search, Edit, Trash2, RefreshCw, Layers, Download, FileText, GraduationCap } from 'lucide-react';
+import { Package, Plus, Search, Edit, Trash2, RefreshCw, Layers, Download, FileText, GraduationCap, History, X, AlertCircle } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { productsAPI, storesAPI } from '@/src/lib/api';
@@ -32,6 +32,7 @@ export default function SellerProductsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [stockModal, setStockModal] = useState<any | null>(null);
 
   // Course stores should use /seller/courses instead
   useEffect(() => {
@@ -214,6 +215,12 @@ export default function SellerProductsPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {product.product_type === 'physical' && (
+                          <button onClick={() => setStockModal(product)} title="Histórico de Stock"
+                            className="p-1.5 hover:bg-purple-50 rounded-md text-muted-foreground hover:text-purple-600 transition-colors">
+                            <History size={16} />
+                          </button>
+                        )}
                         <Link href={`/seller/products/${product.id}/edit`}
                           className="p-1.5 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground transition-colors">
                           <Edit size={16} />
@@ -236,6 +243,45 @@ export default function SellerProductsPage() {
           )}
         </div>
       </div>
+
+      {/* Stock History Modal */}
+      {stockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setStockModal(null)} />
+          <div className="relative bg-white rounded-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto shadow-2xl border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2"><History size={18} className="text-purple-600" /> Stock: {stockModal.name}</h2>
+              <button onClick={() => setStockModal(null)} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">Stock atual: <span className="font-bold text-foreground">{stockModal.stock}</span></p>
+            {stockModal.stock_logs?.length > 0 ? (
+              <div className="space-y-2">
+                {stockModal.stock_logs.map((log: any) => (
+                  <div key={log.id} className="flex items-start gap-2 text-xs border-b border-border pb-2">
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                      log.quantity > 0 ? 'bg-green-500' : 'bg-red-500'
+                    }`} />
+                    <div className="flex-1 min-w-0">
+                      <p>
+                        <span className={`font-semibold ${log.quantity > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                          {log.quantity > 0 ? '+' : ''}{log.quantity}
+                        </span>
+                        {' '}· {log.change_type === 'sale' ? '🛒 Venda' : log.change_type === 'cancel' ? '🔙 Cancelamento' : log.change_type === 'return' ? '🔄 Devolução' : log.change_type === 'restock' ? '📦 Reposição' : '✏️ Ajuste'}
+                        {' '}· <span className="text-muted-foreground">{log.stock_before} → {log.stock_after}</span>
+                      </p>
+                      <p className="text-muted-foreground">{log.reference} · {log.changed_by_name}</p>
+                      <p className="text-muted-foreground/60">{new Date(log.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center py-8 text-muted-foreground text-sm">Nenhum registo de stock ainda.</p>
+            )}
+          </div>
+        </div>
+      )}
+
     </SellerLayout>
   );
 }

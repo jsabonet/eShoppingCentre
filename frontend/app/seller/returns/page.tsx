@@ -73,6 +73,8 @@ interface ReturnItem {
   buyer_tracking_code: string;
   created_at: string;
   images: ReturnImage[];
+  product_names: string[];
+  product_image: string | null;
 }
 
 interface Toast {
@@ -303,7 +305,7 @@ export default function SellerReturnsPage() {
                   <tr className="border-b-2 border-border bg-muted/30">
                     <th className="text-left py-3 px-2 sm:px-4 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider w-8"></th>
                     <th className="text-left py-3 px-2 sm:px-4 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">RMA</th>
-                    <th className="text-left py-3 px-2 sm:px-4 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider hidden sm:table-cell">Pedido</th>
+                    <th className="text-left py-3 px-2 sm:px-4 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Produto</th>
                     <th className="text-left py-3 px-2 sm:px-4 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Cliente</th>
                     <th className="text-left py-3 px-2 sm:px-4 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider hidden md:table-cell">Motivo</th>
                     <th className="text-left py-3 px-2 sm:px-4 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Estado</th>
@@ -326,7 +328,20 @@ export default function SellerReturnsPage() {
                           </button>
                         </td>
                         <td className="py-2.5 px-2 sm:px-4 font-mono text-xs font-semibold">{r.rma_number}</td>
-                        <td className="py-2.5 px-2 sm:px-4 font-mono text-xs text-muted-foreground hidden sm:table-cell">{r.order_number}</td>
+                        <td className="py-2.5 px-2 sm:px-4">
+                          <div className="flex items-center gap-2">
+                            {r.product_image ? (
+                              <Image src={r.product_image.startsWith('http') ? r.product_image : MEDIA_URL + r.product_image}
+                                alt="" width={32} height={32} className="w-8 h-8 rounded-lg object-cover border border-border flex-shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0"><Package size={14} className="text-muted-foreground" /></div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">{(r.product_names || [])[0] || '—'}</p>
+                              <p className="text-[10px] text-muted-foreground">{r.order_number}</p>
+                            </div>
+                          </div>
+                        </td>
                         <td className="py-2.5 px-2 sm:px-4 font-medium text-xs sm:text-sm">{r.buyer_name}</td>
                         <td className="py-2.5 px-2 sm:px-4 hidden md:table-cell">
                           <span className="text-xs">{REASON_LABELS[r.reason_type] || r.reason}</span>

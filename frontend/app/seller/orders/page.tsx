@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
   Camera, Loader2, X, AlertCircle, ChevronDown, ChevronUp, History,
@@ -10,6 +11,8 @@ import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { ordersAPI } from '@/src/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
@@ -213,7 +216,20 @@ export default function SellerOrdersPage() {
                               </button>
                             )}
                           </td>
-                          <td className="py-2.5 px-2 sm:px-4 font-mono text-xs font-semibold">{order.order_number}</td>
+                          <td className="py-2.5 px-2 sm:px-4 font-mono text-xs font-semibold">
+                            <div className="flex items-center gap-2">
+                              {order.items?.[0]?.product_image ? (
+                                <Image src={order.items[0].product_image.startsWith('http') ? order.items[0].product_image : MEDIA_URL + order.items[0].product_image}
+                                  alt="" width={32} height={32} className="w-8 h-8 rounded-lg object-cover border border-border flex-shrink-0" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0"><ShoppingCart size={14} className="text-muted-foreground" /></div>
+                              )}
+                              <div className="min-w-0">
+                                <span className="truncate block">{order.order_number}</span>
+                                <span className="text-[10px] text-muted-foreground truncate block">{(order.items || [])[0]?.product_name || ''}</span>
+                              </div>
+                            </div>
+                          </td>
                           <td className="py-2.5 px-2 sm:px-4">
                             <p className="text-xs font-medium">{order.buyer_name || order.buyer_email || '—'}</p>
                             {order.buyer_phone && <p className="text-[11px] text-muted-foreground">{order.buyer_phone}</p>}

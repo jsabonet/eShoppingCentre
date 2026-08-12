@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
   AlertCircle, ChevronDown, ChevronUp, History, Eye, User, Phone, Mail, Loader2,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
@@ -171,7 +173,17 @@ export default function AdminOrders() {
                             </button>
                           )}
                         </td>
-                        <td className="py-2.5 px-2 font-mono text-xs font-semibold">{order.order_number}</td>
+                        <td className="py-2.5 px-2 font-mono text-xs font-semibold">
+                          <div className="flex items-center gap-2">
+                            {order.items?.[0]?.product_image ? (
+                              <Image src={order.items[0].product_image.startsWith('http') ? order.items[0].product_image : MEDIA_URL + order.items[0].product_image}
+                                alt="" width={32} height={32} className="w-8 h-8 rounded-lg object-cover border border-border flex-shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0"><ShoppingCart size={14} className="text-muted-foreground" /></div>
+                            )}
+                            <span className="truncate">{order.order_number}</span>
+                          </div>
+                        </td>
                         <td className="py-2.5 px-2 text-xs">{order.buyer_name || order.buyer_email || '—'}</td>
                         <td className="py-2.5 px-2 text-xs text-muted-foreground hidden md:table-cell">{order.store_name || '—'}</td>
                         <td className="py-2.5 px-2 font-semibold text-xs">{Number(order.total).toLocaleString('pt-MZ')} MZN</td>

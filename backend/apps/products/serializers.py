@@ -1,11 +1,25 @@
 from rest_framework import serializers
-from .models import Category, Product, ProductImage, ProductVariant, ProductVariation, Coupon, WishlistItem
+from .models import Category, Product, ProductImage, ProductVariant, ProductVariation, Coupon, WishlistItem, StockLog
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
         fields = ('id', 'image', 'alt_text', 'is_primary', 'sort_order')
+
+
+class StockLogSerializer(serializers.ModelSerializer):
+    changed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StockLog
+        fields = ('id', 'change_type', 'quantity', 'stock_before', 'stock_after',
+                  'reference', 'changed_by_name', 'notes', 'created_at')
+
+    def get_changed_by_name(self, obj):
+        if obj.changed_by:
+            return obj.changed_by.get_full_name() or obj.changed_by.email
+        return 'Sistema'
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):
@@ -64,6 +78,7 @@ class SellerProductSerializer(serializers.ModelSerializer):
     discount_percentage = serializers.SerializerMethodField()
     digital_downloads = serializers.SerializerMethodField()
     course = serializers.SerializerMethodField()
+    stock_logs = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -73,7 +88,7 @@ class SellerProductSerializer(serializers.ModelSerializer):
                   'is_featured', 'variant_count', 'created_at',
                   'digital_format', 'digital_license', 'digital_version',
                   'download_limit', 'download_expiry_days', 'digital_downloads',
-                  'course')
+                  'course', 'stock_logs')
 
     def get_primary_image(self, obj):
         img = obj.images.filter(is_primary=True).first()
@@ -89,6 +104,10 @@ class SellerProductSerializer(serializers.ModelSerializer):
         if obj.compare_price and obj.compare_price > 0:
             return round((1 - obj.price / obj.compare_price) * 100)
         return None
+
+    def get_stock_logs(self, obj):
+        logs = obj.stock_logs.order_by('-created_at')[:20]
+        return StockLogSerializer(logs, many=True).data
 
     def get_digital_downloads(self, obj):
         if obj.product_type != 'digital':

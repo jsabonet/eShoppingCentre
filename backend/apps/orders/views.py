@@ -180,8 +180,18 @@ class CancelOrderView(APIView):
                 # Restaurar stock
                 for item in order.items.all():
                     if item.product and item.product.product_type == 'physical':
+                        old_stock = item.product.stock
                         item.product.stock += item.quantity
                         item.product.save(update_fields=['stock'])
+                        from apps.products.models import StockLog
+                        StockLog.objects.create(
+                            product=item.product, change_type='cancel',
+                            quantity=item.quantity,
+                            stock_before=old_stock, stock_after=item.product.stock,
+                            reference=f'Order {order.order_number}',
+                            changed_by=request.user,
+                            notes='Stock restaurado por cancelamento',
+                        )
                 return Response({'detail': 'Encomenda cancelada.'})
             return Response({'detail': 'Não é possível cancelar esta encomenda.'},
                           status=status.HTTP_400_BAD_REQUEST)
@@ -327,6 +337,22 @@ class ReceiveReturnView(APIView):
 
         return_req.status = 'received'
         return_req.save()
+
+        # Restaurar stock do produto devolvido
+        for item in return_req.order.items.all():
+            if item.product and item.product.product_type == 'physical':
+                old_stock = item.product.stock
+                item.product.stock += item.quantity
+                item.product.save(update_fields=['stock'])
+                from apps.products.models import StockLog
+                StockLog.objects.create(
+                    product=item.product, change_type='return',
+                    quantity=item.quantity,
+                    stock_before=old_stock, stock_after=item.product.stock,
+                    reference=f'RMA {return_req.rma_number}',
+                    changed_by=request.user,
+                    notes=f'Stock restaurado por devolução',
+                )
 
         from apps.notifications.models import Notification
         Notification.objects.create(
