@@ -72,10 +72,7 @@ export default function SellerProductsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [stockModal, setStockModal] = useState<any | null>(null);
   const [savingAffiliate, setSavingAffiliate] = useState<string | null>(null);
-  const [bulkCommission, setBulkCommission] = useState('');
-  const [bulkApplying, setBulkApplying] = useState(false);
   const [affiliateError, setAffiliateError] = useState('');
-  const [bulkSuccess, setBulkSuccess] = useState('');
 
   // Course stores should use /seller/courses instead
   useEffect(() => {
@@ -147,41 +144,6 @@ export default function SellerProductsPage() {
     }
   };
 
-  const showFeedback = (type: 'success' | 'error', text: string) => {
-    if (type === 'success') { setBulkSuccess(text); setAffiliateError(''); }
-    else { setAffiliateError(text); setBulkSuccess(''); }
-    setTimeout(() => { setBulkSuccess(''); setAffiliateError(''); }, 5000);
-  };
-
-  const bulkApply = async () => {
-    const num = parseFloat(bulkCommission);
-    if (isNaN(num) || num <= 0) { showFeedback('error', 'Indique uma comissão válida.'); return; }
-    setBulkApplying(true);
-    try {
-      const { data } = await productsAPI.bulkAffiliate({ affiliate_commission: num, affiliate_enabled: true });
-      setProducts((prev) => prev.map((p) => ({ ...p, affiliate_commission: num, affiliate_enabled: true })));
-      showFeedback('success', `${data.updated} produto(s) actualizados com ${num}% de comissão.`);
-      setBulkCommission('');
-    } catch (err: any) {
-      showFeedback('error', err?.response?.data?.detail || 'Erro ao aplicar em massa.');
-    } finally {
-      setBulkApplying(false);
-    }
-  };
-
-  const bulkToggleAll = async (enabled: boolean) => {
-    setBulkApplying(true);
-    try {
-      const { data } = await productsAPI.bulkAffiliate({ affiliate_enabled: enabled });
-      setProducts((prev) => prev.map((p) => ({ ...p, affiliate_enabled: enabled })));
-      showFeedback('success', `${data.updated} produto(s) ${enabled ? 'activados' : 'desactivados'} para afiliação.`);
-    } catch (err: any) {
-      showFeedback('error', err?.response?.data?.detail || 'Erro ao actualizar.');
-    } finally {
-      setBulkApplying(false);
-    }
-  };
-
   const imageUrl = (img: string | null) => {
     if (!img) return null;
     if (img.startsWith('http')) return img;
@@ -246,47 +208,10 @@ export default function SellerProductsPage() {
           </select>
         </div>
 
-        {/* Afiliação em massa */}
-        <div className="mb-4 p-4 bg-violet-50 border border-violet-100 rounded-xl">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-violet-100 rounded-lg"><Users size={18} className="text-violet-700" /></div>
-              <div>
-                <h3 className="text-sm font-bold text-violet-900">Afiliação em massa</h3>
-                <p className="text-xs text-violet-700/70">
-                  {products.length} produtos · {products.filter(p => p.affiliate_enabled !== false).length} afiliáveis
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => bulkToggleAll(true)} disabled={bulkApplying}
-                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50">
-                Activar todos
-              </button>
-              <button onClick={() => bulkToggleAll(false)} disabled={bulkApplying}
-                className="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-xs font-medium hover:bg-gray-700 transition-colors disabled:opacity-50">
-                Desactivar todos
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap border-t border-violet-100 pt-3">
-            <span className="text-xs text-violet-800 font-medium">Definir comissão para todos:</span>
-            <input type="number" min="0" max="100" step="0.5" value={bulkCommission} onChange={(e) => setBulkCommission(e.target.value)}
-              placeholder="Ex: 10" className="w-20 px-2 py-1.5 border border-border rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-300" />
-            <span className="text-xs text-muted-foreground">%</span>
-            <button onClick={bulkApply} disabled={bulkApplying}
-              className="px-4 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-semibold hover:bg-violet-700 transition-colors disabled:opacity-50">
-              {bulkApplying ? 'A aplicar...' : 'Aplicar a todos'}
-            </button>
-            <span className="text-[11px] text-violet-700/60">(liga a afiliação automaticamente)</span>
-          </div>
-          {affiliateError && (
-            <p className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{affiliateError}</p>
-          )}
-          {bulkSuccess && (
-            <p className="mt-3 text-xs text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">{bulkSuccess}</p>
-          )}
-        </div>
+        {/* Afiliação em massa removida */}
+        {affiliateError && (
+          <p className="mb-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{affiliateError}</p>
+        )}
 
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
