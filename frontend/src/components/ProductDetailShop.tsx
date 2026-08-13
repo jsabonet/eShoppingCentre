@@ -10,6 +10,7 @@ import { affiliatesAPI } from '@/src/lib/api';
 import ProductCard from './ProductCard';
 import CartDrawer from './CartDrawer';
 import ProductImageGallery from './ProductImageGallery';
+import PaymentBadges from './PaymentBadges';
 import type { Product } from '../data/marketplace';
 
 interface ProductDetailShopProps {
@@ -477,21 +478,16 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                     <>
                       <p className="flex items-center gap-1"><GraduationCap size={12} /> Acesso ao curso completo online</p>
                       {product.storeName && <p>Por <strong>{product.storeName}</strong></p>}
-                      <p>Pagamento seguro via M-Pesa, e-Mola ou Cartao</p>
                     </>
                   ) : isDigital ? (
                     <>
                       <p className="flex items-center gap-1"><Download size={12} /> Entrega digital — nada de envio fisico</p>
                       {product.storeName && <p>Por <strong>{product.storeName}</strong></p>}
-                      <p>Pagamento seguro via M-Pesa, e-Mola ou Cartao</p>
                     </>
                   ) : (
-                    <>
-                      <p className="flex items-center gap-1"><Truck size={12} /> Vendido e entregue{product.storeName ? ` por ${product.storeName}` : ' por e-Shopping'}</p>
-                      <p>Parcelamento em ate 12x sem juros</p>
-                      <p>Pagamento seguro via M-Pesa, e-Mola ou Cartao</p>
-                    </>
+                    <p className="flex items-center gap-1"><Truck size={12} /> Vendido e entregue{product.storeName ? ` por ${product.storeName}` : ' por e-Shopping'}</p>
                   )}
+                  <PaymentBadges />
                 </div>
               </div>
             </div>
