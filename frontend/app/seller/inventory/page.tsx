@@ -252,7 +252,13 @@ export default function InventoryPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-center py-8 text-muted-foreground text-sm">Nenhum registo de stock.</p>
+                <div className="text-center py-10 flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-3">
+                    <History size={32} className="text-muted-foreground" strokeWidth={1.5} />
+                  </div>
+                  <p className="font-medium text-foreground">Sem registos de stock</p>
+                  <p className="text-xs text-muted-foreground mt-1">Os movimentos de stock aparecerão aqui.</p>
+                </div>
               )}
             </div>
           </div>
