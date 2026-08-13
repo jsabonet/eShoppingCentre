@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Lock } from 'lucide-react';
 
 // Logos oficiais (marcas registadas) — localizados na raiz de /public
 const PAYMENT_METHODS = [
@@ -11,39 +10,52 @@ const PAYMENT_METHODS = [
   { key: 'mastercard', name: 'Mastercard', file: '/mastercard.png' },
 ];
 
-function PaymentBadge({ method }: { method: { key: string; name: string; file: string } }) {
+// Selos de segurança/confiança
+const TRUST_BADGES = [
+  { key: 'compra_segura', name: 'Compra Segura', file: '/compra_segura.png' },
+  { key: 'site_100_seguro', name: 'Site 100% Seguro', file: '/site_100_seguro.png' },
+];
+
+function LogoBadge({ method, imgClass, containerClass }: {
+  method: { key: string; name: string; file: string };
+  imgClass: string;
+  containerClass: string;
+}) {
   const [failed, setFailed] = useState(false);
 
+  if (failed) {
+    return (
+      <span className={`${containerClass} bg-white border border-border rounded-md flex items-center justify-center`} title={method.name}>
+        <span className="text-[11px] font-bold text-foreground/70 whitespace-nowrap">{method.name}</span>
+      </span>
+    );
+  }
+
   return (
-    <span
-      className="h-7 px-2 bg-white border border-border rounded-md flex items-center justify-center"
-      title={method.name}
-    >
-      {failed ? (
-        <span className="text-[10px] font-bold text-foreground/70 whitespace-nowrap">{method.name}</span>
-      ) : (
-        <img
-          src={method.file}
-          alt={method.name}
-          className="h-5 w-auto object-contain"
-          onError={() => setFailed(true)}
-        />
-      )}
+    <span className={`${containerClass} bg-white border border-border rounded-md flex items-center justify-center`} title={method.name}>
+      <img
+        src={method.file}
+        alt={method.name}
+        className={`${imgClass} w-auto object-contain`}
+        onError={() => setFailed(true)}
+      />
     </span>
   );
 }
 
 export default function PaymentBadges() {
   return (
-    <div className="space-y-2 pt-1">
-      <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="space-y-2.5 pt-1">
+      <div className="flex items-center gap-2 flex-wrap">
         {PAYMENT_METHODS.map((m) => (
-          <PaymentBadge key={m.key} method={m} />
+          <LogoBadge key={m.key} method={m} imgClass="h-8" containerClass="h-11 px-2.5" />
         ))}
       </div>
-      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Lock size={11} /> Pagamento 100% seguro
-      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        {TRUST_BADGES.map((b) => (
+          <LogoBadge key={b.key} method={b} imgClass="h-10" containerClass="h-12 px-3" />
+        ))}
+      </div>
     </div>
   );
 }
