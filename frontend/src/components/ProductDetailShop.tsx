@@ -159,32 +159,6 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                 </a>
               </div>
 
-              {/* Price */}
-              <div className="border-y border-border py-4 mb-4">
-                {product.originalPrice && (
-                  <p className="price-original mb-1">
-                    MZN {formatPrice(product.originalPrice)}
-                  </p>
-                )}
-                <p className="text-3xl font-bold mb-1">
-                  MZN {formatPrice(product.price)}
-                </p>
-                {product.discount && (
-                  <p className="price-discount">
-                    Economize {product.discount}% (MZN {formatPrice(product.originalPrice! - product.price)})
-                  </p>
-                )}
-                {isPhysical ? (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    ou 12x de MZN {formatPrice(product.price / 12)} sem juros
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Pagamento único · {isCourse ? 'acesso imediato ao curso' : 'download imediato'}
-                  </p>
-                )}
-              </div>
-
               {/* Description */}
               <div className="mb-6">
                 <h3 className="font-bold mb-2">
@@ -234,34 +208,6 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                   </div>
                 </div>
               )}
-
-              {/* Variant Selector */}
-              {variants.length > 0 && attrKeys.map((key) => (
-                <div key={key} className="mb-4">
-                  <p className="text-sm font-medium mb-2">{key}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {groupedByAttr(key).map((v) => {
-                      const isSelected = selectedVariantId === v.id;
-                      const attrVal = v.attributes?.[key];
-                      return (
-                        <button
-                          key={v.id}
-                          type="button"
-                          onClick={() => setSelectedVariantId(v.id)}
-                          className={`px-3 py-1.5 border rounded-lg text-sm transition-all ${
-                            isSelected
-                              ? 'border-accent bg-accent/10 text-accent font-medium'
-                              : 'border-border hover:border-accent/50'
-                          } ${!v.is_active ? 'opacity-40 cursor-not-allowed' : ''}`}
-                          disabled={!v.is_active}
-                        >
-                          {attrVal || v.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
 
               {/* Benefits */}
               <div className="space-y-3 mb-6">
@@ -337,12 +283,58 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
             {/* Buy Box */}
             <div className="lg:col-span-3">
               <div className="sticky top-32 border border-border rounded-lg p-4 bg-card">
-                <p className="text-2xl font-bold mb-1">
-                  MZN {formatPrice(displayPrice)}
-                </p>
-                {selectedVariant && selectedVariant.price !== null && selectedVariant.price !== product.price && (
-                  <p className="text-xs text-muted-foreground mb-1">Preço base: MZN {formatPrice(product.price)}</p>
-                )}
+                {/* Price (única fonte) */}
+                <div className="pb-3 border-b border-border mb-3">
+                  {product.originalPrice && (
+                    <p className="price-original mb-1">MZN {formatPrice(product.originalPrice)}</p>
+                  )}
+                  <p className="text-3xl font-bold mb-1">MZN {formatPrice(displayPrice)}</p>
+                  {selectedVariant && selectedVariant.price !== null && selectedVariant.price !== product.price && (
+                    <p className="text-xs text-muted-foreground mb-1">Preço base: MZN {formatPrice(product.price)}</p>
+                  )}
+                  {product.discount && (
+                    <p className="price-discount">
+                      Economize {product.discount}% (MZN {formatPrice(product.originalPrice! - product.price)})
+                    </p>
+                  )}
+                  {isPhysical ? (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      ou 12x de MZN {formatPrice(displayPrice / 12)} sem juros
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Pagamento único · {isCourse ? 'acesso imediato ao curso' : 'download imediato'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Variant Selector (na caixa de compra, padrão internacional) */}
+                {variants.length > 0 && attrKeys.map((key) => (
+                  <div key={key} className="mb-3">
+                    <p className="text-sm font-medium mb-2">{key}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {groupedByAttr(key).map((v) => {
+                        const isSelected = selectedVariantId === v.id;
+                        const attrVal = v.attributes?.[key];
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => setSelectedVariantId(v.id)}
+                            className={`px-3 py-1.5 border rounded-lg text-sm transition-all ${
+                              isSelected
+                                ? 'border-accent bg-accent/10 text-accent font-medium'
+                                : 'border-border hover:border-accent/50'
+                            } ${!v.is_active ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            disabled={!v.is_active}
+                          >
+                            {attrVal || v.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
                 {isCourse ? (
                   <>
                     <p className="text-sm text-purple-600 font-medium mb-4 flex items-center gap-1">
