@@ -8,9 +8,9 @@ from django.db.models import F
 from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
 from django.utils import timezone
-from .models import AffiliateProfile, AffiliateLink, AffiliateCommission, AffiliateSettings, AffiliatePayout
+from .models import AffiliateProfile, AffiliateLink, AffiliateCommission, AffiliateSettings, AffiliatePayout, AffiliateKYC
 from .serializers import (AffiliateProfileSerializer, AffiliateLinkSerializer, AffiliateCommissionSerializer,
-                          AffiliateSettingsSerializer, AffiliatePayoutSerializer)
+                          AffiliateSettingsSerializer, AffiliatePayoutSerializer, AffiliateKYCSerializer)
 
 
 class AffiliateRegisterView(APIView):
@@ -91,6 +91,14 @@ class AffiliatePayoutView(APIView):
         profile = request.user.affiliate_profile
         settings_obj = AffiliateSettings.get_settings()
 
+        # Gate: verificação KYC obrigatória antes do 1º saque
+        kyc = AffiliateKYC.objects.filter(affiliate=profile).first()
+        if not kyc or kyc.status != 'approved':
+            return Response(
+                {'detail': 'É necessária a verificação da conta (KYC) antes de solicitar saques. Complete a verificação.'},
+                status=400,
+            )
+
         try:
             amount = Decimal(str(request.data.get('amount')))
         except (ValueError, InvalidOperation, TypeError):
@@ -113,7 +121,46 @@ class AffiliatePayoutView(APIView):
             method=request.data.get('method', 'mpesa'),
             account_details=request.data.get('account_details', {}) or {},
         )
+
+        # Notificar admins sobre o novo pedido de saque
+        from apps.notifications.models import Notification
+        from apps.users.models import User
+        for admin in User.objects.filter(is_staff=True):
+            Notification.objects.create(
+                user=admin,
+                title='Novo pedido de saque',
+                message=f'{profile.user.email} solicitou um saque de {amount} MZN.',
+                notification_type='affiliate',
+                link='/admin?tab=affiliates',
+            )
+
         return Response(AffiliatePayoutSerializer(payout).data, status=201)
+
+
+class AffiliateKYCView(APIView):
+    """Afiliado consulta/submete a verificação de identidade (KYC)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        profile = request.user.affiliate_profile
+        kyc = AffiliateKYC.objects.filter(affiliate=profile).first()
+        if kyc:
+            return Response(AffiliateKYCSerializer(kyc).data)
+        return Response({'status': 'none', 'is_verified': False})
+
+    def post(self, request):
+        profile = request.user.affiliate_profile
+        kyc = AffiliateKYC.objects.filter(affiliate=profile).first()
+        if kyc and kyc.status == 'approved':
+            return Response({'detail': 'A sua conta já está verificada.'}, status=400)
+
+        serializer = AffiliateKYCSerializer(kyc, data=request.data, partial=bool(kyc))
+        serializer.is_valid(raise_exception=True)
+        if kyc:
+            serializer.save(status='pending')
+        else:
+            serializer.save(affiliate=profile, status='pending')
+        return Response(serializer.data, status=201 if not kyc else 200)
 
 
 class StoreAffiliatesView(APIView):
@@ -293,3 +340,38 @@ class AdminAffiliatePayoutActionView(APIView):
             payout.notes = request.data.get('notes', '')
             payout.save(update_fields=['status', 'notes'])
         return Response(AffiliatePayoutSerializer(payout).data)
+
+
+class AdminAffiliateKYCListView(generics.ListAPIView):
+    """Admin: lista as verificações KYC dos afiliados."""
+    serializer_class = AffiliateKYCSerializer
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return AffiliateKYC.objects.select_related('affiliate__user').order_by('-created_at')
+
+
+class AdminAffiliateKYCActionView(APIView):
+    """Admin: aprova/rejeita a verificação KYC de um afiliado."""
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def patch(self, request, pk):
+        kyc = get_object_or_404(AffiliateKYC, pk=pk)
+        action = request.data.get('action')
+        if action == 'approve':
+            kyc.status = 'approved'
+        elif action == 'reject':
+            kyc.status = 'rejected'
+        kyc.review_notes = request.data.get('notes', '')
+        kyc.reviewed_by = request.user
+        kyc.save(update_fields=['status', 'review_notes', 'reviewed_by'])
+
+        from apps.notifications.models import Notification
+        Notification.objects.create(
+            user=kyc.affiliate.user,
+            title='Verificação de conta actualizada',
+            message=f'A sua verificação de conta foi {"aprovada" if kyc.status == "approved" else "rejeitada"}.',
+            notification_type='affiliate',
+            link='/affiliate/earnings',
+        )
+        return Response(AffiliateKYCSerializer(kyc).data)

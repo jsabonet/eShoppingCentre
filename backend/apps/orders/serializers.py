@@ -223,7 +223,15 @@ class CreateOrderSerializer(serializers.Serializer):
                 effective_rate = link.product.affiliate_commission * multiplier
                 for store_data in store_orders.values():
                     for item in store_data['items']:
+                        # Bloquear comissão sobre produtos da própria loja do afiliado
+                        if item['product'].store.owner_id == link.affiliate.user_id:
+                            continue
                         affiliate_commission += (item['total_price'] * item['product'].affiliate_commission * multiplier) / 100
+                # Se nenhum item for elegível, não atribuir comissão
+                if affiliate_commission <= 0:
+                    affiliate = None
+                    affiliate_profile = None
+                    affiliate_link = None
 
         # Frete por loja
         store_shipping = {}  # store_id -> {'cost', 'method_name', 'is_pickup'}

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import AffiliateProfile, AffiliateLink, AffiliateCommission, AffiliateSettings, AffiliatePayout
+from .models import AffiliateProfile, AffiliateLink, AffiliateCommission, AffiliateSettings, AffiliatePayout, AffiliateKYC
 
 
 class AffiliateProfileSerializer(serializers.ModelSerializer):
@@ -49,7 +49,7 @@ class AffiliateSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = AffiliateSettings
         fields = ('id', 'cookie_window_days', 'default_commission_rate',
-                  'min_payout_amount', 'approve_after_days')
+                  'min_payout_amount', 'approve_after_days', 'clawback_days', 'payout_fee_percent')
 
 
 class AffiliatePayoutSerializer(serializers.ModelSerializer):
@@ -60,3 +60,18 @@ class AffiliatePayoutSerializer(serializers.ModelSerializer):
         fields = ('id', 'affiliate', 'affiliate_email', 'amount', 'method',
                   'account_details', 'status', 'notes', 'created_at', 'paid_at')
         read_only_fields = ('affiliate', 'status', 'created_at', 'paid_at')
+
+
+class AffiliateKYCSerializer(serializers.ModelSerializer):
+    affiliate_email = serializers.CharField(source='affiliate.user.email', read_only=True)
+    affiliate_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AffiliateKYC
+        fields = ('id', 'affiliate', 'affiliate_email', 'affiliate_name', 'document_type',
+                  'document_number', 'nuit', 'payout_phone', 'bank_name', 'bank_account',
+                  'status', 'review_notes', 'created_at')
+        read_only_fields = ('affiliate', 'status', 'review_notes', 'created_at')
+
+    def get_affiliate_name(self, obj):
+        return obj.affiliate.user.get_full_name() or obj.affiliate.user.email

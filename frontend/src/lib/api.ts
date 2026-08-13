@@ -575,6 +575,9 @@ export const affiliatesAPI = {
 
   myPayouts: () => api.get('/affiliates/me/payouts/'),
 
+  myKYC: () => api.get('/affiliates/me/kyc/'),
+  submitKYC: (data: any) => api.post('/affiliates/me/kyc/', data),
+
   storeAffiliates: () =>
     api.get<StoreAffiliatesData>('/affiliates/store/'),
 
@@ -586,6 +589,10 @@ export const affiliatesAPI = {
   adminSettings: () => api.get('/affiliates/admin/affiliates/settings/'),
   adminUpdateSettings: (data: any) =>
     api.patch('/affiliates/admin/affiliates/settings/', data),
+  adminKYC: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<any>>('/affiliates/admin/affiliates/kyc/', { params }),
+  adminKYCAction: (id: string, data: { action: string; notes?: string }) =>
+    api.patch(`/affiliates/admin/affiliates/kyc/${id}/`, data),
   adminCommissions: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<any>>('/affiliates/admin/affiliates/commissions/', { params }),
   adminCommissionAction: (id: string, data: { action: string; reason?: string }) =>

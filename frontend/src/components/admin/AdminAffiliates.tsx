@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Users, DollarSign, Wallet, Settings, RefreshCw, Loader2, CheckCircle, AlertCircle, Ban, ShieldCheck, Percent } from 'lucide-react';
+import { Users, DollarSign, Wallet, Settings, RefreshCw, Loader2, CheckCircle, AlertCircle, Ban, ShieldCheck, Percent, FileText } from 'lucide-react';
 import { affiliatesAPI, type AffiliateProfile } from '@/src/lib/api';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -13,10 +13,11 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function AdminAffiliates() {
-  const [view, setView] = useState<'affiliates' | 'commissions' | 'payouts' | 'settings'>('affiliates');
+  const [view, setView] = useState<'affiliates' | 'commissions' | 'payouts' | 'kyc' | 'settings'>('affiliates');
   const [affiliates, setAffiliates] = useState<AffiliateProfile[]>([]);
   const [commissions, setCommissions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
+  const [kycList, setKycList] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,15 +30,17 @@ export default function AdminAffiliates() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, c, p, s] = await Promise.all([
+      const [a, c, p, k, s] = await Promise.all([
         affiliatesAPI.adminList({ page_size: 200 }),
         affiliatesAPI.adminCommissions({ page_size: 200 }),
         affiliatesAPI.adminPayouts({ page_size: 200 }),
+        affiliatesAPI.adminKYC({ page_size: 200 }),
         affiliatesAPI.adminSettings(),
       ]);
       setAffiliates(a.data.results || a.data || []);
       setCommissions(c.data.results || c.data || []);
       setPayouts(p.data.results || p.data || []);
+      setKycList(k.data.results || k.data || []);
       setSettings(s.data);
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -65,6 +68,14 @@ export default function AdminAffiliates() {
     try {
       await affiliatesAPI.adminPayoutAction(id, { action });
       showToast('success', action === 'approve' ? 'Saque aprovado.' : 'Saque rejeitado.');
+      load();
+    } catch { showToast('error', 'Erro ao actualizar.'); }
+  };
+
+  const kycAction = async (id: string, action: string) => {
+    try {
+      await affiliatesAPI.adminKYCAction(id, { action });
+      showToast('success', action === 'approve' ? 'Verificação aprovada.' : 'Verificação rejeitada.');
       load();
     } catch { showToast('error', 'Erro ao actualizar.'); }
   };
@@ -101,6 +112,7 @@ export default function AdminAffiliates() {
           { id: 'affiliates', label: 'Afiliados', icon: Users },
           { id: 'commissions', label: 'Comissões', icon: DollarSign },
           { id: 'payouts', label: 'Saques', icon: Wallet },
+          { id: 'kyc', label: 'Verificações', icon: FileText },
           { id: 'settings', label: 'Configurações', icon: Settings },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setView(t.id)}
@@ -232,6 +244,48 @@ export default function AdminAffiliates() {
             </div>
           )}
 
+          {view === 'kyc' && (
+            <div className="bg-white rounded-xl border border-border overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b-2 border-border bg-muted/20">
+                    <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Afiliado</th>
+                    <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Documento</th>
+                    <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">NUIT</th>
+                    <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Telefone</th>
+                    <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Estado</th>
+                    <th className="text-right py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase w-28">Acção</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-border">
+                    {kycList.length === 0 ? (
+                      <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">Nenhuma verificação pendente.</td></tr>
+                    ) : kycList.map(k => (
+                      <tr key={k.id} className="hover:bg-muted/20">
+                        <td className="py-2.5 px-3 text-xs">{k.affiliate_email}</td>
+                        <td className="py-2.5 px-3 text-xs">{k.document_number}</td>
+                        <td className="py-2.5 px-3 text-xs">{k.nuit || '—'}</td>
+                        <td className="py-2.5 px-3 text-xs">{k.payout_phone}</td>
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${k.status === 'approved' ? 'bg-green-100 text-green-700' : k.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {k.status === 'approved' ? 'Aprovado' : k.status === 'rejected' ? 'Rejeitado' : 'Pendente'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          {k.status === 'pending' && (
+                            <div className="flex justify-end gap-1">
+                              <button onClick={() => kycAction(k.id, 'approve')} className="px-2 py-1 rounded text-[11px] font-semibold bg-green-100 text-green-700 hover:bg-green-200">Aprovar</button>
+                              <button onClick={() => kycAction(k.id, 'reject')} className="px-2 py-1 rounded text-[11px] font-semibold bg-red-100 text-red-700 hover:bg-red-200">Rejeitar</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {view === 'settings' && settings && (
             <form onSubmit={saveSettings} className="bg-white rounded-xl border border-border p-6 max-w-md space-y-4">
               <div className="flex items-center gap-2 mb-2"><Percent size={16} className="text-accent" /><h3 className="font-bold">Configurações do Programa</h3></div>
@@ -253,6 +307,16 @@ export default function AdminAffiliates() {
               <div>
                 <label className="block text-xs font-semibold mb-1">Aprovar comissão após (dias)</label>
                 <input type="number" min="0" value={settings.approve_after_days} onChange={e => setSettings({ ...settings, approve_after_days: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">Janela de reversão (clawback, dias)</label>
+                <input type="number" min="0" value={settings.clawback_days} onChange={e => setSettings({ ...settings, clawback_days: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">Taxa de saque (%)</label>
+                <input type="number" step="0.01" min="0" value={settings.payout_fee_percent} onChange={e => setSettings({ ...settings, payout_fee_percent: Number(e.target.value) })}
                   className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
               </div>
               <button type="submit" disabled={saving}

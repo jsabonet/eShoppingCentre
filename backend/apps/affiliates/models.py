@@ -68,6 +68,8 @@ class AffiliateSettings(BaseModel):
     default_commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
     min_payout_amount = models.DecimalField(max_digits=12, decimal_places=2, default=500)
     approve_after_days = models.PositiveIntegerField(default=7)
+    clawback_days = models.PositiveIntegerField(default=30, help_text='Dias para reverter comissões após aprovação')
+    payout_fee_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text='Taxa da plataforma sobre cada saque (%)')
 
     class Meta:
         verbose_name = 'Configuração de Afiliados'
@@ -112,3 +114,37 @@ class AffiliatePayout(BaseModel):
 
     def __str__(self):
         return f'Payout {self.affiliate.user.email} - {self.amount} MZN ({self.status})'
+
+
+class AffiliateKYC(BaseModel):
+    """Verificação de identidade (KYC) do afiliado — obrigatória antes do 1º saque."""
+    STATUS_CHOICES = [
+        ('pending', 'Pendente'),
+        ('approved', 'Aprovado'),
+        ('rejected', 'Rejeitado'),
+    ]
+    DOCUMENT_CHOICES = [
+        ('bi', 'Bilhete de Identidade'),
+        ('passport', 'Passaporte'),
+    ]
+
+    affiliate = models.OneToOneField(AffiliateProfile, on_delete=models.CASCADE, related_name='kyc')
+    document_type = models.CharField(max_length=20, choices=DOCUMENT_CHOICES, default='bi')
+    document_number = models.CharField(max_length=100)
+    nuit = models.CharField(max_length=50, blank=True)
+    payout_phone = models.CharField(max_length=30)
+    bank_name = models.CharField(max_length=100, blank=True)
+    bank_account = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_kycs')
+    review_notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'KYC de {self.affiliate.user.email} ({self.status})'
+
+    @property
+    def is_verified(self):
+        return self.status == 'approved'

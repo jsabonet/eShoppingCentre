@@ -10,9 +10,12 @@ urlpatterns = [
     path('me/links/', views.MyAffiliateLinksView.as_view(), name='my_affiliate_links'),
     path('me/commissions/', views.MyCommissionsView.as_view(), name='my_commissions'),
     path('me/payouts/', views.AffiliatePayoutView.as_view(), name='affiliate_payout'),
+    path('me/kyc/', views.AffiliateKYCView.as_view(), name='affiliate_kyc'),
     # Admin
     path('admin/affiliates/', views.AdminAffiliateListView.as_view(), name='admin_affiliate_list'),
     path('admin/affiliates/settings/', views.AdminAffiliateSettingsView.as_view(), name='admin_affiliate_settings'),
+    path('admin/affiliates/kyc/', views.AdminAffiliateKYCListView.as_view(), name='admin_affiliate_kyc'),
+    path('admin/affiliates/kyc/<uuid:pk>/', views.AdminAffiliateKYCActionView.as_view(), name='admin_affiliate_kyc_action'),
     path('admin/affiliates/commissions/', views.AdminAffiliateCommissionListView.as_view(), name='admin_affiliate_commissions'),
     path('admin/affiliates/commissions/<uuid:pk>/', views.AdminAffiliateCommissionActionView.as_view(), name='admin_affiliate_commission_action'),
     path('admin/affiliates/payouts/', views.AdminAffiliatePayoutListView.as_view(), name='admin_affiliate_payouts'),
