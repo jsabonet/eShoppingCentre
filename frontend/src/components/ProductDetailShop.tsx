@@ -172,9 +172,15 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                     Economize {product.discount}% (MZN {formatPrice(product.originalPrice! - product.price)})
                   </p>
                 )}
-                <p className="text-sm text-muted-foreground mt-2">
-                  ou 12x de MZN {formatPrice(product.price / 12)} sem juros
-                </p>
+                {isPhysical ? (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    ou 12x de MZN {formatPrice(product.price / 12)} sem juros
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Pagamento único · {isCourse ? 'acesso imediato ao curso' : 'download imediato'}
+                  </p>
+                )}
               </div>
 
               {/* Description */}
@@ -443,14 +449,26 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                   </div>
                 )}
 
-                {/* Área de Afiliação */}
+                {/* Área de Afiliação (padrão internacional) */}
                 {product.affiliateEnabled && (
-                  <button
-                    onClick={() => setAffiliateOpen(true)}
-                    className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-dashed border-accent/50 text-accent rounded-md text-sm font-medium hover:bg-accent/5 transition-colors"
-                  >
-                    <Link2 size={16} /> Área de Afiliação
-                  </button>
+                  <div className="mt-3 rounded-lg border border-green-200 bg-green-50/70 p-3">
+                    <button onClick={() => setAffiliateOpen(true)} className="w-full text-left group">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-green-800 flex items-center gap-1.5">
+                          <Link2 size={14} /> Programa de Afiliados
+                        </span>
+                        <span className="text-xs font-bold text-green-700 bg-white border border-green-200 rounded-full px-2 py-0.5">
+                          +{product.affiliateCommission ?? 10}%
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-green-700/80 mt-1">
+                        Ganhe {product.affiliateCommission ?? 10}% por cada venda gerada com o seu link.
+                      </p>
+                      <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-green-700 group-hover:text-green-800 transition-colors">
+                        Promover este produto <ChevronDown size={12} className="transition-transform group-hover:translate-y-0.5" />
+                      </span>
+                    </button>
+                  </div>
                 )}
 
                 <div className="mt-4 pt-4 border-t border-border text-xs text-muted-foreground space-y-1">
@@ -779,18 +797,20 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setAffiliateOpen(false)} />
           <div className="relative bg-card rounded-2xl p-6 w-full max-w-md shadow-2xl border border-border">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold flex items-center gap-2"><Link2 size={18} className="text-accent" /> Área de Afiliação</h3>
+              <h3 className="text-lg font-bold flex items-center gap-2"><Link2 size={18} className="text-green-600" /> Área de Afiliação</h3>
               <button onClick={() => setAffiliateOpen(false)} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
+            </div>
+
+            {/* Comissão em destaque */}
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+              <p className="text-2xl font-bold text-green-700">{product.affiliateCommission ?? 10}%</p>
+              <p className="text-xs text-green-700/80">de comissão por venda</p>
             </div>
 
             <div className="space-y-3 text-sm">
               <div className="flex justify-between gap-3">
                 <span className="text-muted-foreground shrink-0">Produto</span>
                 <span className="font-medium text-right truncate">{product.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Comissão</span>
-                <span className="font-bold text-green-600">{product.affiliateCommission ?? 10}%</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Janela de Cookie</span>
@@ -800,6 +820,12 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                 <p className="text-muted-foreground mb-1">Termos</p>
                 <p className="text-xs text-muted-foreground/80">{product.affiliateTerms || 'Termos padrão do programa de afiliados da plataforma.'}</p>
               </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-border text-[11px] text-muted-foreground space-y-1">
+              <p>1. Gere o seu link único</p>
+              <p>2. Partilhe no WhatsApp, Facebook ou site</p>
+              <p>3. Receba comissão por cada venda concluída</p>
             </div>
 
             <div className="mt-5">
