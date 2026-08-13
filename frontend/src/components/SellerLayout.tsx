@@ -100,7 +100,6 @@ function getNavGroups(productType: string): SellerNavGroup[] {
 
   return groups;
 }
-}
 
 export default function SellerLayout({ children }: SellerLayoutProps) {
   const pathname = usePathname();
