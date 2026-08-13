@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
+from decimal import Decimal, InvalidOperation
 from .models import Category, Product, ProductImage, ProductVariant, Coupon, WishlistItem, StockLog
 from .serializers import (
     CategorySerializer, ProductListSerializer, ProductDetailSerializer,
@@ -269,6 +270,45 @@ class ProductVariantDetailView(generics.RetrieveUpdateDestroyAPIView):
         return ProductVariant.objects.filter(
             product__store=self.request.user.store
         )
+
+
+class BulkAffiliateUpdateView(APIView):
+    """POST /api/v1/products/bulk-affiliate/ — define afiliação/comissão em vários produtos de uma vez."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        store = getattr(request.user, 'store', None)
+        if not store:
+            return Response({'detail': 'Não tem uma loja associada.'}, status=403)
+
+        qs = store.products.filter(~Q(status='deleted'))
+        product_ids = request.data.get('product_ids')
+        if product_ids:
+            qs = qs.filter(id__in=product_ids)
+
+        updates = {}
+        if 'affiliate_enabled' in request.data:
+            updates['affiliate_enabled'] = bool(request.data.get('affiliate_enabled'))
+
+        if 'affiliate_commission' in request.data and request.data.get('affiliate_commission') not in (None, ''):
+            from apps.affiliates.models import AffiliateSettings
+            settings_obj = AffiliateSettings.get_settings()
+            try:
+                commission = Decimal(str(request.data.get('affiliate_commission')))
+            except (ValueError, InvalidOperation, TypeError):
+                return Response({'detail': 'Comissão inválida.'}, status=400)
+            if commission < settings_obj.min_commission_rate or commission > settings_obj.max_commission_rate:
+                return Response(
+                    {'detail': f'A comissão deve estar entre {settings_obj.min_commission_rate}% e {settings_obj.max_commission_rate}%.'},
+                    status=400,
+                )
+            updates['affiliate_commission'] = commission
+
+        if not updates:
+            return Response({'detail': 'Nada a actualizar.'}, status=400)
+
+        count = qs.update(**updates)
+        return Response({'updated': count})
 
 
 # ─── Coupon Management ───

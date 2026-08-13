@@ -24,6 +24,44 @@ const LICENSE_LABELS: Record<string, string> = {
   extended: '🌐 Extended',
 };
 
+function AffiliateCell({ product, saving, onToggle, onSaveCommission }: {
+  product: Product;
+  saving: boolean;
+  onToggle: () => void;
+  onSaveCommission: (value: string) => void;
+}) {
+  const [value, setValue] = useState(String(product.affiliate_commission ?? 10));
+  const enabled = product.affiliate_enabled !== false;
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={saving}
+        title={enabled ? 'Desactivar afiliação' : 'Activar afiliação'}
+        className={`relative w-9 h-5 rounded-full transition-colors disabled:opacity-50 ${enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-4' : ''}`} />
+      </button>
+      <div className="flex items-center gap-0.5">
+        <input
+          type="number"
+          value={value}
+          min="0"
+          max="100"
+          step="0.5"
+          disabled={!enabled || saving}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => onSaveCommission(value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          className="w-14 px-1.5 py-1 border border-border rounded-md text-xs bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+        />
+        <span className="text-xs text-muted-foreground">%</span>
+      </div>
+    </div>
+  );
+}
+
 export default function SellerProductsPage() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
@@ -33,6 +71,10 @@ export default function SellerProductsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [stockModal, setStockModal] = useState<any | null>(null);
+  const [savingAffiliate, setSavingAffiliate] = useState<string | null>(null);
+  const [bulkCommission, setBulkCommission] = useState('');
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [affiliateError, setAffiliateError] = useState('');
 
   // Course stores should use /seller/courses instead
   useEffect(() => {
@@ -72,6 +114,53 @@ export default function SellerProductsPage() {
       setProducts((prev) => prev.filter((p) => p.id !== id));
     } catch { alert('Erro ao remover produto.'); }
     finally { setDeleting(null); }
+  };
+
+  const toggleAffiliate = async (product: Product) => {
+    setSavingAffiliate(product.id);
+    setAffiliateError('');
+    try {
+      const newValue = product.affiliate_enabled === false;
+      await productsAPI.updateAffiliate(product.id, { affiliate_enabled: newValue });
+      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, affiliate_enabled: newValue } : p));
+    } catch {
+      setAffiliateError('Erro ao actualizar afiliação.');
+    } finally {
+      setSavingAffiliate(null);
+    }
+  };
+
+  const saveCommission = async (product: Product, value: string) => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num < 0) return;
+    if (num === Number(product.affiliate_commission)) return;
+    setSavingAffiliate(product.id);
+    setAffiliateError('');
+    try {
+      await productsAPI.updateAffiliate(product.id, { affiliate_commission: num });
+      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, affiliate_commission: num } : p));
+    } catch (err: any) {
+      setAffiliateError(err?.response?.data?.detail || 'Erro ao actualizar comissão.');
+    } finally {
+      setSavingAffiliate(null);
+    }
+  };
+
+  const bulkApply = async () => {
+    const num = parseFloat(bulkCommission);
+    if (isNaN(num) || num <= 0) { setAffiliateError('Indique uma comissão válida.'); return; }
+    setBulkApplying(true);
+    setAffiliateError('');
+    try {
+      const { data } = await productsAPI.bulkAffiliate({ affiliate_commission: num, affiliate_enabled: true });
+      setProducts((prev) => prev.map((p) => ({ ...p, affiliate_commission: num, affiliate_enabled: true })));
+      alert(`${data.updated} produto(s) actualizados.`);
+      setBulkCommission('');
+    } catch (err: any) {
+      setAffiliateError(err?.response?.data?.detail || 'Erro ao aplicar em massa.');
+    } finally {
+      setBulkApplying(false);
+    }
   };
 
   const imageUrl = (img: string | null) => {
@@ -138,6 +227,24 @@ export default function SellerProductsPage() {
           </select>
         </div>
 
+        {/* Afiliação em massa */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4 p-3 bg-violet-50 border border-violet-100 rounded-lg">
+          <div className="flex items-center gap-2 text-sm font-semibold text-violet-800 shrink-0">
+            <Users size={16} /> Afiliação em massa
+          </div>
+          <div className="flex items-center gap-2 flex-1 flex-wrap">
+            <span className="text-xs text-muted-foreground">Definir comissão para todos os produtos:</span>
+            <input type="number" min="0" max="100" step="0.5" value={bulkCommission} onChange={(e) => setBulkCommission(e.target.value)}
+              placeholder="Ex: 10" className="w-20 px-2 py-1.5 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+            <span className="text-xs text-muted-foreground">%</span>
+            <button onClick={bulkApply} disabled={bulkApplying}
+              className="px-3 py-1.5 bg-violet-600 text-white rounded-md text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50">
+              {bulkApplying ? 'A aplicar...' : 'Aplicar a todos'}
+            </button>
+          </div>
+        </div>
+        {affiliateError && <p className="text-xs text-red-600 mb-3">{affiliateError}</p>}
+
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -154,6 +261,7 @@ export default function SellerProductsPage() {
                   )}
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">{storeType === 'digital' ? 'Downloads' : 'Vendas'}</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Afiliação</th>
                   <th className="text-right py-3 px-4 font-medium text-muted-foreground">Acções</th>
                 </tr>
               </thead>
@@ -217,6 +325,14 @@ export default function SellerProductsPage() {
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor[product.status] || 'bg-gray-100 text-gray-700'}`}>
                         {statusLabel[product.status] || product.status}
                       </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <AffiliateCell
+                        product={product}
+                        saving={savingAffiliate === product.id}
+                        onToggle={() => toggleAffiliate(product)}
+                        onSaveCommission={(v) => saveCommission(product, v)}
+                      />
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">

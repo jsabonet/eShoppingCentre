@@ -467,6 +467,12 @@ export const productsAPI = {
   myProducts: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<Product>>('/products/my/', { params }),
 
+  updateAffiliate: (id: string, data: { affiliate_enabled?: boolean; affiliate_commission?: number }) =>
+    api.patch<Product>(`/products/${id}/update/`, data),
+
+  bulkAffiliate: (data: { affiliate_enabled?: boolean; affiliate_commission?: number; product_ids?: string[] }) =>
+    api.post<{ updated: number }>('/products/bulk-affiliate/', data),
+
   addImage: (productId: string, data: FormData) =>
     api.post(`/products/${productId}/images/`, data),
 

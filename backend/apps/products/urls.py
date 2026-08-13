@@ -16,6 +16,7 @@ urlpatterns = [
     path('coupons/admin/', views.AdminCouponListView.as_view(), name='admin_coupon_list'),
     path('coupons/<uuid:pk>/toggle/', views.AdminCouponToggleView.as_view(), name='admin_coupon_toggle'),
     path('coupons/<uuid:pk>/', views.CouponDetailView.as_view(), name='coupon_detail'),
+    path('bulk-affiliate/', views.BulkAffiliateUpdateView.as_view(), name='product_bulk_affiliate'),
     path('<slug:slug>/', views.ProductDetailView.as_view(), name='product_detail'),
     path('<uuid:pk>/update/', views.ProductUpdateView.as_view(), name='product_update'),
     path('<uuid:pk>/delete/', views.ProductDeleteView.as_view(), name='product_delete'),
