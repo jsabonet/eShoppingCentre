@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -10,25 +10,83 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 
-const adminNavItems = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin?tab=stores', label: 'Lojas', icon: Store },
-  { href: '/admin?tab=orders', label: 'Encomendas', icon: ShoppingCart },
-  { href: '/admin?tab=returns', label: 'Devoluções', icon: RotateCcw },
-  { href: '/admin?tab=tickets', label: 'Suporte', icon: LifeBuoy },
-  { href: '/admin?tab=coupons', label: 'Cupões', icon: TicketPercent },
-  { href: '/admin?tab=carts', label: 'Carrinhos', icon: Clock },
-  { href: '/admin?tab=affiliates', label: 'Afiliados', icon: Gift },
-  { href: '/admin?tab=categories', label: 'Categorias', icon: Filter },
-  { href: '/admin?tab=blog', label: 'Blog', icon: Edit },
-  { href: '/admin?tab=users', label: 'Utilizadores', icon: Users },
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: any;
+  badge?: 'stores' | 'disputes' | 'tickets' | 'payouts';
+}
+
+const navGroups: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Operacional',
+    items: [
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/admin?tab=orders', label: 'Encomendas', icon: ShoppingCart },
+      { href: '/admin?tab=returns', label: 'Devoluções', icon: RotateCcw, badge: 'disputes' },
+      { href: '/admin?tab=tickets', label: 'Suporte', icon: LifeBuoy, badge: 'tickets' },
+    ],
+  },
+  {
+    label: 'Comércio',
+    items: [
+      { href: '/admin?tab=stores', label: 'Lojas', icon: Store, badge: 'stores' },
+      { href: '/admin?tab=categories', label: 'Categorias', icon: Filter },
+      { href: '/admin?tab=coupons', label: 'Cupões', icon: TicketPercent },
+      { href: '/admin?tab=affiliates', label: 'Afiliados', icon: Gift, badge: 'payouts' },
+      { href: '/admin?tab=carts', label: 'Carrinhos Abandonados', icon: Clock },
+    ],
+  },
+  {
+    label: 'Gestão',
+    items: [
+      { href: '/admin?tab=users', label: 'Utilizadores', icon: Users },
+      { href: '/admin?tab=blog', label: 'Blog', icon: Edit },
+    ],
+  },
 ];
+
+interface Badges {
+  stores: number;
+  disputes: number;
+  tickets: number;
+  payouts: number;
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [badges, setBadges] = useState<Badges>({ stores: 0, disputes: 0, tickets: 0, payouts: 0 });
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    (async () => {
+      try {
+        const [stats, returns, tickets, payouts] = await Promise.allSettled([
+          fetch(`${API_URL}/admin/stats/`, { headers }).then(r => r.ok ? r.json() : null),
+          fetch(`${API_URL}/orders/returns/admin/`, { headers }).then(r => r.ok ? r.json() : null),
+          fetch(`${API_URL}/orders/tickets/admin/`, { headers }).then(r => r.ok ? r.json() : null),
+          fetch(`${API_URL}/affiliates/admin/affiliates/payouts/`, { headers }).then(r => r.ok ? r.json() : null),
+        ]);
+        const s = stats.status === 'fulfilled' ? stats.value : null;
+        const r = returns.status === 'fulfilled' ? returns.value : null;
+        const t = tickets.status === 'fulfilled' ? tickets.value : null;
+        const p = payouts.status === 'fulfilled' ? payouts.value : null;
+        setBadges({
+          stores: s?.pending_stores || 0,
+          disputes: ((r?.results || r) || []).filter((x: any) => x.status === 'disputed').length,
+          tickets: ((t?.results || t) || []).filter((x: any) => x.status === 'open').length,
+          payouts: ((p?.results || p) || []).filter((x: any) => x.status === 'pending').length,
+        });
+      } catch {}
+    })();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -47,6 +105,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             onLogout={handleLogout}
             user={user}
             pathname={pathname}
+            badges={badges}
           />
         </div>
       )}
@@ -59,6 +118,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           onLogout={handleLogout}
           user={user}
           pathname={pathname}
+          badges={badges}
         />
       </aside>
 
@@ -110,12 +170,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 }
 
-function AdminSidebarContent({ collapsed, onClose, onLogout, user, pathname }: {
+function AdminSidebarContent({ collapsed, onClose, onLogout, user, pathname, badges }: {
   collapsed: boolean;
   onClose: () => void;
   onLogout: () => void;
   user: any;
   pathname: string;
+  badges: Badges;
 }) {
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col overflow-y-auto">
@@ -135,43 +196,59 @@ function AdminSidebarContent({ collapsed, onClose, onLogout, user, pathname }: {
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 py-3 px-2 space-y-0.5">
-        {adminNavItems.map((item) => {
-          const Icon = item.icon;
-          const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-          const currentTab = searchParams?.get('tab') || '';
-          const itemTab = item.href.includes('?tab=') ? item.href.split('?tab=')[1] : '';
-          // Also highlight "Lojas" when on /admin/stores/... sub-pages
-          const onStoresSubPage = itemTab === 'stores' && pathname.startsWith('/admin/stores');
-          const isActive = (item.href === '/admin' && !currentTab) || (itemTab && currentTab === itemTab) || onStoresSubPage;
+      <nav className="flex-1 py-2 px-2 overflow-y-auto">
+        {navGroups.map((group) => (
+          <div key={group.label} className="mb-1.5">
+            {!collapsed && (
+              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                {group.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const badgeCount = item.badge ? badges[item.badge] : 0;
+                const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+                const currentTab = searchParams?.get('tab') || '';
+                const itemTab = item.href.includes('?tab=') ? item.href.split('?tab=')[1] : '';
+                const onStoresSubPage = itemTab === 'stores' && pathname.startsWith('/admin/stores');
+                const isActive = (item.href === '/admin' && !currentTab) || (itemTab && currentTab === itemTab) || onStoresSubPage;
 
-          const handleClick = (e: React.MouseEvent) => {
-            if (item.href.includes('?tab=')) {
-              e.preventDefault();
-              const tab = item.href.split('?tab=')[1];
-              const url = new URL(window.location.href);
-              url.searchParams.set('tab', tab);
-              window.history.pushState({}, '', url);
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }
-          };
+                const handleClick = (e: React.MouseEvent) => {
+                  if (item.href.includes('?tab=')) {
+                    e.preventDefault();
+                    const tab = item.href.split('?tab=')[1];
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('tab', tab);
+                    window.history.pushState({}, '', url);
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  }
+                };
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={handleClick}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                isActive
-                  ? 'bg-indigo-600 text-white font-medium'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <Icon size={18} />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={handleClick}
+                    className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      isActive
+                        ? 'bg-indigo-600 text-white font-medium'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon size={18} className="shrink-0" />
+                    {!collapsed && <span className="flex-1">{item.label}</span>}
+                    {badgeCount > 0 && (
+                      <span className={`${collapsed ? 'absolute -top-0.5 -right-0.5 w-4 h-4 text-[9px]' : 'min-w-[18px] h-[18px] text-[10px]'} bg-red-500 text-white font-bold rounded-full flex items-center justify-center px-1`}>
+                        {badgeCount}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Bottom */}
