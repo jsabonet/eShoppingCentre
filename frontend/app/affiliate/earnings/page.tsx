@@ -16,6 +16,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default function AffiliateEarningsPage() {
   const [profile, setProfile] = useState<AffiliateProfile | null>(null);
   const [commissions, setCommissions] = useState<any[]>([]);
+  const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPayout, setShowPayout] = useState(false);
   const [amount, setAmount] = useState('');
@@ -31,16 +32,18 @@ export default function AffiliateEarningsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c, k] = await Promise.all([
+      const [p, c, k, w] = await Promise.all([
         affiliatesAPI.myProfile(),
         affiliatesAPI.myCommissions({ page_size: 100 }),
         affiliatesAPI.myKYC(),
+        affiliatesAPI.myPayouts(),
       ]);
       setProfile(p.data);
       const cData = c.data;
       setCommissions(cData.results || cData || []);
       setKyc(k.data?.status && k.data.status !== 'none' ? k.data : null);
-    } catch { setProfile(null); setCommissions([]); setKyc(null); }
+      setPayouts(Array.isArray(w.data) ? w.data : []);
+    } catch { setProfile(null); setCommissions([]); setKyc(null); setPayouts([]); }
     finally { setLoading(false); }
   }, []);
 
@@ -185,6 +188,41 @@ export default function AffiliateEarningsPage() {
             </div>
           )}
         </div>
+
+        {/* Meus Saques */}
+        {payouts.length > 0 && (
+          <div className="bg-card border border-border rounded-xl mt-6">
+            <div className="p-4 border-b border-border">
+              <h2 className="font-bold">Meus Saques</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Valor</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Método</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {payouts.map((p) => (
+                    <tr key={p.id} className="hover:bg-muted/30">
+                      <td className="py-3 px-4 font-medium">{Number(p.amount).toLocaleString('pt-MZ')} MZN</td>
+                      <td className="py-3 px-4 uppercase text-xs">{p.method}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{new Date(p.created_at).toLocaleDateString('pt-MZ')}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-700'}`}>
+                          {STATUS_LABEL[p.status] || p.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* KYC Modal */}

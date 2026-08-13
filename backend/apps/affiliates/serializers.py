@@ -37,10 +37,11 @@ class AffiliateLinkSerializer(serializers.ModelSerializer):
 class AffiliateCommissionSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     order_number = serializers.CharField(source='order.order_number', read_only=True)
+    affiliate_email = serializers.CharField(source='affiliate.user.email', read_only=True)
 
     class Meta:
         model = AffiliateCommission
-        fields = ('id', 'product_name', 'order_number', 'amount',
+        fields = ('id', 'product_name', 'order_number', 'affiliate_email', 'amount',
                   'commission_rate', 'status', 'rejection_reason', 'created_at')
         read_only_fields = ('amount', 'commission_rate', 'status', 'rejection_reason')
 

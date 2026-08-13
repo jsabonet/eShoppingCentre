@@ -218,7 +218,8 @@ export interface AffiliateProfile {
 
 export interface AffiliateLink {
   id: string;
-  product: Product;
+  product: string;
+  product_name: string;
   code: string;
   clicks: number;
   conversions: number;

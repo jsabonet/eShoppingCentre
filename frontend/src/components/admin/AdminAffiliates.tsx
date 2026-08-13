@@ -186,7 +186,7 @@ export default function AdminAffiliates() {
                     {commissions.map(c => (
                       <tr key={c.id} className="hover:bg-muted/20">
                         <td className="py-2.5 px-3 font-mono text-xs">{c.order_number}</td>
-                        <td className="py-2.5 px-3 text-xs">{c.affiliate?.user_email || c.affiliate_email || '—'}</td>
+                        <td className="py-2.5 px-3 text-xs">{c.affiliate_email || '—'}</td>
                         <td className="py-2.5 px-3 text-xs font-semibold">{Number(c.amount).toLocaleString('pt-MZ')} MZN</td>
                         <td className="py-2.5 px-3 text-xs">{Number(c.commission_rate)}%</td>
                         <td className="py-2.5 px-3">
