@@ -671,6 +671,7 @@ export const walletAPI = {
   adminPayoutApprove: (id: string) => api.post(`/wallet/admin/payouts/${id}/approve/`),
   adminPayoutPay: (id: string, reference: string) => api.post(`/wallet/admin/payouts/${id}/pay/`, { reference }),
   adminPayoutReject: (id: string, reason: string) => api.post(`/wallet/admin/payouts/${id}/reject/`, { reason }),
+  adminReconciliation: () => api.get<any>('/wallet/admin/reconciliation/'),
 };
 
 export const reviewsAPI = {

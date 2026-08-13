@@ -94,3 +94,42 @@ class AdminPayoutRejectView(APIView):
         payout = get_object_or_404(PayoutRequest, pk=pk)
         reject_payout(payout, request.user, request.data.get('reason', ''))
         return Response(PayoutRequestSerializer(payout).data)
+
+
+class AdminReconciliationView(APIView):
+    """GET /api/v1/wallet/admin/reconciliation/ — relatório de reconciliação."""
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get(self, request):
+        from django.db.models import Sum
+        from apps.orders.models import Order
+        from apps.affiliates.models import AffiliateCommission
+        from .models import EscrowHolding, Wallet
+
+        def s(qs, field):
+            return qs.aggregate(v=Sum(field))['v'] or 0
+
+        collected = s(Order.objects.filter(payment_status='completed'), 'total')
+        platform_fees = s(Order.objects.all(), 'platform_fee')
+        affiliate_paid = s(AffiliateCommission.objects.filter(status__in=['approved', 'paid']), 'amount')
+        payouts_paid = s(PayoutRequest.objects.filter(status='paid'), 'amount')
+        payouts_pending = s(PayoutRequest.objects.filter(status__in=['pending', 'approved']), 'amount')
+        escrow_held = s(EscrowHolding.objects.filter(status='held'), 'amount')
+        wallets_payout = s(Wallet.objects.all(), 'payout_balance')
+        wallets_reserved = s(Wallet.objects.all(), 'reserved_balance')
+        wallets_buyer = s(Wallet.objects.all(), 'balance')
+
+        liabilities = float(wallets_payout) + float(wallets_reserved) + float(escrow_held) + float(payouts_pending)
+
+        return Response({
+            'collected_total': float(collected),
+            'platform_fees': float(platform_fees),
+            'affiliate_commissions': float(affiliate_paid),
+            'payouts_paid': float(payouts_paid),
+            'payouts_pending': float(payouts_pending),
+            'escrow_held': float(escrow_held),
+            'wallets_payout_balance': float(wallets_payout),
+            'wallets_reserved_balance': float(wallets_reserved),
+            'wallets_buyer_balance': float(wallets_buyer),
+            'liabilities': liabilities,
+        })

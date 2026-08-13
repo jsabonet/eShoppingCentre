@@ -18,8 +18,11 @@ function formatAccount(acc: any): string {
   return parts.join(' · ') || '—';
 }
 
+const fmt = (v: any) => Number(v || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 });
+
 export default function AdminWallet() {
   const [payouts, setPayouts] = useState<any[]>([]);
+  const [recon, setRecon] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -30,8 +33,12 @@ export default function AdminWallet() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await walletAPI.adminPayouts({ page_size: 200 });
-      setPayouts((data as any).results || data || []);
+      const [pRes, rRes] = await Promise.all([
+        walletAPI.adminPayouts({ page_size: 200 }),
+        walletAPI.adminReconciliation(),
+      ]);
+      setPayouts((pRes.data as any).results || pRes.data || []);
+      setRecon(rRes.data);
     } catch { setPayouts([]); }
     finally { setLoading(false); }
   }, []);
@@ -67,11 +74,29 @@ export default function AdminWallet() {
 
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold flex items-center gap-2"><Wallet size={18} /> Saques (Carteira)</h2>
-          <p className="text-sm text-muted-foreground">{pending} pendentes · pagamento manual pelo admin</p>
+          <h2 className="text-lg font-bold flex items-center gap-2"><Wallet size={18} /> Carteira & Reconciliação</h2>
+          <p className="text-sm text-muted-foreground">{pending} saques pendentes · pagamento manual pelo admin</p>
         </div>
         <button onClick={load} className="p-2 hover:bg-muted rounded-lg"><RefreshCw size={16} /></button>
       </div>
+
+      {recon && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
+          {[
+            { label: 'Cobrado (admin)', value: recon.collected_total, color: 'text-green-700' },
+            { label: 'Taxas da plataforma', value: recon.platform_fees, color: 'text-purple-700' },
+            { label: 'Comissões afiliados', value: recon.affiliate_commissions, color: 'text-amber-700' },
+            { label: 'Pago em saques', value: recon.payouts_paid, color: 'text-red-700' },
+            { label: 'Escrow retido', value: recon.escrow_held, color: 'text-blue-700' },
+            { label: 'A pagar (passivo)', value: recon.liabilities, color: 'text-accent' },
+          ].map((k) => (
+            <div key={k.label} className="bg-white border border-border rounded-lg p-3">
+              <p className="text-[11px] text-muted-foreground">{k.label}</p>
+              <p className={`text-base font-bold ${k.color}`}>{fmt(k.value)} MZN</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-16"><Loader2 size={28} className="animate-spin mx-auto text-muted-foreground" /></div>

@@ -10,4 +10,5 @@ urlpatterns = [
     path('admin/payouts/<uuid:pk>/approve/', views.AdminPayoutApproveView.as_view(), name='admin_payout_approve'),
     path('admin/payouts/<uuid:pk>/pay/', views.AdminPayoutPayView.as_view(), name='admin_payout_pay'),
     path('admin/payouts/<uuid:pk>/reject/', views.AdminPayoutRejectView.as_view(), name='admin_payout_reject'),
+    path('admin/reconciliation/', views.AdminReconciliationView.as_view(), name='admin_reconciliation'),
 ]
