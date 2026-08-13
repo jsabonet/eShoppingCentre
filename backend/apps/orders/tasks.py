@@ -16,7 +16,7 @@ def auto_refund_unprocessed_returns():
     que não foram reembolsadas pelo vendedor em 3 dias.
     """
     from apps.orders.models import ReturnRequest
-    from apps.wallet.models import Wallet, WalletTransaction
+    from apps.wallet.services import get_wallet, credit, debit, InsufficientFunds
     from apps.notifications.models import Notification
     from django.db import transaction
 
@@ -29,40 +29,32 @@ def auto_refund_unprocessed_returns():
     count = 0
     for return_req in pending:
         refund_amount = return_req.refund_amount or return_req.order.total
+        seller = return_req.store.owner if return_req.store else None
 
-        with transaction.atomic():
-            # Deduct from seller (owner of store)
-            seller = return_req.store.owner if return_req.store else None
-            if seller:
-                seller_wallet, _ = Wallet.objects.get_or_create(user=seller)
-                if seller_wallet.balance >= refund_amount:
-                    seller_wallet.balance -= refund_amount
-                    seller_wallet.save()
-                    WalletTransaction.objects.create(
-                        wallet=seller_wallet, type='refund', amount=-refund_amount,
-                        status='completed',
+        try:
+            with transaction.atomic():
+                if seller:
+                    debit(
+                        get_wallet(seller), refund_amount, kind='payout',
+                        ref_type='return', ref_id=return_req.id,
                         description=f'Reembolso automático da devolução #{return_req.rma_number}',
+                        txn_type='refund',
                     )
-                else:
-                    # Seller não tem saldo — marca para revisão manual do admin
-                    return_req.admin_notes = 'Reembolso automático falhou: saldo insuficiente do vendedor. Revisão manual necessária.'
-                    return_req.status = 'disputed'
-                    return_req.save()
-                    continue
-
-            # Credit buyer
-            buyer_wallet, _ = Wallet.objects.get_or_create(user=return_req.buyer)
-            buyer_wallet.balance += refund_amount
-            buyer_wallet.save()
-            WalletTransaction.objects.create(
-                wallet=buyer_wallet, type='refund', amount=refund_amount,
-                status='completed',
-                description=f'Reembolso automático da devolução #{return_req.rma_number}',
-            )
-
-            return_req.status = 'refunded'
-            return_req.admin_notes = f'Reembolsado automaticamente pelo sistema em {timezone.now().date()}'
+                credit(
+                    get_wallet(return_req.buyer), refund_amount, kind='buyer',
+                    ref_type='return', ref_id=return_req.id,
+                    description=f'Reembolso automático da devolução #{return_req.rma_number}',
+                    txn_type='refund',
+                )
+                return_req.status = 'refunded'
+                return_req.admin_notes = f'Reembolsado automaticamente pelo sistema em {timezone.now().date()}'
+                return_req.save()
+        except InsufficientFunds:
+            # Vendedor sem saldo — marca para revisão manual do admin
+            return_req.admin_notes = 'Reembolso automático falhou: saldo insuficiente do vendedor. Revisão manual necessária.'
+            return_req.status = 'disputed'
             return_req.save()
+            continue
 
         # Reverter comissão de afiliado (se existir)
         from apps.affiliates.services import reject_commissions_for_order

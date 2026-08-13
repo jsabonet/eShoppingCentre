@@ -166,6 +166,19 @@ class ConfirmDeliveryView(APIView):
 
         log_status_change(order, 'delivered', request.user, 'Comprador confirmou receção')
 
+        # ─── W1 Carteira: creditar o vendedor (saldo virtual disponível para saque) ───
+        if order.store and order.store.owner and order.payment_status == 'completed':
+            from apps.wallet.services import get_wallet, credit
+            net = order.total - (order.platform_fee or 0) - (order.affiliate_commission or 0)
+            if net > 0:
+                seller_wallet = get_wallet(order.store.owner)
+                credit(
+                    seller_wallet, net, kind='payout',
+                    ref_type='order', ref_id=order.id,
+                    description=f'Venda {order.order_number} (total − taxa − comissão)',
+                    txn_type='sale',
+                )
+
         from apps.notifications.models import Notification
         if order.store and order.store.owner:
             Notification.objects.create(
@@ -203,6 +216,17 @@ class CancelOrderView(APIView):
                             changed_by=request.user,
                             notes='Stock restaurado por cancelamento',
                         )
+                # ─── W1 Carteira: reembolsar o comprador ───
+                if order.payment_status == 'completed' and order.total > 0:
+                    from apps.wallet.services import get_wallet, credit
+                    buyer_wallet = get_wallet(order.buyer)
+                    credit(
+                        buyer_wallet, order.total, kind='buyer',
+                        ref_type='order', ref_id=order.id,
+                        description=f'Reembolso por cancelamento {order.order_number}',
+                        txn_type='refund',
+                    )
+
                 # Reverter comissão de afiliado (se existir)
                 from apps.affiliates.services import reject_commissions_for_order
                 reject_commissions_for_order(order, 'Encomenda cancelada')
@@ -410,37 +434,28 @@ class RefundReturnView(APIView):
 
         refund_amount = return_req.refund_amount or return_req.order.total
 
-        # Wallet check: does seller have enough balance?
-        from apps.wallet.models import Wallet, WalletTransaction
-        seller_wallet, _ = Wallet.objects.get_or_create(user=request.user)
-        if seller_wallet.balance < refund_amount:
-            return Response(
-                {'detail': f'Saldo insuficiente na carteira. Necessário: {refund_amount} MZN, Disponível: {seller_wallet.balance} MZN.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        with transaction.atomic():
-            # Deduct from seller
-            seller_wallet.balance -= refund_amount
-            seller_wallet.save()
-            WalletTransaction.objects.create(
-                wallet=seller_wallet, type='refund', amount=-refund_amount,
-                status='completed',
-                description=f'Reembolso da devolução #{return_req.rma_number}',
-            )
-
-            # Credit buyer
-            buyer_wallet, _ = Wallet.objects.get_or_create(user=return_req.buyer)
-            buyer_wallet.balance += refund_amount
-            buyer_wallet.save()
-            WalletTransaction.objects.create(
-                wallet=buyer_wallet, type='refund', amount=refund_amount,
-                status='completed',
-                description=f'Reembolso recebido da devolução #{return_req.rma_number}',
-            )
-
-            return_req.status = 'refunded'
-            return_req.save()
+        # W1 Carteira: reembolso via ledger (débito do vendedor, crédito do comprador)
+        from apps.wallet.services import get_wallet, credit, debit, InsufficientFunds
+        try:
+            with transaction.atomic():
+                seller_wallet = get_wallet(request.user)
+                debit(
+                    seller_wallet, refund_amount, kind='payout',
+                    ref_type='return', ref_id=return_req.id,
+                    description=f'Reembolso da devolução #{return_req.rma_number}',
+                    txn_type='refund',
+                )
+                buyer_wallet = get_wallet(return_req.buyer)
+                credit(
+                    buyer_wallet, refund_amount, kind='buyer',
+                    ref_type='return', ref_id=return_req.id,
+                    description=f'Reembolso recebido da devolução #{return_req.rma_number}',
+                    txn_type='refund',
+                )
+                return_req.status = 'refunded'
+                return_req.save()
+        except InsufficientFunds as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         # Reverter comissão de afiliado (se existir)
         from apps.affiliates.services import reject_commissions_for_order

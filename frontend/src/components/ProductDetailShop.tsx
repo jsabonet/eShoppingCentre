@@ -476,8 +476,7 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                       <p className="flex items-center gap-1"><Download size={12} /> Entrega digital — nada de envio fisico</p>
                       {product.storeName && <p>Por <strong>{product.storeName}</strong></p>}
                     </>
-                  ) : (
-                    <p className="flex items-center gap-1"><Truck size={12} /> Vendido e entregue{product.storeName ? ` por ${product.storeName}` : ' por e-Shopping'}</p>
+                  ) : (<></>
                   )}
                   <PaymentBadges />
                 </div>

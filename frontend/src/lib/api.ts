@@ -373,6 +373,7 @@ export interface Review {
 
 export interface WalletInfo {
   balance: number;
+  payout_balance: number;
   total_earned: number;
   total_withdrawn: number;
 }
