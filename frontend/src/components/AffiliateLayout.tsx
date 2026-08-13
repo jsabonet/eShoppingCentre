@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Gift, Link as LinkIcon, DollarSign, TrendingUp, Menu, X } from 'lucide-react';
@@ -13,12 +13,47 @@ const navItems = [
   { href: '/affiliate/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/affiliate/products', label: 'Produtos', icon: Gift },
   { href: '/affiliate/links', label: 'Meus Links', icon: LinkIcon },
-  { href: '/affiliate/earnings', label: 'Comissões', icon: DollarSign },
+  { href: '/affiliate/earnings', label: 'Comissões', icon: DollarSign, badge: 'balance' as const },
 ];
 
 export default function AffiliateLayout({ children }: AffiliateLayoutProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [balance, setBalance] = useState<string>('');
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    fetch(`${API_URL}/affiliates/me/`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data && typeof data.available_commission === 'number') {
+          const v = data.available_commission;
+          setBalance(v >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : `${Math.round(v)}`);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const renderItem = (item: typeof navItems[number], onClick?: () => void) => {
+    const isActive = pathname === item.href;
+    const Icon = item.icon;
+    return (
+      <Link key={item.href} href={item.href} onClick={onClick}
+        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+          isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        }`}>
+        <Icon size={20} />
+        <span className="flex-1">{item.label}</span>
+        {item.badge === 'balance' && balance && (
+          <span className="px-1.5 h-[18px] text-[10px] bg-green-100 text-green-700 font-bold rounded-full flex items-center">
+            {balance} MZN
+          </span>
+        )}
+      </Link>
+    );
+  };
 
   return (
     <div className="min-h-[calc(100vh-200px)] bg-muted/30 flex">
@@ -29,18 +64,7 @@ export default function AffiliateLayout({ children }: AffiliateLayoutProps) {
           <p className="text-xs text-muted-foreground">Ganhe dinheiro a promover</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            const Icon = item.icon;
-            return (
-              <Link key={item.href} href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}>
-                <Icon size={20} /> {item.label}
-              </Link>
-            );
-          })}
+          {navItems.map((item) => renderItem(item))}
         </nav>
       </aside>
 
@@ -54,18 +78,7 @@ export default function AffiliateLayout({ children }: AffiliateLayoutProps) {
               <button onClick={() => setMobileOpen(false)} className="p-1 hover:bg-muted rounded"><X size={20} /></button>
             </div>
             <nav className="p-3 space-y-1">
-              {navItems.map((item) => {
-                const isActive = pathname === item.href;
-                const Icon = item.icon;
-                return (
-                  <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    }`}>
-                    <Icon size={20} /> {item.label}
-                  </Link>
-                );
-              })}
+              {navItems.map((item) => renderItem(item, () => setMobileOpen(false)))}
             </nav>
           </aside>
         </div>

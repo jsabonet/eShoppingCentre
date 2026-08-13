@@ -34,50 +34,72 @@ interface SellerLayoutProps {
 }
 
 // Base navigation varies by store type: course stores use "Cursos" instead of "Produtos"
-function getBaseNav(productType: string) {
-  if (productType === 'course') {
-    return [
-      { href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/seller/courses', label: 'Cursos', icon: GraduationCap },
-      { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart },
-      { href: '/seller/returns', label: 'Devoluções', icon: RotateCcw },
-      { href: '/seller/coupons', label: 'Cupões', icon: TicketPercent },
-      { href: '/seller/tickets', label: 'Suporte', icon: LifeBuoy },
-      { href: '/seller/messages', label: 'Mensagens', icon: MessageCircle },
-      { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
-      { href: '/seller/settings', label: 'Configurações', icon: Settings },
-    ];
-  }
-  return [
-    { href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/seller/products', label: 'Produtos', icon: Package },
-    { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart },
-    { href: '/seller/returns', label: 'Devoluções', icon: RotateCcw },
-    ...(productType === 'physical' ? [{ href: '/seller/shipping' as const, label: 'Envios', icon: Truck }, { href: '/seller/inventory' as const, label: 'Inventário', icon: ClipboardList }] : []),
-    { href: '/seller/coupons', label: 'Cupões', icon: TicketPercent },
-    { href: '/seller/tickets', label: 'Suporte', icon: LifeBuoy },
-    { href: '/seller/messages', label: 'Mensagens', icon: MessageCircle },
-    { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
-    { href: '/seller/settings', label: 'Configurações', icon: Settings },
-  ];
+interface SellerNavItem {
+  href: string;
+  label: string;
+  icon: any;
+  badge?: 'orders' | 'returns' | 'tickets';
 }
 
-const TYPE_NAV: Record<string, { href: string; label: string; icon: any }[]> = {
-  physical: [
-    { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
-  ],
-  digital: [
-    { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
-  ],
-  course: [
-    { href: '/seller/students', label: 'Alunos', icon: Users },
-    { href: '/seller/certificates', label: 'Certificados', icon: Award },
-    { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
-  ],
-};
+interface SellerNavGroup {
+  label: string;
+  items: SellerNavItem[];
+}
 
-function getNavItems(productType: string) {
-  return [...getBaseNav(productType), ...(TYPE_NAV[productType] || TYPE_NAV.physical)];
+function getNavGroups(productType: string): SellerNavGroup[] {
+  const groups: SellerNavGroup[] = [
+    { label: '', items: [{ href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+    {
+      label: 'Catálogo',
+      items: [
+        { href: productType === 'course' ? '/seller/courses' : '/seller/products', label: productType === 'course' ? 'Cursos' : 'Produtos', icon: productType === 'course' ? GraduationCap : Package },
+        ...(productType === 'physical'
+          ? [{ href: '/seller/shipping', label: 'Envios', icon: Truck }, { href: '/seller/inventory', label: 'Inventário', icon: ClipboardList }]
+          : []),
+      ],
+    },
+    {
+      label: 'Vendas',
+      items: [
+        { href: '/seller/orders', label: 'Encomendas', icon: ShoppingCart, badge: 'orders' },
+        { href: '/seller/returns', label: 'Devoluções', icon: RotateCcw, badge: 'returns' },
+        { href: '/seller/tickets', label: 'Suporte', icon: LifeBuoy, badge: 'tickets' },
+      ],
+    },
+    {
+      label: 'Marketing',
+      items: [
+        { href: '/seller/coupons', label: 'Cupões', icon: TicketPercent },
+        { href: '/seller/affiliates', label: 'Afiliados', icon: Users },
+      ],
+    },
+    {
+      label: 'Comunicação',
+      items: [
+        { href: '/seller/messages', label: 'Mensagens', icon: MessageCircle },
+      ],
+    },
+    {
+      label: 'Conta',
+      items: [
+        { href: '/seller/earnings', label: 'Ganhos', icon: DollarSign },
+        { href: '/seller/settings', label: 'Configurações', icon: Settings },
+      ],
+    },
+  ];
+
+  if (productType === 'course') {
+    groups.splice(3, 0, {
+      label: 'Alunos',
+      items: [
+        { href: '/seller/students', label: 'Alunos', icon: Users },
+        { href: '/seller/certificates', label: 'Certificados', icon: Award },
+      ],
+    });
+  }
+
+  return groups;
+}
 }
 
 export default function SellerLayout({ children }: SellerLayoutProps) {
@@ -90,8 +112,33 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
   const [storeStatus, setStoreStatus] = useState<string | null>(cachedStore?.status ?? null);
   const [productType, setProductType] = useState<string>(cachedStore?.productType ?? 'physical');
   const [checking, setChecking] = useState(!cacheChecked);
+  const [badges, setBadges] = useState<{ orders: number; returns: number; tickets: number }>({ orders: 0, returns: 0, tickets: 0 });
 
-  const navItems = getNavItems(productType);
+  const navGroups = getNavGroups(productType);
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    (async () => {
+      try {
+        const [orders, returns, tickets] = await Promise.allSettled([
+          fetch(`${API_URL}/orders/store/`, { headers }).then(r => r.ok ? r.json() : null),
+          fetch(`${API_URL}/orders/returns/store/`, { headers }).then(r => r.ok ? r.json() : null),
+          fetch(`${API_URL}/orders/tickets/seller/`, { headers }).then(r => r.ok ? r.json() : null),
+        ]);
+        const o = orders.status === 'fulfilled' ? orders.value : null;
+        const r = returns.status === 'fulfilled' ? returns.value : null;
+        const t = tickets.status === 'fulfilled' ? tickets.value : null;
+        setBadges({
+          orders: ((o?.results || o) || []).filter((x: any) => x.status === 'pending').length,
+          returns: ((r?.results || r) || []).filter((x: any) => x.status === 'requested').length,
+          tickets: ((t?.results || t) || []).filter((x: any) => x.status === 'open').length,
+        });
+      } catch {}
+    })();
+  }, [storeName]);
 
   useEffect(() => {
     if (pathname === '/seller/register') {
@@ -228,25 +275,40 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-                title={collapsed ? item.label : undefined}
-              >
-                <item.icon size={20} className="flex-shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          {navGroups.map((group) => (
+            <div key={group.label} className="mb-1">
+              {!collapsed && group.label && (
+                <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</p>
+              )}
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                  const badgeCount = item.badge ? badges[item.badge] : 0;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-accent text-accent-foreground'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      }`}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <item.icon size={20} className="flex-shrink-0" />
+                      {!collapsed && <span className="flex-1">{item.label}</span>}
+                      {badgeCount > 0 && (
+                        <span className={`${collapsed ? 'absolute -top-0.5 -right-0.5 w-4 h-4 text-[9px]' : 'min-w-[18px] h-[18px] text-[10px]'} bg-red-500 text-white font-bold rounded-full flex items-center justify-center px-1`}>
+                          {badgeCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* Store Link */}
@@ -273,22 +335,37 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
               </button>
             </div>
             <nav className="p-3 space-y-1">
-              {navItems.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    }`}
-                  >
-                    <item.icon size={20} />
-                    {item.label}
-                  </Link>
-                );
-              })}
+              {navGroups.map((group) => (
+                <div key={group.label} className="mb-1">
+                  {group.label && (
+                    <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</p>
+                  )}
+                  <div className="space-y-1">
+                    {group.items.map((item) => {
+                      const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                      const badgeCount = item.badge ? badges[item.badge] : 0;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMobileOpen(false)}
+                          className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                          }`}
+                        >
+                          <item.icon size={20} />
+                          <span className="flex-1">{item.label}</span>
+                          {badgeCount > 0 && (
+                            <span className="min-w-[18px] h-[18px] text-[10px] bg-red-500 text-white font-bold rounded-full flex items-center justify-center px-1">
+                              {badgeCount}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </nav>
           </aside>
         </div>
