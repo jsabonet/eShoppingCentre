@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Gift, Check, DollarSign, Users, TrendingUp } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Gift, Check, DollarSign, Users, TrendingUp, Loader2 } from 'lucide-react';
+import { affiliatesAPI } from '@/src/lib/api';
 
 const benefits = [
   { icon: DollarSign, title: 'Comissões Atrativas', desc: 'Ganhe até 15% por venda realizada através dos seus links.' },
@@ -16,11 +18,23 @@ function LinkIcon(props: { size?: number; className?: string }) {
 }
 
 export default function AffiliateRegisterPage() {
+  const router = useRouter();
   const [form, setForm] = useState({ name: '', email: '', phone: '', agree: false });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Parabéns! Você agora é um afiliado do eShoppingCentre! 🎉');
+    setSubmitting(true);
+    setError('');
+    try {
+      await affiliatesAPI.register();
+      router.push('/affiliate/dashboard');
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Erro ao criar conta de afiliado. Tente novamente.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -99,8 +113,12 @@ export default function AffiliateRegisterPage() {
                   Concordo com os <Link href="/terms" className="text-accent hover:underline">Termos do Programa de Afiliados</Link>
                 </span>
               </label>
-              <button type="submit" className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors flex items-center justify-center gap-2">
-                <Gift size={18} /> Tornar-me Afiliado
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
+              )}
+              <button type="submit" disabled={submitting}
+                className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+                {submitting ? <Loader2 size={18} className="animate-spin" /> : <Gift size={18} />} Tornar-me Afiliado
               </button>
             </form>
           </div>

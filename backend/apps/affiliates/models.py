@@ -8,16 +8,27 @@ class AffiliateProfile(BaseModel):
         ('silver', 'Prata'),
         ('gold', 'Ouro'),
     ]
+    STATUS_CHOICES = [
+        ('pending', 'Pendente'),
+        ('active', 'Activo'),
+        ('suspended', 'Suspenso'),
+    ]
     user = models.OneToOneField('users.User', on_delete=models.CASCADE, related_name='affiliate_profile')
     referral_code = models.CharField(max_length=50, unique=True)
     total_clicks = models.PositiveIntegerField(default=0)
     total_sales = models.PositiveIntegerField(default=0)
     total_commission = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_withdrawn = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     commission_tier = models.CharField(max_length=20, choices=TIER_CHOICES, default='basic')
 
     def __str__(self):
         return f'Affiliate: {self.user.email}'
+
+    @property
+    def available_commission(self):
+        return self.total_commission - self.total_withdrawn
 
 
 class AffiliateLink(BaseModel):
@@ -49,3 +60,55 @@ class AffiliateCommission(BaseModel):
 
     def __str__(self):
         return f'{self.affiliate.user.email} - {self.amount} MZN'
+
+
+class AffiliateSettings(BaseModel):
+    """Configurações globais do programa de afiliados (singleton, gerido pelo admin)."""
+    cookie_window_days = models.PositiveIntegerField(default=30)
+    default_commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
+    min_payout_amount = models.DecimalField(max_digits=12, decimal_places=2, default=500)
+    approve_after_days = models.PositiveIntegerField(default=7)
+
+    class Meta:
+        verbose_name = 'Configuração de Afiliados'
+        verbose_name_plural = 'Configurações de Afiliados'
+
+    def __str__(self):
+        return 'Configurações de Afiliados'
+
+    @classmethod
+    def get_settings(cls):
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create()
+        return obj
+
+
+class AffiliatePayout(BaseModel):
+    """Pedido de saque de comissões por um afiliado."""
+    STATUS_CHOICES = [
+        ('pending', 'Pendente'),
+        ('approved', 'Aprovado'),
+        ('paid', 'Pago'),
+        ('rejected', 'Rejeitado'),
+    ]
+    METHOD_CHOICES = [
+        ('mpesa', 'M-Pesa'),
+        ('emola', 'e-Mola'),
+        ('bank', 'Transferência Bancária'),
+    ]
+
+    affiliate = models.ForeignKey(AffiliateProfile, on_delete=models.CASCADE, related_name='payouts')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    method = models.CharField(max_length=20, choices=METHOD_CHOICES, default='mpesa')
+    account_details = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    approved_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_payouts')
+    paid_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Payout {self.affiliate.user.email} - {self.amount} MZN ({self.status})'

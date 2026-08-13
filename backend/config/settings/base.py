@@ -8,6 +8,7 @@ SECRET_KEY = config('SECRET_KEY', default='dev-secret-key-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+BACKEND_URL = config('BACKEND_URL', default='http://localhost:8000')
 
 INSTALLED_APPS = [
     'daphne',

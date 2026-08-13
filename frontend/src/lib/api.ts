@@ -203,11 +203,17 @@ export interface OrderItem {
 
 export interface AffiliateProfile {
   id: string;
+  user_email: string;
+  user_name?: string;
   referral_code: string;
   total_clicks: number;
   total_sales: number;
   total_commission: number;
+  total_withdrawn: number;
+  available_commission: number;
   is_active: boolean;
+  status: string;
+  commission_tier: string;
 }
 
 export interface AffiliateLink {
@@ -567,8 +573,27 @@ export const affiliatesAPI = {
   requestPayout: (data: { amount: number; method: string; account_details: Record<string, string> }) =>
     api.post('/affiliates/me/payouts/', data),
 
+  myPayouts: () => api.get('/affiliates/me/payouts/'),
+
   storeAffiliates: () =>
     api.get<StoreAffiliatesData>('/affiliates/store/'),
+
+  // Admin
+  adminList: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<AffiliateProfile>>('/affiliates/admin/affiliates/', { params }),
+  adminUpdateStatus: (id: string, status: string) =>
+    api.patch<AffiliateProfile>(`/affiliates/admin/affiliates/${id}/status/`, { status }),
+  adminSettings: () => api.get('/affiliates/admin/affiliates/settings/'),
+  adminUpdateSettings: (data: any) =>
+    api.patch('/affiliates/admin/affiliates/settings/', data),
+  adminCommissions: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<any>>('/affiliates/admin/affiliates/commissions/', { params }),
+  adminCommissionAction: (id: string, data: { action: string; reason?: string }) =>
+    api.patch(`/affiliates/admin/affiliates/commissions/${id}/`, data),
+  adminPayouts: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<any>>('/affiliates/admin/affiliates/payouts/', { params }),
+  adminPayoutAction: (id: string, data: { action: string; notes?: string }) =>
+    api.patch(`/affiliates/admin/affiliates/payouts/${id}/`, data),
 };
 
 export interface StoreAffiliatesData {

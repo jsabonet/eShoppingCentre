@@ -32,6 +32,14 @@ def auto_approve_affiliate_commissions():
         AffiliateProfile.objects.filter(pk=comm.affiliate_id).update(
             total_commission=F('total_commission') + comm.amount
         )
+        from apps.notifications.models import Notification
+        Notification.objects.create(
+            user=comm.affiliate.user,
+            title='Comissão aprovada',
+            message=f'A sua comissão de {comm.amount} MZN foi aprovada.',
+            notification_type='affiliate',
+            link='/affiliate/earnings',
+        )
         affected_ids.add(comm.affiliate_id)
         count += 1
 

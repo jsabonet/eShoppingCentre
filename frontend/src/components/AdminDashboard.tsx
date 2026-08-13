@@ -15,10 +15,11 @@ import AdminOrders from './admin/AdminOrders';
 import AdminTickets from './admin/AdminTickets';
 import AdminCoupons from './admin/AdminCoupons';
 import AdminAbandonedCarts from './admin/AdminAbandonedCarts';
+import AdminAffiliates from './admin/AdminAffiliates';
 
 const BACKEND_READY = true;
 
-type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts';
+type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates';
 
 interface Product {
   id: string;
@@ -638,6 +639,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
             { id: 'tickets', label: 'Suporte', icon: LifeBuoy },
             { id: 'coupons', label: 'Cupões', icon: TicketPercent },
             { id: 'carts', label: 'Carrinhos', icon: Clock },
+            { id: 'affiliates', label: 'Afiliados', icon: Users },
             { id: 'categories', label: 'Categorias', icon: Filter },
             { id: 'blog', label: 'Blog', icon: Edit },
             { id: 'users', label: 'Utilizadores', icon: Users },
@@ -1252,6 +1254,9 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
 
         {/* Abandoned Carts Tab (Admin) */}
         {activeTab === 'carts' && <AdminAbandonedCarts />}
+
+        {/* Affiliates Tab (Admin) */}
+        {activeTab === 'affiliates' && <AdminAffiliates />}
 
         {/* Confirm Action Modal */}
         {confirmModal && (
