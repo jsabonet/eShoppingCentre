@@ -1,7 +1,8 @@
 """Serviço da Carteira — operações atómicas sobre saldos + ledger (W1)."""
 from decimal import Decimal
 from django.db import transaction
-from .models import Wallet, WalletTransaction, WalletEntry
+from django.utils import timezone
+from .models import Wallet, WalletTransaction, WalletEntry, EscrowHolding
 
 
 class InsufficientFunds(Exception):
@@ -82,3 +83,71 @@ def debit(wallet, amount, *, kind='buyer', ref_type='system', ref_id, descriptio
         raise ValueError('debit: amount deve ser positivo')
     return _apply(wallet, -amount, kind=kind, ref_type=ref_type, ref_id=ref_id,
                   description=description, txn_type=txn_type)
+
+
+@transaction.atomic
+def settle_payment(order):
+    """
+    Após pagamento confirmado: produtos digitais/cursos são creditados de imediato;
+    produtos físicos ficam retidos em escrow até entrega + janela de devolução.
+    """
+    net = order.total - (order.platform_fee or 0) - (order.affiliate_commission or 0)
+    if net <= 0:
+        return None
+    seller = order.store.owner if order.store else None
+    if not seller:
+        return None
+
+    has_physical = order.items.filter(product__product_type='physical').exists()
+    if has_physical:
+        escrow, _created = EscrowHolding.objects.get_or_create(
+            order=order,
+            defaults={'amount': net, 'status': 'held'},
+        )
+        return escrow
+
+    credit(get_wallet(seller), net, kind='payout',
+           ref_type='order', ref_id=order.id,
+           description=f'Venda {order.order_number} (digital/curso)', txn_type='sale')
+    return None
+
+
+@transaction.atomic
+def release_escrow(escrow):
+    """Liberta um escrow retido, creditando o vendedor no saldo de saque."""
+    escrow = EscrowHolding.objects.select_for_update().get(pk=escrow.pk)
+    if escrow.status != 'held':
+        return escrow
+    order = escrow.order
+    seller = order.store.owner if order.store else None
+    if seller:
+        credit(get_wallet(seller), escrow.amount, kind='payout',
+               ref_type='order', ref_id=order.id,
+               description=f'Libertação de escrow {order.order_number}', txn_type='sale')
+    escrow.status = 'released'
+    escrow.released_at = timezone.now()
+    escrow.save(update_fields=['status', 'released_at'])
+    return escrow
+
+
+@transaction.atomic
+def reverse_escrow(order):
+    """Reverte um escrow ainda retido (ex: cancelamento/reembolso). Retorna True se reverteu."""
+    escrow = EscrowHolding.objects.select_for_update().filter(order=order, status='held').first()
+    if escrow:
+        escrow.status = 'reversed'
+        escrow.save(update_fields=['status'])
+        return True
+    return False
+
+
+def process_refund(order, seller, buyer, refund_amount, description):
+    """
+    Reembolso: reverte o escrow se ainda retido; senão debita o vendedor;
+    e credita o comprador. Deve ser chamado dentro de transaction.atomic().
+    """
+    if not reverse_escrow(order) and seller:
+        debit(get_wallet(seller), refund_amount, kind='payout',
+              ref_type='order', ref_id=order.id, description=description, txn_type='refund')
+    credit(get_wallet(buyer), refund_amount, kind='buyer',
+           ref_type='order', ref_id=order.id, description=description, txn_type='refund')

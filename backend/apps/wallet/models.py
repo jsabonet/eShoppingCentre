@@ -64,3 +64,23 @@ class WalletEntry(BaseModel):
 
     def __str__(self):
         return f'{self.direction} {self.amount} MZN ({self.kind})'
+
+
+class EscrowHolding(BaseModel):
+    """Retenção virtual (escrow) do valor de uma encomenda física até entrega + janela de devolução."""
+    STATUS_CHOICES = [
+        ('held', 'Retido'),
+        ('released', 'Libertado'),
+        ('reversed', 'Revertido'),
+    ]
+
+    order = models.ForeignKey('orders.Order', on_delete=models.CASCADE, related_name='escrow')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='held')
+    released_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Escrow {self.order.order_number} — {self.amount} MZN ({self.status})'

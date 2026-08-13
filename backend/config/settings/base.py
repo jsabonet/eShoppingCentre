@@ -166,6 +166,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.affiliates.tasks.auto_approve_affiliate_commissions',
         'schedule': 3600.0,  # a cada hora
     },
+    'release-escrow-after-return-window': {
+        'task': 'apps.orders.tasks.release_escrow_after_return_window',
+        'schedule': 3600.0,  # a cada hora
+    },
 }
 
 CHANNEL_LAYERS = {

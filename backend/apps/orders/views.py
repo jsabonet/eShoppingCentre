@@ -165,19 +165,7 @@ class ConfirmDeliveryView(APIView):
         order.save()
 
         log_status_change(order, 'delivered', request.user, 'Comprador confirmou receção')
-
-        # ─── W1 Carteira: creditar o vendedor (saldo virtual disponível para saque) ───
-        if order.store and order.store.owner and order.payment_status == 'completed':
-            from apps.wallet.services import get_wallet, credit
-            net = order.total - (order.platform_fee or 0) - (order.affiliate_commission or 0)
-            if net > 0:
-                seller_wallet = get_wallet(order.store.owner)
-                credit(
-                    seller_wallet, net, kind='payout',
-                    ref_type='order', ref_id=order.id,
-                    description=f'Venda {order.order_number} (total − taxa − comissão)',
-                    txn_type='sale',
-                )
+        # (W2: o crédito ao vendedor é feito pelo escrow, libertado após entrega + 7 dias)
 
         from apps.notifications.models import Notification
         if order.store and order.store.owner:
@@ -216,6 +204,10 @@ class CancelOrderView(APIView):
                             changed_by=request.user,
                             notes='Stock restaurado por cancelamento',
                         )
+                # ─── W2 Escrow: reverter retenção do vendedor (se ainda retida) ───
+                from apps.wallet.services import reverse_escrow
+                reverse_escrow(order)
+
                 # ─── W1 Carteira: reembolsar o comprador ───
                 if order.payment_status == 'completed' and order.total > 0:
                     from apps.wallet.services import get_wallet, credit
@@ -434,23 +426,13 @@ class RefundReturnView(APIView):
 
         refund_amount = return_req.refund_amount or return_req.order.total
 
-        # W1 Carteira: reembolso via ledger (débito do vendedor, crédito do comprador)
-        from apps.wallet.services import get_wallet, credit, debit, InsufficientFunds
+        # W2 Carteira: reembolso (reverte escrow se retido; senão debita vendedor; credita comprador)
+        from apps.wallet.services import process_refund, InsufficientFunds
         try:
             with transaction.atomic():
-                seller_wallet = get_wallet(request.user)
-                debit(
-                    seller_wallet, refund_amount, kind='payout',
-                    ref_type='return', ref_id=return_req.id,
-                    description=f'Reembolso da devolução #{return_req.rma_number}',
-                    txn_type='refund',
-                )
-                buyer_wallet = get_wallet(return_req.buyer)
-                credit(
-                    buyer_wallet, refund_amount, kind='buyer',
-                    ref_type='return', ref_id=return_req.id,
-                    description=f'Reembolso recebido da devolução #{return_req.rma_number}',
-                    txn_type='refund',
+                process_refund(
+                    return_req.order, request.user, return_req.buyer, refund_amount,
+                    f'Reembolso da devolução #{return_req.rma_number}',
                 )
                 return_req.status = 'refunded'
                 return_req.save()

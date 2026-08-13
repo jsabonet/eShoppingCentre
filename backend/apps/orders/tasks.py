@@ -8,6 +8,9 @@ AUTO_DELIVERY_DAYS = 7
 # Horas sem atividade até o carrinho ser considerado abandonado
 ABANDONED_CART_HOURS = 24
 
+# Dias após entrega até o escrow ser libertado ao vendedor
+ESCROW_RELEASE_DAYS = 7
+
 
 @shared_task
 def auto_refund_unprocessed_returns():
@@ -16,7 +19,7 @@ def auto_refund_unprocessed_returns():
     que não foram reembolsadas pelo vendedor em 3 dias.
     """
     from apps.orders.models import ReturnRequest
-    from apps.wallet.services import get_wallet, credit, debit, InsufficientFunds
+    from apps.wallet.services import process_refund, InsufficientFunds
     from apps.notifications.models import Notification
     from django.db import transaction
 
@@ -33,18 +36,9 @@ def auto_refund_unprocessed_returns():
 
         try:
             with transaction.atomic():
-                if seller:
-                    debit(
-                        get_wallet(seller), refund_amount, kind='payout',
-                        ref_type='return', ref_id=return_req.id,
-                        description=f'Reembolso automático da devolução #{return_req.rma_number}',
-                        txn_type='refund',
-                    )
-                credit(
-                    get_wallet(return_req.buyer), refund_amount, kind='buyer',
-                    ref_type='return', ref_id=return_req.id,
-                    description=f'Reembolso automático da devolução #{return_req.rma_number}',
-                    txn_type='refund',
+                process_refund(
+                    return_req.order, seller, return_req.buyer, refund_amount,
+                    f'Reembolso automático da devolução #{return_req.rma_number}',
                 )
                 return_req.status = 'refunded'
                 return_req.admin_notes = f'Reembolsado automaticamente pelo sistema em {timezone.now().date()}'
@@ -190,3 +184,30 @@ def recover_abandoned_carts():
         count += 1
 
     return f'{count} carrinho(s) abandonado(s) notificado(s).'
+
+
+@shared_task
+def release_escrow_after_return_window():
+    """
+    Liberta escrows de encomendas físicas entregues há mais de ESCROW_RELEASE_DAYS dias,
+    creditando o vendedor no saldo de saque.
+    """
+    from apps.wallet.models import EscrowHolding
+    from apps.wallet.services import release_escrow
+
+    cutoff = timezone.now() - timedelta(days=ESCROW_RELEASE_DAYS)
+    held = EscrowHolding.objects.filter(
+        status='held',
+        order__status='delivered',
+        order__delivered_at__lte=cutoff,
+    ).select_related('order')
+
+    count = 0
+    for escrow in held:
+        try:
+            release_escrow(escrow)
+            count += 1
+        except Exception:
+            continue
+
+    return f'{count} escrow(s) libertado(s).'

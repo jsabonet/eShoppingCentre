@@ -416,6 +416,12 @@ class CreateOrderSerializer(serializers.Serializer):
             fresh_profile = AffiliateProfile.objects.get(pk=affiliate_profile.pk)
             update_tier(fresh_profile)
 
+        # ─── W2 Escrow: liquidar pagamento (crédito imediato ou retenção) ───
+        from apps.wallet.services import settle_payment
+        for order in orders:
+            if order.payment_status == 'completed':
+                settle_payment(order)
+
         return orders
 
     def _process_delivery(self, order):
