@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   User, ShoppingBag, MapPin, Download, Heart, LogOut, ChevronLeft, ChevronRight,
-  Package, Settings, Store, Gift, Menu, X, LayoutDashboard, BookOpen, MessageCircle, LifeBuoy
+  Package, Settings, Store, Gift, Menu, X, LayoutDashboard, BookOpen, MessageCircle, LifeBuoy, Wallet
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 
@@ -41,6 +41,7 @@ const navGroups: AccountNavGroup[] = [
     items: [
       { href: '/account/profile', label: 'Meu Perfil', icon: Settings },
       { href: '/account/addresses', label: 'Endereços', icon: MapPin },
+      { href: '/account/wallet', label: 'Carteira', icon: Wallet },
     ],
   },
   {
