@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Store, Filter,
   Edit, Users, LogOut, ChevronLeft, ChevronRight,
-  Menu, X, Settings, Bell, RotateCcw, ShoppingCart, LifeBuoy, TicketPercent, Clock, Gift
+  Menu, X, Settings, Bell, RotateCcw, ShoppingCart, LifeBuoy, TicketPercent, Clock, Gift, Wallet
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 
@@ -44,6 +44,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { href: '/admin?tab=users', label: 'Utilizadores', icon: Users },
       { href: '/admin?tab=blog', label: 'Blog', icon: Edit },
+      { href: '/admin?tab=wallet', label: 'Carteira', icon: Wallet },
     ],
   },
 ];

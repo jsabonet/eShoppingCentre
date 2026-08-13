@@ -151,3 +151,95 @@ def process_refund(order, seller, buyer, refund_amount, description):
               ref_type='order', ref_id=order.id, description=description, txn_type='refund')
     credit(get_wallet(buyer), refund_amount, kind='buyer',
            ref_type='order', ref_id=order.id, description=description, txn_type='refund')
+
+
+# ─── Payouts manuais (W3/W4) ───
+
+def get_available_balance(wallet):
+    return wallet.payout_balance - wallet.reserved_balance
+
+
+@transaction.atomic
+def request_payout(user, *, role, amount, method, account_details):
+    """Cria um pedido de saque e reserva o valor no saldo de saque."""
+    from .models import PayoutRequest
+    wallet = get_wallet(user)
+    amount = Decimal(str(amount))
+    if amount <= 0:
+        raise ValueError('Valor de saque inválido.')
+
+    available = get_available_balance(wallet)
+    if amount > available:
+        raise InsufficientFunds(
+            f'Saldo insuficiente. Disponível para saque: {available} MZN.'
+        )
+
+    payout = PayoutRequest.objects.create(
+        user=user, role=role, amount=amount, method=method,
+        account_details=account_details or {},
+    )
+    wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
+    wallet.reserved_balance += amount
+    wallet.save(update_fields=['reserved_balance'])
+    return payout
+
+
+@transaction.atomic
+def approve_payout(payout, admin):
+    if payout.status != 'pending':
+        return payout
+    payout.status = 'approved'
+    payout.approved_by = admin
+    payout.approved_at = timezone.now()
+    payout.save(update_fields=['status', 'approved_by', 'approved_at'])
+    return payout
+
+
+@transaction.atomic
+def pay_payout(payout, admin, reference=''):
+    """Admin confirma o pagamento manual → debita o saldo e marca como pago."""
+    if payout.status not in ('pending', 'approved'):
+        return payout
+
+    wallet = Wallet.objects.select_for_update().get(pk=get_wallet(payout.user).pk)
+    wallet.reserved_balance = max(wallet.reserved_balance - payout.amount, Decimal('0'))
+    if wallet.payout_balance < payout.amount:
+        raise InsufficientFunds('Saldo de saque insuficiente.')
+    balance_before = wallet.payout_balance
+    wallet.payout_balance -= payout.amount
+    wallet.total_withdrawn += payout.amount
+    wallet.save(update_fields=['reserved_balance', 'payout_balance', 'total_withdrawn'])
+    balance_after = wallet.payout_balance
+
+    txn = WalletTransaction.objects.create(
+        wallet=wallet, type='withdrawal', amount=-payout.amount,
+        balance_before=balance_before, balance_after=balance_after,
+        reference_type='payout', reference_id=payout.id,
+        description=f'Saque ({payout.get_method_display()})', status='completed',
+    )
+    WalletEntry.objects.create(
+        wallet=wallet, transaction=txn, direction='debit', amount=payout.amount,
+        balance_before=balance_before, balance_after=balance_after, kind='payout',
+    )
+
+    payout.status = 'paid'
+    payout.paid_by = admin
+    payout.paid_at = timezone.now()
+    payout.admin_reference = reference or ''
+    payout.save(update_fields=['status', 'paid_by', 'paid_at', 'admin_reference'])
+    return payout
+
+
+@transaction.atomic
+def reject_payout(payout, admin, reason=''):
+    if payout.status not in ('pending', 'approved'):
+        return payout
+
+    wallet = Wallet.objects.select_for_update().get(pk=get_wallet(payout.user).pk)
+    wallet.reserved_balance = max(wallet.reserved_balance - payout.amount, Decimal('0'))
+    wallet.save(update_fields=['reserved_balance'])
+
+    payout.status = 'rejected'
+    payout.rejection_reason = reason or 'Rejeitado pelo admin'
+    payout.save(update_fields=['status', 'rejection_reason'])
+    return payout

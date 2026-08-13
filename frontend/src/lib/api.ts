@@ -374,6 +374,8 @@ export interface Review {
 export interface WalletInfo {
   balance: number;
   payout_balance: number;
+  reserved_balance: number;
+  available_payout: number;
   total_earned: number;
   total_withdrawn: number;
 }
@@ -661,8 +663,14 @@ export const walletAPI = {
   myWallet: () => api.get<WalletInfo>('/wallet/me/'),
   myTransactions: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<WalletTransaction>>('/wallet/me/transactions/', { params }),
-  requestPayout: (data: { amount: number; method: string; account_details: Record<string, string> }) =>
+  requestPayout: (data: { amount: number; method: string; account_details: Record<string, string>; role?: string }) =>
     api.post('/wallet/me/payouts/', data),
+  myPayouts: () => api.get<any[]>('/wallet/me/payouts/'),
+  adminPayouts: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<any>>('/wallet/admin/payouts/', { params }),
+  adminPayoutApprove: (id: string) => api.post(`/wallet/admin/payouts/${id}/approve/`),
+  adminPayoutPay: (id: string, reference: string) => api.post(`/wallet/admin/payouts/${id}/pay/`, { reference }),
+  adminPayoutReject: (id: string, reason: string) => api.post(`/wallet/admin/payouts/${id}/reject/`, { reason }),
 };
 
 export const reviewsAPI = {

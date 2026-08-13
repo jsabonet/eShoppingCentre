@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard, Package, ShoppingCart, LogOut, Plus, Edit, Trash2,
   TrendingUp, Users, DollarSign, Eye, X, ChevronLeft, ChevronRight,
-  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw, LifeBuoy, TicketPercent
+  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw, LifeBuoy, TicketPercent, Wallet
 } from 'lucide-react';
 import { adminAPI, productsAPI, ordersAPI, storesAPI, type Product as APIProduct } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -16,10 +16,11 @@ import AdminTickets from './admin/AdminTickets';
 import AdminCoupons from './admin/AdminCoupons';
 import AdminAbandonedCarts from './admin/AdminAbandonedCarts';
 import AdminAffiliates from './admin/AdminAffiliates';
+import AdminWallet from './admin/AdminWallet';
 
 const BACKEND_READY = true;
 
-type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates';
+type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet';
 
 interface Product {
   id: string;
@@ -640,6 +641,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
             { id: 'coupons', label: 'Cupões', icon: TicketPercent },
             { id: 'carts', label: 'Carrinhos', icon: Clock },
             { id: 'affiliates', label: 'Afiliados', icon: Users },
+            { id: 'wallet', label: 'Carteira', icon: Wallet },
             { id: 'categories', label: 'Categorias', icon: Filter },
             { id: 'blog', label: 'Blog', icon: Edit },
             { id: 'users', label: 'Utilizadores', icon: Users },
@@ -1257,6 +1259,9 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
 
         {/* Affiliates Tab (Admin) */}
         {activeTab === 'affiliates' && <AdminAffiliates />}
+
+        {/* Wallet Tab (Admin) */}
+        {activeTab === 'wallet' && <AdminWallet />}
 
         {/* Confirm Action Modal */}
         {confirmModal && (

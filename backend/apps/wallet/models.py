@@ -6,6 +6,7 @@ class Wallet(BaseModel):
     user = models.OneToOneField('users.User', on_delete=models.CASCADE, related_name='wallet')
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text='Saldo comprável (buyer)')
     payout_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text='Saldo virtual disponível para saque (vendedor/afiliado)')
+    reserved_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text='Valor reservado em pedidos de saque pendentes/aprovados')
     total_earned = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_withdrawn = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
@@ -84,3 +85,42 @@ class EscrowHolding(BaseModel):
 
     def __str__(self):
         return f'Escrow {self.order.order_number} — {self.amount} MZN ({self.status})'
+
+
+class PayoutRequest(BaseModel):
+    """Pedido de saque — pagamento manual executado pelo admin."""
+    ROLE_CHOICES = [
+        ('seller', 'Vendedor'),
+        ('affiliate', 'Afiliado'),
+    ]
+    METHOD_CHOICES = [
+        ('mpesa', 'M-Pesa'),
+        ('emola', 'e-Mola'),
+        ('bank', 'Transferência Bancária'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'Pendente'),
+        ('approved', 'Aprovado'),
+        ('paid', 'Pago'),
+        ('rejected', 'Rejeitado'),
+    ]
+
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='payout_requests')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='seller')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    method = models.CharField(max_length=20, choices=METHOD_CHOICES, default='mpesa')
+    account_details = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    approved_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='wallet_approved_payouts')
+    paid_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='wallet_paid_payouts')
+    admin_reference = models.CharField(max_length=255, blank=True, help_text='Referência/confirmação do pagamento manual')
+    approved_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.role} {self.user.email} — {self.amount} MZN ({self.status})'
