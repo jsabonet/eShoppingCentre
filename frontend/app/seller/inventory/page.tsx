@@ -235,9 +235,9 @@ export default function InventoryPage() {
                 <button onClick={() => setHistoryModal(null)} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
               </div>
               <p className="text-sm text-muted-foreground mb-4">Stock atual: <span className="font-bold">{historyModal.stock}</span></p>
-              {historyModal.stock_logs?.length > 0 ? (
+              {(historyModal.stock_logs ?? []).length > 0 ? (
                 <div className="space-y-2">
-                  {historyModal.stock_logs.map((log: any) => (
+                  {(historyModal.stock_logs ?? []).map((log: any) => (
                     <div key={log.id} className="flex items-start gap-2 text-xs border-b border-border pb-2">
                       <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${log.quantity > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
                       <div className="flex-1">
