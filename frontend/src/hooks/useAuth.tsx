@@ -26,6 +26,8 @@ interface AuthContextType {
     phone?: string;
   }) => Promise<void>;
   logout: () => void;
+  /** Refresca o utilizador autenticado (ex: após tornar-se afiliado). */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -140,8 +142,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register: registerFn,
         logout,
+        refreshUser: checkAuth,
         loginWithGoogle,
-      }), [user, loading, login, registerFn, logout, loginWithGoogle])}
+      }), [user, loading, login, registerFn, logout, loginWithGoogle, checkAuth])}
     >
       {/* Session expiry warning modal */}
       {user && showWarning && (

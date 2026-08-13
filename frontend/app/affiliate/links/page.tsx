@@ -24,7 +24,7 @@ export default function AffiliateLinksPage() {
     try {
       const [linksRes, prodRes] = await Promise.all([
         affiliatesAPI.myLinks(),
-        fetch(`${API_URL}/products/?page_size=100`, { headers: headers() }).then(r => r.ok ? r.json() : null),
+        fetch(`${API_URL}/products/?page_size=100&affiliate_enabled=true`, { headers: headers() }).then(r => r.ok ? r.json() : null),
       ]);
       setLinks(Array.isArray(linksRes.data) ? linksRes.data : linksRes.data.results || []);
       const prodData = prodRes?.results || prodRes || [];

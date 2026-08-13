@@ -22,6 +22,12 @@ class AffiliateRegisterView(APIView):
             user=request.user,
             defaults={'referral_code': uuid.uuid4().hex[:12].upper()}
         )
+        # Garantir que o utilizador tem o papel 'affiliate'
+        roles = set(request.user.roles or [])
+        if 'affiliate' not in roles:
+            roles.add('affiliate')
+            request.user.roles = list(roles)
+            request.user.save(update_fields=['roles'])
         return Response(AffiliateProfileSerializer(profile).data,
                        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 

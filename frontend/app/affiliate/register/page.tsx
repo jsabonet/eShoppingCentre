@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Gift, Check, DollarSign, Users, TrendingUp, Loader2 } from 'lucide-react';
+import { Gift, Check, DollarSign, Users, TrendingUp, Loader2, LogIn } from 'lucide-react';
 import { affiliatesAPI } from '@/src/lib/api';
+import { useAuth } from '@/src/hooks/useAuth';
 
 const benefits = [
   { icon: DollarSign, title: 'Comissões Atrativas', desc: 'Ganhe até 15% por venda realizada através dos seus links.' },
@@ -19,7 +20,8 @@ function LinkIcon(props: { size?: number; className?: string }) {
 
 export default function AffiliateRegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', agree: false });
+  const { isAuthenticated, isAffiliate, user, refreshUser } = useAuth();
+  const [agree, setAgree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -29,6 +31,7 @@ export default function AffiliateRegisterPage() {
     setError('');
     try {
       await affiliatesAPI.register();
+      await refreshUser();
       router.push('/affiliate/dashboard');
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Erro ao criar conta de afiliado. Tente novamente.');
@@ -90,37 +93,46 @@ export default function AffiliateRegisterPage() {
           {/* Form */}
           <div className="bg-card border border-border rounded-xl p-6">
             <h2 className="text-xl font-bold mb-6">Criar Conta de Afiliado</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Nome Completo *</label>
-                <input type="text" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})}
-                  className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" required />
+            {isAffiliate ? (
+              <div className="text-center py-6">
+                <div className="inline-flex p-3 bg-green-100 rounded-full mb-3"><Check size={28} className="text-green-600" /></div>
+                <p className="font-medium mb-1">Já é um afiliado!</p>
+                <p className="text-sm text-muted-foreground mb-4">A sua conta de afiliado está activa.</p>
+                <Link href="/affiliate/dashboard" className="inline-block px-5 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90">
+                  Ir para o Painel
+                </Link>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Email *</label>
-                <input type="email" value={form.email} onChange={(e) => setForm({...form, email: e.target.value})}
-                  className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" required />
+            ) : !isAuthenticated ? (
+              <div className="text-center py-6">
+                <div className="inline-flex p-3 bg-muted rounded-full mb-3"><LogIn size={28} className="text-muted-foreground" /></div>
+                <p className="font-medium mb-1">Precisa de entrar na sua conta</p>
+                <p className="text-sm text-muted-foreground mb-4">Crie uma conta gratuita ou entre para se tornar afiliado.</p>
+                <Link href="/login?redirect=/affiliate/register" className="inline-block px-5 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90">
+                  Entrar / Criar Conta
+                </Link>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Telefone</label>
-                <input type="tel" value={form.phone} onChange={(e) => setForm({...form, phone: e.target.value})}
-                  className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="+258 84 000 0000" />
-              </div>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" checked={form.agree} onChange={(e) => setForm({...form, agree: e.target.checked})}
-                  className="mt-1 accent-accent" required />
-                <span className="text-sm text-muted-foreground">
-                  Concordo com os <Link href="/terms" className="text-accent hover:underline">Termos do Programa de Afiliados</Link>
-                </span>
-              </label>
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
-              )}
-              <button type="submit" disabled={submitting}
-                className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
-                {submitting ? <Loader2 size={18} className="animate-spin" /> : <Gift size={18} />} Tornar-me Afiliado
-              </button>
-            </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="p-3 bg-muted/40 rounded-lg space-y-1">
+                  <p className="text-sm font-medium">{user?.first_name ? `${user.first_name} ${user?.last_name || ''}`.trim() : (user?.username || user?.email)}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)}
+                    className="mt-1 accent-accent" required />
+                  <span className="text-sm text-muted-foreground">
+                    Concordo com os <Link href="/terms" className="text-accent hover:underline">Termos do Programa de Afiliados</Link>
+                  </span>
+                </label>
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
+                )}
+                <button type="submit" disabled={submitting}
+                  className="w-full px-6 py-3 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+                  {submitting ? <Loader2 size={18} className="animate-spin" /> : <Gift size={18} />} Tornar-me Afiliado
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>
