@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { Lock } from 'lucide-react';
 
-// Logos oficiais (marcas registadas) — coloque os ficheiros em /public/images/payments/
+// Logos oficiais (marcas registadas) — localizados na raiz de /public
 const PAYMENT_METHODS = [
-  { key: 'mpesa', name: 'M-Pesa', file: '/images/payments/mpesa.svg' },
-  { key: 'emola', name: 'e-Mola', file: '/images/payments/emola.svg' },
-  { key: 'visa', name: 'Visa', file: '/images/payments/visa.svg' },
-  { key: 'mastercard', name: 'Mastercard', file: '/images/payments/mastercard.svg' },
+  { key: 'mpesa', name: 'M-Pesa', file: '/m-pesa.png' },
+  { key: 'emola', name: 'e-Mola', file: '/e-mola.png' },
+  { key: 'visa', name: 'Visa', file: '/visa.png' },
+  { key: 'mastercard', name: 'Mastercard', file: '/mastercard.png' },
 ];
 
 function PaymentBadge({ method }: { method: { key: string; name: string; file: string } }) {
@@ -25,7 +25,7 @@ function PaymentBadge({ method }: { method: { key: string; name: string; file: s
         <img
           src={method.file}
           alt={method.name}
-          className="h-4 w-auto object-contain"
+          className="h-5 w-auto object-contain"
           onError={() => setFailed(true)}
         />
       )}
