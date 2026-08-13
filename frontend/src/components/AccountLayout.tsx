@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  User, ShoppingBag, MapPin, Download, Heart, LogOut, ChevronRight,
+  User, ShoppingBag, MapPin, Download, Heart, LogOut, ChevronLeft, ChevronRight,
   Package, Settings, Store, Gift, Menu, X, LayoutDashboard, BookOpen, MessageCircle, LifeBuoy
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -59,6 +59,7 @@ const navGroups: AccountNavGroup[] = [
 
 export default function AccountLayout({ children }: AccountLayoutProps) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [badges, setBadges] = useState<{ orders: number }>({ orders: 0 });
 
@@ -92,11 +93,20 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
 
       <div className="flex gap-8">
         {/* Sidebar Desktop */}
-        <aside className="hidden lg:block w-64 flex-shrink-0">
+        <aside className={`hidden lg:block ${collapsed ? 'w-16' : 'w-64'} flex-shrink-0 transition-all duration-300`}>
           <nav className="sticky top-32 space-y-1 bg-card border border-border rounded-xl p-3">
+            <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-end'} pb-1`}>
+              <button
+                onClick={() => setCollapsed(!collapsed)}
+                className="p-1.5 hover:bg-muted rounded-md transition-colors"
+                title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+              >
+                {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+              </button>
+            </div>
             {navGroups.map((group) => (
               <div key={group.label} className="mb-1">
-                {group.label && (
+                {!collapsed && group.label && (
                   <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</p>
                 )}
                 <div className="space-y-1">
@@ -108,16 +118,17 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        title={collapsed ? item.label : undefined}
+                        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${collapsed ? 'justify-center' : ''} ${
                           isActive
                             ? 'bg-accent text-accent-foreground'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                         }`}
                       >
-                        <Icon size={18} />
-                        <span className="flex-1">{item.label}</span>
+                        <Icon size={18} className="shrink-0" />
+                        {!collapsed && <span className="flex-1">{item.label}</span>}
                         {badgeCount > 0 && (
-                          <span className="min-w-[18px] h-[18px] text-[10px] bg-red-500 text-white font-bold rounded-full flex items-center justify-center px-1">
+                          <span className={`${collapsed ? 'absolute -top-0.5 -right-0.5 w-4 h-4 text-[9px]' : 'min-w-[18px] h-[18px] text-[10px]'} bg-red-500 text-white font-bold rounded-full flex items-center justify-center px-1`}>
                             {badgeCount}
                           </span>
                         )}
@@ -131,25 +142,28 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
             {isAdmin && (
               <Link
                 href="/admin"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title={collapsed ? 'Painel Admin' : undefined}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ${collapsed ? 'justify-center' : ''}`}
               >
-                <LayoutDashboard size={18} />
-                Painel Admin
+                <LayoutDashboard size={18} className="shrink-0" />
+                {!collapsed && <span>Painel Admin</span>}
               </Link>
             )}
             <Link
               href="/seller/dashboard"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title={collapsed ? 'Ser Vendedor' : undefined}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ${collapsed ? 'justify-center' : ''}`}
             >
-              <Store size={18} />
-              Ser Vendedor
+              <Store size={18} className="shrink-0" />
+              {!collapsed && <span>Ser Vendedor</span>}
             </Link>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+              title={collapsed ? 'Sair' : undefined}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors cursor-pointer ${collapsed ? 'justify-center' : ''}`}
             >
-              <LogOut size={18} />
-              Sair
+              <LogOut size={18} className="shrink-0" />
+              {!collapsed && <span>Sair</span>}
             </button>
           </nav>
         </aside>
