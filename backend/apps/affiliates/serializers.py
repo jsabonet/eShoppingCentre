@@ -50,7 +50,8 @@ class AffiliateSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = AffiliateSettings
         fields = ('id', 'cookie_window_days', 'default_commission_rate',
-                  'min_payout_amount', 'approve_after_days', 'clawback_days', 'payout_fee_percent')
+                  'min_payout_amount', 'approve_after_days', 'clawback_days', 'payout_fee_percent',
+                  'affiliate_program_active', 'min_commission_rate', 'max_commission_rate', 'terms_of_service')
 
 
 class AffiliatePayoutSerializer(serializers.ModelSerializer):

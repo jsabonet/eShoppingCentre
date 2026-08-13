@@ -107,6 +107,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
     digitalFileSize: product.digital_file_size || '',
     downloadLimit: product.download_limit ?? 3,
     downloadExpiryDays: product.download_expiry_days ?? 365,
+    affiliateEnabled: product.affiliate_enabled !== false,
+    affiliateCommission: product.affiliate_commission != null ? parseFloat(product.affiliate_commission) : undefined,
+    affiliateCookieDays: product.affiliate_cookie_days ?? null,
+    affiliateTerms: product.affiliate_terms || '',
     course: product.course ? { ...product.course, curriculum: courseCurriculum } : undefined,
     variants: (product.variants || []).map((v: any) => ({
       id: v.id, name: v.name, sku: v.sku || '',

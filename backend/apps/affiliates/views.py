@@ -11,6 +11,7 @@ from django.utils import timezone
 from .models import AffiliateProfile, AffiliateLink, AffiliateCommission, AffiliateSettings, AffiliatePayout, AffiliateKYC
 from .serializers import (AffiliateProfileSerializer, AffiliateLinkSerializer, AffiliateCommissionSerializer,
                           AffiliateSettingsSerializer, AffiliatePayoutSerializer, AffiliateKYCSerializer)
+from apps.products.models import Product
 
 
 class AffiliateRegisterView(APIView):
@@ -55,6 +56,17 @@ class CreateAffiliateLinkView(APIView):
     def post(self, request):
         profile = request.user.affiliate_profile
         product_id = request.data.get('product_id')
+
+        product = Product.objects.filter(id=product_id, status='active').first()
+        if not product:
+            return Response({'detail': 'Produto não encontrado.'}, status=400)
+
+        settings_obj = AffiliateSettings.get_settings()
+        if not settings_obj.affiliate_program_active:
+            return Response({'detail': 'O programa de afiliados está temporariamente desactivado.'}, status=400)
+        if not product.affiliate_enabled:
+            return Response({'detail': 'Este produto não está disponível para afiliação.'}, status=400)
+
         link, created = AffiliateLink.objects.get_or_create(
             affiliate=profile,
             product_id=product_id,
@@ -217,16 +229,26 @@ class StoreAffiliatesView(APIView):
 def affiliate_click(request, code):
     """GET /r/{code}/ — regista o clique, define cookie de atribuição e redireciona."""
     link = AffiliateLink.objects.filter(code=code).select_related('product', 'affiliate').first()
+    target = f'{settings.FRONTEND_URL}/product/{link.product.slug}' if link else settings.FRONTEND_URL
+
     if link and link.affiliate.is_active:
+        settings_obj = AffiliateSettings.get_settings()
+        product_enabled = getattr(link.product, 'affiliate_enabled', True)
+        program_active = settings_obj.affiliate_program_active
+
+        # Produto desligado ou programa global inactivo: redirecciona sem atribuir
+        if not product_enabled or not program_active:
+            return redirect(target)
+
         AffiliateLink.objects.filter(pk=link.pk).update(clicks=F('clicks') + 1)
         AffiliateProfile.objects.filter(pk=link.affiliate_id).update(total_clicks=F('total_clicks') + 1)
 
-        target = f'{settings.FRONTEND_URL}/product/{link.product.slug}'
+        # Janela de cookie: produto > global
+        cookie_days = link.product.affiliate_cookie_days or settings_obj.cookie_window_days
         response = redirect(target)
-        # Cookie de atribuição: 30 dias (padrão internacional)
-        response.set_cookie('ref', link.code, max_age=30 * 24 * 60 * 60, samesite='Lax')
+        response.set_cookie('ref', link.code, max_age=cookie_days * 24 * 60 * 60, samesite='Lax')
         return response
-    return redirect(settings.FRONTEND_URL)
+    return redirect(target)
 
 
 # ─── Admin ───

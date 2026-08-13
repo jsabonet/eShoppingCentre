@@ -299,6 +299,23 @@ export default function AdminAffiliates() {
                 <input type="number" step="0.01" min="0" value={settings.default_commission_rate} onChange={e => setSettings({ ...settings, default_commission_rate: Number(e.target.value) })}
                   className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
               </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={settings.affiliate_program_active !== false} onChange={e => setSettings({ ...settings, affiliate_program_active: e.target.checked })}
+                  className="accent-accent rounded w-4 h-4" />
+                <span className="font-medium">Programa de afiliados activo</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Comissão mínima (%)</label>
+                  <input type="number" step="0.01" min="0" value={settings.min_commission_rate} onChange={e => setSettings({ ...settings, min_commission_rate: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Comissão máxima (%)</label>
+                  <input type="number" step="0.01" min="0" value={settings.max_commission_rate} onChange={e => setSettings({ ...settings, max_commission_rate: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-semibold mb-1">Valor mínimo de saque (MZN)</label>
                 <input type="number" step="0.01" min="0" value={settings.min_payout_amount} onChange={e => setSettings({ ...settings, min_payout_amount: Number(e.target.value) })}
@@ -317,6 +334,12 @@ export default function AdminAffiliates() {
               <div>
                 <label className="block text-xs font-semibold mb-1">Taxa de saque (%)</label>
                 <input type="number" step="0.01" min="0" value={settings.payout_fee_percent} onChange={e => setSettings({ ...settings, payout_fee_percent: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">Termos de serviço globais</label>
+                <textarea rows={4} value={settings.terms_of_service || ''} onChange={e => setSettings({ ...settings, terms_of_service: e.target.value })}
+                  placeholder="Termos exibidos na Área de Afiliação..."
                   className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
               </div>
               <button type="submit" disabled={saving}

@@ -212,10 +212,13 @@ class CreateOrderSerializer(serializers.Serializer):
         affiliate_commission = 0
         effective_rate = None
         if affiliate_code:
-            from apps.affiliates.models import AffiliateLink
+            from apps.affiliates.models import AffiliateLink, AffiliateSettings
             from apps.affiliates.services import get_tier_multiplier
+            settings_obj = AffiliateSettings.get_settings()
             link = AffiliateLink.objects.filter(code=affiliate_code).select_related('affiliate', 'product').first()
-            if link and link.affiliate.is_active and link.affiliate.user != user:  # anti auto-referência
+            if (settings_obj.affiliate_program_active and link and link.affiliate.is_active
+                    and link.affiliate.user != user  # anti auto-referência
+                    and getattr(link.product, 'affiliate_enabled', True)):
                 affiliate = link.affiliate.user
                 affiliate_profile = link.affiliate
                 affiliate_link = link
@@ -225,6 +228,9 @@ class CreateOrderSerializer(serializers.Serializer):
                     for item in store_data['items']:
                         # Bloquear comissão sobre produtos da própria loja do afiliado
                         if item['product'].store.owner_id == link.affiliate.user_id:
+                            continue
+                        # Só produtos com afiliação habilitada geram comissão
+                        if not getattr(item['product'], 'affiliate_enabled', True):
                             continue
                         affiliate_commission += (item['total_price'] * item['product'].affiliate_commission * multiplier) / 100
                 # Se nenhum item for elegível, não atribuir comissão

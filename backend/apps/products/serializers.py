@@ -56,7 +56,8 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'slug', 'price', 'compare_price',
                   'discount_percentage', 'primary_image', 'product_type',
                   'rating', 'review_count', 'sales_count', 'is_on_sale',
-                  'stock', 'store_name', 'store_slug', 'created_at')
+                  'stock', 'store_name', 'store_slug', 'created_at',
+                  'affiliate_enabled', 'affiliate_commission', 'affiliate_cookie_days')
 
     def get_primary_image(self, obj):
         img = obj.images.filter(is_primary=True).first()
@@ -88,7 +89,8 @@ class SellerProductSerializer(serializers.ModelSerializer):
                   'is_featured', 'variant_count', 'created_at',
                   'digital_format', 'digital_license', 'digital_version',
                   'download_limit', 'download_expiry_days', 'digital_downloads',
-                  'course', 'stock_logs')
+                  'course', 'stock_logs',
+                  'affiliate_commission', 'affiliate_enabled', 'affiliate_cookie_days', 'affiliate_terms')
 
     def get_primary_image(self, obj):
         img = obj.images.filter(is_primary=True).first()
@@ -203,6 +205,17 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             }
         except Exception:
             return None
+
+    def validate_affiliate_commission(self, value):
+        from apps.affiliates.models import AffiliateSettings
+        settings_obj = AffiliateSettings.get_settings()
+        if value < settings_obj.min_commission_rate:
+            raise serializers.ValidationError(
+                f'A comissão mínima permitida é {settings_obj.min_commission_rate}%.')
+        if value > settings_obj.max_commission_rate:
+            raise serializers.ValidationError(
+                f'A comissão máxima permitida é {settings_obj.max_commission_rate}%.')
+        return value
 
 
 from django.utils.text import slugify

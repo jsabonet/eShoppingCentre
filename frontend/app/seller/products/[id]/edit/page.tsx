@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Upload, Save, ArrowLeft, X, FileText, BookOpen, Box, Info, Check, ChevronRight, Plus, Layers, Trash2, ImagePlus } from 'lucide-react';
+import { Upload, Save, ArrowLeft, X, FileText, BookOpen, Box, Info, Check, ChevronRight, Plus, Layers, Trash2, ImagePlus, Users } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import Link from 'next/link';
 import SellerLayout from '@/src/components/SellerLayout';
@@ -104,6 +104,8 @@ export default function EditProductPage() {
     is_active: true, is_featured: false, is_on_sale: false,
     // Extra
     warranty_days: '0', commission: '10',
+    // Afiliação
+    affiliate_enabled: true, affiliate_cookie_days: '', affiliate_terms: '',
     // Type-specific
     digitalFile: null as File | null,
     instructorName: '', courseLevel: 'iniciante', courseDuration: '', courseLessons: '',
@@ -159,6 +161,9 @@ export default function EditProductPage() {
           video_url: d.video_url || '',
           warranty_days: String(d.warranty_days ?? '0'),
           commission: String(data.affiliate_commission ?? '10'),
+          affiliate_enabled: data.affiliate_enabled !== false,
+          affiliate_cookie_days: d.affiliate_cookie_days != null ? String(d.affiliate_cookie_days) : '',
+          affiliate_terms: d.affiliate_terms || '',
           is_active: data.status === 'active', is_featured: d.is_featured || false,
           is_on_sale: data.is_on_sale || false, digitalFile: null,
           instructorName: d.instructor_name || '',
@@ -285,6 +290,9 @@ export default function EditProductPage() {
       if (form.compare_price) formData.append('compare_price', form.compare_price);
       formData.append('category', form.category); formData.append('product_type', productType);
       formData.append('affiliate_commission', form.commission);
+      formData.append('affiliate_enabled', String(form.affiliate_enabled));
+      if (form.affiliate_cookie_days) formData.append('affiliate_cookie_days', form.affiliate_cookie_days);
+      if (form.affiliate_terms) formData.append('affiliate_terms', form.affiliate_terms);
       formData.append('status', form.is_active ? 'active' : 'draft');
       formData.append('is_featured', String(form.is_featured));
       formData.append('is_on_sale', String(form.is_on_sale));
@@ -743,6 +751,25 @@ export default function EditProductPage() {
                   ))}
                 </div>
 
+                {/* ─── Afiliação ─── */}
+                <div className="mt-4">
+                  <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${form.affiliate_enabled ? 'border-accent bg-accent/[0.03]' : 'border-border hover:bg-muted/20'}`}>
+                    <input type="checkbox" checked={form.affiliate_enabled} onChange={(e) => updateField('affiliate_enabled', e.target.checked)}
+                      className="accent-accent rounded w-4 h-4 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Disponível para Afiliados</p>
+                      <p className="text-[11px] text-muted-foreground">Permitir que afiliados promovam este produto e ganhem comissão</p>
+                    </div>
+                  </label>
+                  {form.affiliate_enabled && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                      <Field label="Comissão" hint="%"><input type="number" value={form.commission} onChange={(e) => updateField('commission', e.target.value)} min="0" max="100" step="0.5" className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" /></Field>
+                      <Field label="Janela de Cookie" hint="dias (vazio = global)"><input type="number" min="0" value={form.affiliate_cookie_days} onChange={(e) => updateField('affiliate_cookie_days', e.target.value)} placeholder="Ex: 30" className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" /></Field>
+                      <Field label="Termos" hint="opcional"><input type="text" value={form.affiliate_terms} onChange={(e) => updateField('affiliate_terms', e.target.value)} placeholder="Ex: não acumulável com cupões" className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" /></Field>
+                    </div>
+                  )}
+                </div>
+
                 {/* Resumo */}
                 <div className="mt-4 p-4 bg-muted/30 rounded-xl border border-border space-y-1.5">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Resumo do Produto</p>
@@ -775,7 +802,7 @@ export default function EditProductPage() {
                       {form.courseLessons && <p className="text-sm"><span className="text-muted-foreground">Aulas:</span> {form.courseLessons}</p>}
                     </>
                   )}
-                  <p className="text-sm"><span className="text-muted-foreground">Comissao Afiliados:</span> {form.commission}%</p>
+                  <p className="text-sm"><span className="text-muted-foreground">Afiliacao:</span> {form.affiliate_enabled ? `Sim — ${form.commission}%` : 'Desactivada'}</p>
                   <p className="text-sm"><span className="text-muted-foreground">Imagens:</span> {mainImage ? '1 principal' : '0'}{thumbnailPreviews.length > 0 ? ` + ${thumbnailPreviews.length} miniaturas` : ''}</p>
                   {form.video_url && <p className="text-sm"><span className="text-muted-foreground">Video:</span> {form.video_url}</p>}
                   {form.tags && <p className="text-sm"><span className="text-muted-foreground">Tags:</span> {form.tags}</p>}

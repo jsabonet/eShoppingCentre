@@ -85,6 +85,9 @@ export interface Product {
   is_on_sale: boolean;
   stock: number;
   affiliate_commission: number;
+  affiliate_enabled: boolean;
+  affiliate_cookie_days: number | null;
+  affiliate_terms: string;
   status: string;
   created_at: string;
   course?: {
@@ -224,6 +227,20 @@ export interface AffiliateLink {
   clicks: number;
   conversions: number;
   short_url: string;
+}
+
+export interface AffiliateSettings {
+  id: string;
+  cookie_window_days: number;
+  default_commission_rate: number;
+  min_payout_amount: number;
+  approve_after_days: number;
+  clawback_days: number;
+  payout_fee_percent: number;
+  affiliate_program_active: boolean;
+  min_commission_rate: number;
+  max_commission_rate: number;
+  terms_of_service: string;
 }
 
 export interface Course {

@@ -80,6 +80,9 @@ class Product(BaseModel):
     review_count = models.PositiveIntegerField(default=0)
     sales_count = models.PositiveIntegerField(default=0)
     affiliate_commission = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
+    affiliate_enabled = models.BooleanField(default=True, help_text='Produto disponível para o programa de afiliados')
+    affiliate_cookie_days = models.PositiveIntegerField(null=True, blank=True, help_text='Janela de cookie específica (dias). Vazio = usa a global.')
+    affiliate_terms = models.TextField(blank=True, help_text='Termos adicionais de afiliação definidos pelo vendedor')
     tags = models.JSONField(default=list)
     specifications = models.JSONField(default=dict)
     digital_file = models.FileField(upload_to='products/digital/', blank=True,

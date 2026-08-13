@@ -62,6 +62,11 @@ export interface Product {
   digitalFileSize?: string;
   downloadLimit?: number;
   downloadExpiryDays?: number;
+  // Affiliate fields
+  affiliateEnabled?: boolean;
+  affiliateCommission?: number;
+  affiliateCookieDays?: number | null;
+  affiliateTerms?: string;
   // Course product fields
   course?: {
     course_id: string;

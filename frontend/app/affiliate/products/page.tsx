@@ -19,7 +19,7 @@ export default function AffiliateProductsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/products/?page_size=100`, {
+      const res = await fetch(`${API_URL}/products/?page_size=100&affiliate_enabled=true`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
       });
       const data = await res.ok ? await res.json() : null;
@@ -84,6 +84,9 @@ export default function AffiliateProductsPage() {
                       <Percent size={10} /> {Number(product.affiliate_commission || 10)}%
                     </span>
                   </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {product.affiliate_cookie_days ? `Cookie: ${product.affiliate_cookie_days} dias` : 'Cookie: padrão da plataforma'}
+                  </p>
                   {createdUrl ? (
                     <div className="mt-2">
                       <p className="text-[10px] text-muted-foreground font-mono truncate">{createdUrl}</p>

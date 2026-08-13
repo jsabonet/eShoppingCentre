@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Save, ArrowLeft, X, FileText, BookOpen, Box, Info, Check, ChevronRight, Plus, Layers, Trash2, ImagePlus, Shield, Download, Clock, Monitor } from 'lucide-react';
+import { Upload, Save, ArrowLeft, X, FileText, BookOpen, Box, Info, Check, ChevronRight, Plus, Layers, Trash2, ImagePlus, Shield, Download, Clock, Monitor, Users } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import Link from 'next/link';
 import SellerLayout from '@/src/components/SellerLayout';
@@ -92,6 +92,8 @@ export default function NewProductPage() {
     is_active: true, is_featured: false, is_on_sale: false,
     // Extra
     warranty_days: '0', commission: '10',
+    // Afiliação
+    affiliate_enabled: true, affiliate_cookie_days: '', affiliate_terms: '',
     // Type-specific — Digital
     digitalFile: null as File | null,
     digitalFormat: '',           // PDF, ZIP, MP3, MP4, etc.
@@ -229,6 +231,9 @@ export default function NewProductPage() {
       formData.append('category', form.category);
       formData.append('product_type', productType);
       formData.append('affiliate_commission', form.commission);
+      formData.append('affiliate_enabled', String(form.affiliate_enabled));
+      if (form.affiliate_cookie_days) formData.append('affiliate_cookie_days', form.affiliate_cookie_days);
+      if (form.affiliate_terms) formData.append('affiliate_terms', form.affiliate_terms);
 
       // Toggles
       formData.append('status', form.is_active ? 'active' : 'draft');
@@ -818,6 +823,25 @@ export default function NewProductPage() {
                   ))}
                 </div>
 
+                {/* ─── Afiliação ─── */}
+                <div className="mt-4">
+                  <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${form.affiliate_enabled ? 'border-accent bg-accent/3' : 'border-border hover:bg-muted/20'}`}>
+                    <input type="checkbox" checked={form.affiliate_enabled} onChange={(e) => updateField('affiliate_enabled', e.target.checked)}
+                      className="accent-accent rounded w-4 h-4 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Disponível para Afiliados</p>
+                      <p className="text-[11px] text-muted-foreground">Permitir que afiliados promovam este produto e ganhem comissão</p>
+                    </div>
+                  </label>
+                  {form.affiliate_enabled && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                      <Field label="Comissão" hint="%"><input type="number" value={form.commission} onChange={(e) => updateField('commission', e.target.value)} min="0" max="100" step="0.5" className="w-full h-11 px-4 rounded-xl border border-border bg-card placeholder:text-muted-foreground transition-all duration-200 hover:border-accent/30 focus:border-accent focus:ring-4 focus:ring-ring/20 focus:outline-none" /></Field>
+                      <Field label="Janela de Cookie" hint="dias (vazio = global)"><input type="number" min="0" value={form.affiliate_cookie_days} onChange={(e) => updateField('affiliate_cookie_days', e.target.value)} placeholder="Ex: 30" className="w-full h-11 px-4 rounded-xl border border-border bg-card placeholder:text-muted-foreground transition-all duration-200 hover:border-accent/30 focus:border-accent focus:ring-4 focus:ring-ring/20 focus:outline-none" /></Field>
+                      <Field label="Termos" hint="opcional"><input type="text" value={form.affiliate_terms} onChange={(e) => updateField('affiliate_terms', e.target.value)} placeholder="Ex: não acumulável com cupões" className="w-full h-11 px-4 rounded-xl border border-border bg-card placeholder:text-muted-foreground transition-all duration-200 hover:border-accent/30 focus:border-accent focus:ring-4 focus:ring-ring/20 focus:outline-none" /></Field>
+                    </div>
+                  )}
+                </div>
+
                 {/* Resumo */}
                 <div className="mt-4 p-4 bg-muted/30 rounded-xl border border-border space-y-1.5">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Resumo do Produto</p>
@@ -860,7 +884,7 @@ export default function NewProductPage() {
                       <p className="text-sm"><span className="text-muted-foreground">Acesso:</span> {form.accessDurationDays ? `${form.accessDurationDays} dias` : 'Vitalicio'}</p>
                     </>
                   )}
-                  <p className="text-sm"><span className="text-muted-foreground">Comissao Afiliados:</span> {form.commission}%</p>
+                  <p className="text-sm"><span className="text-muted-foreground">Afiliacao:</span> {form.affiliate_enabled ? `Sim — ${form.commission}%` : 'Desactivada'}</p>
                   <p className="text-sm"><span className="text-muted-foreground">Imagens:</span> {mainImage ? '1 principal' : '0'}{thumbnailPreviews.length > 0 ? ` + ${thumbnailPreviews.length} miniaturas` : ''}</p>
                   {form.video_url && <p className="text-sm"><span className="text-muted-foreground">Video:</span> {form.video_url}</p>}
                   {form.tags && <p className="text-sm"><span className="text-muted-foreground">Tags:</span> {form.tags}</p>}

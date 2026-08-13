@@ -11,8 +11,9 @@ class ProductFilter(django_filters.FilterSet):
     is_featured = django_filters.BooleanFilter()
     min_rating = django_filters.NumberFilter(field_name='rating', lookup_expr='gte')
     status = django_filters.CharFilter(field_name='status', lookup_expr='exact')
+    affiliate_enabled = django_filters.BooleanFilter()
 
     class Meta:
         model = Product
         fields = ['product_type', 'category', 'store', 'min_price', 'max_price',
-                  'is_on_sale', 'is_featured', 'min_rating', 'status']
+                  'is_on_sale', 'is_featured', 'min_rating', 'status', 'affiliate_enabled']

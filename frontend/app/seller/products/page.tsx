@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Package, Plus, Search, Edit, Trash2, RefreshCw, Layers, Download, FileText, GraduationCap, History, X, AlertCircle, ShoppingBag, Undo2, RotateCcw, Pencil } from 'lucide-react';
+import { Package, Plus, Search, Edit, Trash2, RefreshCw, Layers, Download, FileText, GraduationCap, History, X, AlertCircle, ShoppingBag, Undo2, RotateCcw, Pencil, Users } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { productsAPI, storesAPI } from '@/src/lib/api';
@@ -173,6 +173,11 @@ export default function SellerProductsPage() {
                           <span className="font-medium truncate block max-w-[200px]">{product.name}</span>
                           {storeType === 'digital' && pData.digital_version && (
                             <span className="text-[10px] text-muted-foreground">{pData.digital_version}</span>
+                          )}
+                          {product.affiliate_enabled !== false && (
+                            <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] px-1.5 py-0.5 bg-violet-50 text-violet-700 rounded-full font-medium">
+                              <Users size={10} /> Afiliável {Number(product.affiliate_commission ?? 10)}%
+                            </span>
                           )}
                         </div>
                       </div>

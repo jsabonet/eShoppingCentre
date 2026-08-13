@@ -1,10 +1,12 @@
 ﻿"use client";
 
 import { useState } from 'react';
-import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play, Download, Monitor, FileText, GraduationCap, BookOpen, Award, Users, ChevronDown, Store, MessageCircle } from 'lucide-react';
+import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play, Download, Monitor, FileText, GraduationCap, BookOpen, Award, Users, ChevronDown, Store, MessageCircle, Link2, Copy, Check, Loader2, X } from 'lucide-react';
 import ChatButton from './ChatButton';
 import ProductReviews from './ProductReviews';
 import { CartProvider, useCart } from '../contexts/CartContext';
+import { useAuth } from '@/src/hooks/useAuth';
+import { affiliatesAPI } from '@/src/lib/api';
 import ProductCard from './ProductCard';
 import CartDrawer from './CartDrawer';
 import ProductImageGallery from './ProductImageGallery';
@@ -51,6 +53,39 @@ function StarRatingLg({ rating }: { rating: number }) {
 
 function ProductDetailContent({ product, categoryName, categorySlug, relatedProducts }: ProductDetailShopProps) {
   const { addToCart } = useCart();
+  const { isAuthenticated, isAffiliate } = useAuth();
+  const [affiliateOpen, setAffiliateOpen] = useState(false);
+  const [affiliateLoading, setAffiliateLoading] = useState(false);
+  const [affiliateLink, setAffiliateLink] = useState<string | null>(null);
+  const [affiliateError, setAffiliateError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const promoteProduct = async () => {
+    setAffiliateLoading(true);
+    setAffiliateError('');
+    try {
+      if (!isAffiliate) {
+        await affiliatesAPI.register();
+      }
+      const { data } = await affiliatesAPI.createLink(product.id);
+      setAffiliateLink(data.short_url);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setAffiliateError(typeof detail === 'string' ? detail : 'Não foi possível criar o link. Tente novamente.');
+    } finally {
+      setAffiliateLoading(false);
+    }
+  };
+
+  const copyAffiliateLink = async () => {
+    if (!affiliateLink) return;
+    try {
+      await navigator.clipboard.writeText(affiliateLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
   const isDigital = product.productType === 'digital';
   const isCourse = product.productType === 'course';
   const isPhysical = !product.productType || product.productType === 'physical';
@@ -408,6 +443,16 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                   </div>
                 )}
 
+                {/* Área de Afiliação */}
+                {product.affiliateEnabled && (
+                  <button
+                    onClick={() => setAffiliateOpen(true)}
+                    className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-dashed border-accent/50 text-accent rounded-md text-sm font-medium hover:bg-accent/5 transition-colors"
+                  >
+                    <Link2 size={16} /> Área de Afiliação
+                  </button>
+                )}
+
                 <div className="mt-4 pt-4 border-t border-border text-xs text-muted-foreground space-y-1">
                   {isCourse ? (
                     <>
@@ -726,6 +771,58 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
             </div>
           </div>
         </section>
+      )}
+
+      {/* Área de Afiliação Modal */}
+      {affiliateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setAffiliateOpen(false)} />
+          <div className="relative bg-card rounded-2xl p-6 w-full max-w-md shadow-2xl border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold flex items-center gap-2"><Link2 size={18} className="text-accent" /> Área de Afiliação</h3>
+              <button onClick={() => setAffiliateOpen(false)} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground shrink-0">Produto</span>
+                <span className="font-medium text-right truncate">{product.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Comissão</span>
+                <span className="font-bold text-green-600">{product.affiliateCommission ?? 10}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Janela de Cookie</span>
+                <span>{product.affiliateCookieDays ? `${product.affiliateCookieDays} dias` : 'Padrão da plataforma'}</span>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">Termos</p>
+                <p className="text-xs text-muted-foreground/80">{product.affiliateTerms || 'Termos padrão do programa de afiliados da plataforma.'}</p>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              {!isAuthenticated ? (
+                <a href="/login" className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors">
+                  Entrar para Promover
+                </a>
+              ) : affiliateLink ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground font-mono break-all">{affiliateLink}</p>
+                  <button onClick={copyAffiliateLink} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+                    {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? 'Copiado!' : 'Copiar Link'}
+                  </button>
+                </div>
+              ) : (
+                <button onClick={promoteProduct} disabled={affiliateLoading} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50">
+                  {affiliateLoading ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />} Promover este Produto
+                </button>
+              )}
+              {affiliateError && <p className="text-xs text-red-600 mt-2">{affiliateError}</p>}
+            </div>
+          </div>
+        </div>
       )}
 
       <CartDrawer />
