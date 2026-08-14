@@ -8,10 +8,15 @@ class WalletSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wallet
         fields = ('id', 'balance', 'payout_balance', 'reserved_balance', 'available_payout',
-                  'total_earned', 'total_withdrawn', 'is_active')
+                  'total_spent', 'total_earned', 'total_withdrawn', 'is_active')
 
     def get_available_payout(self, obj):
         return obj.payout_balance - obj.reserved_balance
+
+    def get_total_spent(self, obj):
+        from django.db.models import Sum
+        from apps.orders.models import Order
+        return Order.objects.filter(buyer=obj.user, payment_status='completed').aggregate(s=Sum('total'))['s'] or 0
 
 
 class PayoutRequestSerializer(serializers.ModelSerializer):

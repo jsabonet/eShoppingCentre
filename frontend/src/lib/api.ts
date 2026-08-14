@@ -376,6 +376,7 @@ export interface WalletInfo {
   payout_balance: number;
   reserved_balance: number;
   available_payout: number;
+  total_spent: number;
   total_earned: number;
   total_withdrawn: number;
 }

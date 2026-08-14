@@ -74,7 +74,7 @@ export default function AdminWallet() {
 
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold flex items-center gap-2"><Wallet size={18} /> Carteira & Reconciliação</h2>
+          <h2 className="text-lg font-bold flex items-center gap-2"><Wallet size={18} /> Saques & Reconciliação</h2>
           <p className="text-sm text-muted-foreground">{pending} saques pendentes · pagamento manual pelo admin</p>
         </div>
         <button onClick={load} className="p-2 hover:bg-muted rounded-lg"><RefreshCw size={16} /></button>

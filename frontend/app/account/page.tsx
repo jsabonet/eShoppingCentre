@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, Heart, Download, MapPin, ShoppingBag, ChevronRight, BookOpen } from 'lucide-react';
+import { Package, Heart, Download, MapPin, ShoppingBag, ChevronRight, BookOpen, Wallet } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import AccountLayout from '@/src/components/AccountLayout';
 import { useAuth } from '@/src/hooks/useAuth';
-import { ordersAPI, usersAPI, type Order, type User } from '@/src/lib/api';
+import { ordersAPI, usersAPI, walletAPI, type Order, type User } from '@/src/lib/api';
 
 export default function AccountPage() {
   const router = useRouter();
@@ -18,6 +18,8 @@ export default function AccountPage() {
   const [addressCount, setAddressCount] = useState(0);
   const [courseCount, setCourseCount] = useState(0);
   const [downloadCount, setDownloadCount] = useState(0);
+  const [balance, setBalance] = useState(0);
+  const [totalSpent, setTotalSpent] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -31,7 +33,7 @@ export default function AccountPage() {
 
   const loadData = async () => {
     try {
-      const [ordersRes, wishlistRes, addressesRes, coursesRes, downloadsRes] = await Promise.allSettled([
+      const [ordersRes, wishlistRes, addressesRes, coursesRes, downloadsRes, walletRes] = await Promise.allSettled([
         ordersAPI.myOrders({ page_size: 5 }),
         usersAPI.myWishlist(),
         usersAPI.myAddresses(),
@@ -41,6 +43,7 @@ export default function AccountPage() {
         fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/products/downloads/`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
         }).then(r => r.ok ? r.json() : Promise.reject(r)),
+        walletAPI.myWallet(),
       ]);
 
       if (ordersRes.status === 'fulfilled') {
@@ -62,6 +65,10 @@ export default function AccountPage() {
       if (downloadsRes.status === 'fulfilled') {
         const data = downloadsRes.value as any;
         setDownloadCount(Array.isArray(data) ? data.length : data.results?.length || data.count || 0);
+      }
+      if (walletRes.status === 'fulfilled') {
+        setBalance(Number(walletRes.value.data?.balance || 0));
+        setTotalSpent(Number(walletRes.value.data?.total_spent || 0));
       }
     } catch {} finally {
       setOrdersLoading(false);
@@ -101,6 +108,18 @@ export default function AccountPage() {
         <div className="bg-gradient-to-r from-accent/10 to-primary/5 rounded-xl p-6 border border-accent/20">
           <h2 className="text-xl font-bold mb-1">Bem-vindo, {user?.first_name || user?.username || 'Utilizador'}! 👋</h2>
           <p className="text-muted-foreground">{user?.email}</p>
+          {balance > 0 && (
+            <p className="mt-3 text-sm">
+              <Wallet size={14} className="inline mr-1 text-emerald-600" />
+              Saldo de reembolsos: <strong>{balance.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</strong>
+            </p>
+          )}
+          {totalSpent > 0 && (
+            <p className="mt-1 text-sm">
+              <ShoppingBag size={14} className="inline mr-1 text-muted-foreground" />
+              Total gasto: <strong>{totalSpent.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</strong>
+            </p>
+          )}
         </div>
 
         {/* Quick Stats */}

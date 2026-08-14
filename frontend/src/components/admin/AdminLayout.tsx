@@ -44,7 +44,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { href: '/admin?tab=users', label: 'Utilizadores', icon: Users },
       { href: '/admin?tab=blog', label: 'Blog', icon: Edit },
-      { href: '/admin?tab=wallet', label: 'Carteira', icon: Wallet },
+      { href: '/admin?tab=wallet', label: 'Saques', icon: Wallet },
     ],
   },
 ];

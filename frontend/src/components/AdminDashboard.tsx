@@ -641,7 +641,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
             { id: 'coupons', label: 'Cupões', icon: TicketPercent },
             { id: 'carts', label: 'Carrinhos', icon: Clock },
             { id: 'affiliates', label: 'Afiliados', icon: Users },
-            { id: 'wallet', label: 'Carteira', icon: Wallet },
+            { id: 'wallet', label: 'Saques', icon: Wallet },
             { id: 'categories', label: 'Categorias', icon: Filter },
             { id: 'blog', label: 'Blog', icon: Edit },
             { id: 'users', label: 'Utilizadores', icon: Users },
