@@ -5,7 +5,6 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import {
   getAuth,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   signOut,
@@ -63,44 +62,16 @@ function getGoogleProvider(): GoogleAuthProvider {
 }
 
 /**
- * Sign in with Google.
- * Tries popup first; falls back to redirect if popup is blocked.
- * Returns the Firebase ID token to exchange for backend JWT.
+ * Inicia o login com Google usando REDIRECT (fluxo recomendado para browsers
+ * modernos que bloqueiam cookies de terceiros — Chrome, Safari, Brave).
+ *
+ * Após o utilizador escolher a conta, o browser regressa ao site e o token é
+ * capturado por `completeRedirectSignIn()` (que usa `getRedirectResult`),
+ * chamada uma única vez no carregamento da página.
  */
-export async function signInWithGoogle(): Promise<{
-  idToken: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  firebaseUid: string;
-}> {
+export async function signInWithGoogle(): Promise<void> {
   const auth = getFirebaseAuth();
-  const provider = getGoogleProvider();
-
-  try {
-    const result = await signInWithPopup(auth, provider);
-    const idToken = await result.user.getIdToken();
-
-    return {
-      idToken,
-      email: result.user.email,
-      displayName: result.user.displayName,
-      photoURL: result.user.photoURL,
-      firebaseUid: result.user.uid,
-    };
-  } catch (error: any) {
-    // If popup is blocked or closed, fall back to redirect
-    if (
-      error?.code === 'auth/popup-blocked' ||
-      error?.code === 'auth/popup-closed-by-user'
-    ) {
-      await signInWithRedirect(auth, provider);
-      // The page will redirect — this promise never resolves.
-      // Return a never-resolving promise to avoid downstream errors.
-      return new Promise(() => {});
-    }
-    throw error;
-  }
+  await signInWithRedirect(auth, getGoogleProvider());
 }
 
 /**

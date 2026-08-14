@@ -115,19 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const loginWithGoogle = useCallback(async (): Promise<{ isNewUser: boolean }> => {
-    // Step 1: Firebase popup → get ID token
-    const { idToken } = await signInWithGoogle();
-
-    // Step 2: Exchange Firebase ID token for backend JWT
-    const { data } = await authAPI.firebaseLogin(idToken);
-
-    localStorage.setItem('access_token', data.access);
-    localStorage.setItem('refresh_token', data.refresh);
-
-    // User info already comes in the response from firebaseLogin
-    setUser(data.user);
-
-    return { isNewUser: data.is_new_user };
+    // Fluxo redirect: inicia o redirect para o Google.
+    // Ao regressar ao site, o effect `handleRedirect` captura o resultado via
+    // getRedirectResult() e faz o exchange do ID token pelo JWT do backend.
+    await signInWithGoogle();
+    return { isNewUser: false };
   }, []);
 
   return (
