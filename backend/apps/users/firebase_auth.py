@@ -67,11 +67,13 @@ class FirebaseAuthBackend(BaseBackend):
             if email:
                 try:
                     user = User.objects.get(email=email)
+                    # Segurança: só ligar Google a contas com email já verificado (anti pre-hijacking)
+                    if not user.is_verified:
+                        return None
                     # Link Firebase UID to existing account
                     user.firebase_uid = firebase_uid
                     user.auth_provider = 'google'
-                    user.is_verified = True
-                    user.save(update_fields=['firebase_uid', 'auth_provider', 'is_verified'])
+                    user.save(update_fields=['firebase_uid', 'auth_provider'])
                     return user
                 except User.DoesNotExist:
                     pass
@@ -145,10 +147,15 @@ class FirebaseIDTokenAuthentication(authentication.BaseAuthentication):
             if email:
                 try:
                     user = User.objects.get(email=email)
+                    # Segurança: só ligar Google a contas com email já verificado (anti pre-hijacking)
+                    if not user.is_verified:
+                        raise exceptions.AuthenticationFailed(
+                            'Este email já está registado mas não foi verificado. '
+                            'Entre com email/password e verifique o seu email primeiro.'
+                        )
                     user.firebase_uid = firebase_uid
                     user.auth_provider = firebase_provider
-                    user.is_verified = True
-                    user.save(update_fields=['firebase_uid', 'auth_provider', 'is_verified'])
+                    user.save(update_fields=['firebase_uid', 'auth_provider'])
                 except User.DoesNotExist:
                     # Create new user
                     user = self._create_user_from_firebase(

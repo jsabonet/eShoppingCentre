@@ -215,10 +215,16 @@ class FirebaseTokenObtainPairView(APIView):
             if email:
                 try:
                     user = User.objects.get(email=email)
+                    # Segurança: só ligar Google a contas com email já verificado (anti pre-hijacking)
+                    if not user.is_verified:
+                        return Response(
+                            {'error': 'Este email já está registado mas não foi verificado. '
+                                      'Entre com email/password e verifique o seu email primeiro.'},
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
                     user.firebase_uid = firebase_uid
                     user.auth_provider = firebase_provider
-                    user.is_verified = True
-                    user.save(update_fields=['firebase_uid', 'auth_provider', 'is_verified'])
+                    user.save(update_fields=['firebase_uid', 'auth_provider'])
                 except User.DoesNotExist:
                     user = self._create_user_from_firebase(
                         firebase_uid, email, name, firebase_provider
