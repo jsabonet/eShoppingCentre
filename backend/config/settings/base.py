@@ -213,13 +213,18 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024      # 10 MB em memoria, depois d
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024       # 10 MB request body em memoria
 FILE_UPLOAD_MAX_SIZE = 500 * 1024 * 1024              # 500 MB maximo absoluto
 
-# ─── Email ───
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Development: prints to console
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@eshoppingcentre.co.mz')
+# ─── Email (Resend via django-anymail) ───
+# Em dev usa o console backend (mostra o OTP no terminal).
+# Se RESEND_API_KEY estiver definida, envia emails reais pela Resend.
+EMAIL_BACKEND = (
+    'anymail.backends.resend.EmailBackend'
+    if config('RESEND_API_KEY', default='')
+    else 'django.core.mail.backends.console.EmailBackend'
+)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='suporte@e-shoppingcentre.com')
 
-# Brevo (via django-anymail). Em produção, production.py substitui o EMAIL_BACKEND.
 ANYMAIL = {
-    'BREVO_API_KEY': config('BREVO_API_KEY', default=''),
+    'RESEND_API_KEY': config('RESEND_API_KEY', default=''),
 }
 
 # ─── Cloudflare Stream ───
