@@ -1,5 +1,5 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView, TokenBlacklistView
+from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from . import views
 
 urlpatterns = [
@@ -7,6 +7,7 @@ urlpatterns = [
     path('login/', views.LoginTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('firebase/', views.FirebaseTokenObtainPairView.as_view(), name='firebase_token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('refresh/', views.CookieTokenRefreshView.as_view(), name='cookie_token_refresh'),
     path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-    path('logout/', TokenBlacklistView.as_view(), name='token_blacklist'),
+    path('logout/', views.CookieLogoutView.as_view(), name='logout'),
 ]

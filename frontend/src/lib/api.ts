@@ -8,6 +8,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1
 const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true, // envia o cookie httpOnly (refresh token)
 });
 
 // ─── Interceptor: Adicionar token JWT ───
@@ -26,20 +27,15 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const refresh = localStorage.getItem('refresh_token');
-      if (refresh) {
-        try {
-          const { data } = await axios.post(`${API_URL}/auth/token/refresh/`, { refresh });
-          localStorage.setItem('access_token', data.access);
-          // Com ROTATE_REFRESH_TOKENS activo, o backend devolve um novo refresh
-          if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
-          originalRequest.headers.Authorization = `Bearer ${data.access}`;
-          return api(originalRequest);
-        } catch {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          if (typeof window !== 'undefined') window.location.href = '/login';
-        }
+      try {
+        // O refresh token viaja num cookie httpOnly — não precisa de corpo
+        const { data } = await axios.post(`${API_URL}/auth/refresh/`, {}, { withCredentials: true });
+        localStorage.setItem('access_token', data.access);
+        originalRequest.headers.Authorization = `Bearer ${data.access}`;
+        return api(originalRequest);
+      } catch {
+        localStorage.removeItem('access_token');
+        if (typeof window !== 'undefined') window.location.href = '/login';
       }
     }
     return Promise.reject(error);
@@ -444,13 +440,9 @@ export const authAPI = {
     api.post('/users/password/change/', data),
 
   logout: () => {
-    const refresh = localStorage.getItem('refresh_token');
-    if (refresh) {
-      // Revoga o refresh token no servidor (blacklist) — fire-and-forget
-      axios.post(`${API_URL}/auth/logout/`, { refresh }).catch(() => {});
-    }
+    // Revoga o refresh token (cookie httpOnly) no servidor — fire-and-forget
+    axios.post(`${API_URL}/auth/logout/`, {}, { withCredentials: true }).catch(() => {});
     localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
     localStorage.removeItem('admin_logged_in');
     window.location.href = '/';
   },

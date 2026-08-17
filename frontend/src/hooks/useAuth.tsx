@@ -47,7 +47,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data);
     } catch {
       localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
     } finally {
       setLoading(false);
     }
@@ -62,7 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Exchange Firebase ID token for backend JWT
           const { data } = await authAPI.firebaseLogin(redirectData.idToken);
           localStorage.setItem('access_token', data.access);
-          localStorage.setItem('refresh_token', data.refresh);
           setUser(data.user);
         }
       } catch (err) {
@@ -77,7 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const { data } = await authAPI.login({ email, password });
     localStorage.setItem('access_token', data.access);
-    localStorage.setItem('refresh_token', data.refresh);
     // Fetch user profile after login (Django only returns tokens)
     const userRes = await usersAPI.me();
     setUser(userRes.data);
@@ -94,7 +91,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }) => {
     const { data } = await authAPI.register(formData);
     localStorage.setItem('access_token', data.access);
-    localStorage.setItem('refresh_token', data.refresh);
     // Fetch user profile after register
     const userRes = await usersAPI.me();
     setUser(userRes.data);

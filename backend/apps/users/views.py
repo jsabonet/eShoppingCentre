@@ -36,17 +36,29 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         from rest_framework_simplejwt.tokens import RefreshToken
+        from .token_cookies import set_refresh_cookie
         refresh = RefreshToken.for_user(user)
-        return Response({
+        response = Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
             'user': _user_payload(user),
         }, status=status.HTTP_201_CREATED)
+        set_refresh_cookie(response, str(refresh))
+        return response
 
 
 class LoginTokenObtainPairView(BaseTokenObtainPairView):
-    """Login com throttle dedicado (anti brute-force)."""
+    """Login com throttle dedicado (anti brute-force) + cookie httpOnly."""
     throttle_classes = [LoginRateThrottle]
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            from .token_cookies import set_refresh_cookie
+            refresh = response.data.get('refresh')
+            if refresh:
+                set_refresh_cookie(response, refresh)
+        return response
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -227,7 +239,8 @@ class FirebaseTokenObtainPairView(APIView):
         # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
 
-        return Response({
+        from .token_cookies import set_refresh_cookie
+        response = Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
             'user': {
@@ -243,6 +256,8 @@ class FirebaseTokenObtainPairView(APIView):
             },
             'is_new_user': is_new_user,
         })
+        set_refresh_cookie(response, str(refresh))
+        return response
 
     def _create_user_from_firebase(self, firebase_uid, email, name, provider):
         """Create a new Django User from Firebase data."""
@@ -277,3 +292,49 @@ class FirebaseTokenObtainPairView(APIView):
 
         logger.info(f'Created new user from Firebase: {email or firebase_uid}')
         return user
+
+
+class CookieTokenRefreshView(APIView):
+    """POST /api/v1/auth/refresh/ — renova o access token a partir do cookie httpOnly."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        from .token_cookies import REFRESH_COOKIE_NAME, set_refresh_cookie
+        refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+        if not refresh_token:
+            return Response({'detail': 'Sem refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            refresh = RefreshToken(refresh_token)
+        except Exception:
+            return Response({'detail': 'Refresh token inválido ou expirado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        response = Response({'access': str(refresh.access_token)})
+
+        from rest_framework_simplejwt import settings as jwt_settings
+        if jwt_settings.api_settings.ROTATE_REFRESH_TOKENS:
+            try:
+                refresh.blacklist()
+            except Exception:
+                pass
+            new_refresh = RefreshToken.for_user(refresh.user)
+            set_refresh_cookie(response, str(new_refresh))
+        return response
+
+
+class CookieLogoutView(APIView):
+    """POST /api/v1/auth/logout/ — revoga o refresh token do cookie httpOnly."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        from .token_cookies import REFRESH_COOKIE_NAME, clear_refresh_cookie
+        refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+        if refresh_token:
+            try:
+                RefreshToken(refresh_token).blacklist()
+            except Exception:
+                pass
+        response = Response({'detail': 'Sessão terminada.'})
+        clear_refresh_cookie(response)
+        return response

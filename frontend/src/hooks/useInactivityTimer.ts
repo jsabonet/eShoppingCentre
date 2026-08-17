@@ -66,7 +66,6 @@ export function useInactivityTimer({
           clearInterval(interval);
           // Remove tokens and call logout
           localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
           logoutRef.current();
           return 0;
         }

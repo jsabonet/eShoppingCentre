@@ -130,6 +130,7 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOWED_ORIGINS = config('CORS_ORIGINS', default='http://localhost:3000').split(',')
+CORS_ALLOW_CREDENTIALS = True
 
 # ──────────────────────────────────────────────
 # Firebase Authentication
