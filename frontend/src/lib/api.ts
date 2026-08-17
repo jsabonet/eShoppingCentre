@@ -31,6 +31,8 @@ api.interceptors.response.use(
         try {
           const { data } = await axios.post(`${API_URL}/auth/token/refresh/`, { refresh });
           localStorage.setItem('access_token', data.access);
+          // Com ROTATE_REFRESH_TOKENS activo, o backend devolve um novo refresh
+          if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
           originalRequest.headers.Authorization = `Bearer ${data.access}`;
           return api(originalRequest);
         } catch {
@@ -430,7 +432,7 @@ export const authAPI = {
     ),
 
   refreshToken: (refresh: string) =>
-    api.post<{ access: string }>('/auth/token/refresh/', { refresh }),
+    api.post<{ access: string; refresh?: string }>('/auth/token/refresh/', { refresh }),
 
   requestPasswordReset: (email: string) =>
     api.post('/auth/password/reset/', { email }),
@@ -442,6 +444,11 @@ export const authAPI = {
     api.post('/users/password/change/', data),
 
   logout: () => {
+    const refresh = localStorage.getItem('refresh_token');
+    if (refresh) {
+      // Revoga o refresh token no servidor (blacklist) — fire-and-forget
+      axios.post(`${API_URL}/auth/logout/`, { refresh }).catch(() => {});
+    }
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('admin_logged_in');

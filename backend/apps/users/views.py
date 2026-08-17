@@ -2,6 +2,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.views import TokenObtainPairView as BaseTokenObtainPairView
+from .throttles import LoginRateThrottle
 from .serializers import RegisterSerializer, UserProfileSerializer, AddressSerializer, ChangePasswordSerializer
 from apps.orders.serializers import OrderSerializer
 from apps.orders.models import Order
@@ -11,9 +13,40 @@ from apps.products.serializers import WishlistItemSerializer
 User = get_user_model()
 
 
+def _user_payload(user):
+    return {
+        'id': str(user.id),
+        'email': user.email,
+        'username': user.username,
+        'phone': user.phone,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'avatar': user.avatar.url if user.avatar else None,
+        'roles': user.roles,
+        'is_verified': user.is_verified,
+    }
+
+
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': _user_payload(user),
+        }, status=status.HTTP_201_CREATED)
+
+
+class LoginTokenObtainPairView(BaseTokenObtainPairView):
+    """Login com throttle dedicado (anti brute-force)."""
+    throttle_classes = [LoginRateThrottle]
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -123,6 +156,7 @@ class FirebaseTokenObtainPairView(APIView):
     """
     permission_classes = [permissions.AllowAny]
     authentication_classes = []  # No DRF auth needed — we verify Firebase token manually
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         serializer = FirebaseTokenSerializer(data=request.data)
@@ -142,6 +176,7 @@ class FirebaseTokenObtainPairView(APIView):
 
         firebase_uid = decoded_token.get('uid')
         email = decoded_token.get('email', '')
+        email_verified = decoded_token.get('email_verified', False)
         name = decoded_token.get('name', '')
         firebase_provider = decoded_token.get('firebase', {}).get('sign_in_provider', 'google')
 
@@ -149,6 +184,13 @@ class FirebaseTokenObtainPairView(APIView):
             return Response(
                 {'error': 'Token Firebase sem UID.'},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Segurança: nunca ligar/criar conta com email não verificado
+        if email and not email_verified:
+            return Response(
+                {'error': 'O email da conta não está verificado. Verifique o email e tente novamente.'},
+                status=status.HTTP_401_UNAUTHORIZED,
             )
 
         is_new_user = False

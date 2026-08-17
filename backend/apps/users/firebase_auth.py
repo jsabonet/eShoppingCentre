@@ -125,12 +125,17 @@ class FirebaseIDTokenAuthentication(authentication.BaseAuthentication):
 
         firebase_uid = decoded_token.get('uid')
         email = decoded_token.get('email', '')
+        email_verified = decoded_token.get('email_verified', False)
         name = decoded_token.get('name', '')
         picture = decoded_token.get('picture', '')
         firebase_provider = decoded_token.get('firebase', {}).get('sign_in_provider', 'google')
 
         if not firebase_uid:
             raise exceptions.AuthenticationFailed('Token Firebase sem UID.')
+
+        # Segurança: nunca ligar/criar conta com email não verificado
+        if email and not email_verified:
+            raise exceptions.AuthenticationFailed('O email da conta não está verificado.')
 
         # Try to find existing user by firebase_uid
         try:
