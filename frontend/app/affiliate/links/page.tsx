@@ -3,9 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link as LinkIcon, Copy, Check, ExternalLink, RefreshCw, Loader2, Plus } from 'lucide-react';
 import AffiliateLayout from '@/src/components/AffiliateLayout';
-import { affiliatesAPI, type AffiliateLink } from '@/src/lib/api';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+import { affiliatesAPI, productsAPI, type AffiliateLink } from '@/src/lib/api';
 
 export default function AffiliateLinksPage() {
   const [links, setLinks] = useState<AffiliateLink[]>([]);
@@ -15,23 +13,18 @@ export default function AffiliateLinksPage() {
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const headers = useCallback(() => ({
-    Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-  }), []);
-
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [linksRes, prodRes] = await Promise.all([
         affiliatesAPI.myLinks(),
-        fetch(`${API_URL}/products/?page_size=100&affiliate_enabled=true`, { headers: headers() }).then(r => r.ok ? r.json() : null),
+        productsAPI.list({ page_size: 100, affiliate_enabled: true }),
       ]);
-      setLinks(Array.isArray(linksRes.data) ? linksRes.data : linksRes.data.results || []);
-      const prodData = prodRes?.results || prodRes || [];
-      setProducts(prodData);
+      setLinks(linksRes.data || []);
+      setProducts(prodRes.data.results || []);
     } catch { setLinks([]); setProducts([]); }
     finally { setLoading(false); }
-  }, [headers]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -96,7 +89,7 @@ export default function AffiliateLinksPage() {
                     <h3 className="font-medium text-sm">{link.product_name || 'Produto'}</h3>
                     <p className="text-xs text-muted-foreground font-mono truncate">{link.short_url}</p>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => copyToClipboard(link.id, link.short_url)}
                       className="p-2 hover:bg-muted rounded-lg transition-colors" title="Copiar link">
                       {copiedId === link.id ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}

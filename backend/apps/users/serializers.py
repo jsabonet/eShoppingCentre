@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from .models import UserProfile, Address
 
 User = get_user_model()
@@ -85,3 +86,34 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         user.is_verified = is_verified
         user.save()
         return user
+
+
+class VerifyEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=6, max_length=6)
+
+
+class ResendVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=6, max_length=6)
+    new_password = serializers.CharField()
+
+    def validate(self, attrs):
+        user = User.objects.filter(email__iexact=attrs['email']).first()
+        if user is None:
+            # Erro genérico: não revelar se o email existe
+            raise serializers.ValidationError({'code': 'Código inválido ou expirado.'})
+        try:
+            validate_password(attrs['new_password'], user=user)
+        except ValidationError as exc:
+            raise serializers.ValidationError({'new_password': exc.messages})
+        attrs['user'] = user
+        return attrs

@@ -1,10 +1,16 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import ScopedRateThrottle
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView as BaseTokenObtainPairView
 from .throttles import LoginRateThrottle
-from .serializers import RegisterSerializer, UserProfileSerializer, AddressSerializer, ChangePasswordSerializer
+from .serializers import (
+    RegisterSerializer, UserProfileSerializer, AddressSerializer, ChangePasswordSerializer,
+    VerifyEmailSerializer, ResendVerificationSerializer,
+    PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
+)
+from . import otp_service, tasks
 from apps.orders.serializers import OrderSerializer
 from apps.orders.models import Order
 from apps.products.models import WishlistItem
@@ -44,6 +50,14 @@ class RegisterView(generics.CreateAPIView):
             'user': _user_payload(user),
         }, status=status.HTTP_201_CREATED)
         set_refresh_cookie(response, str(refresh))
+
+        # Enviar email de verificação (assíncrono, não bloqueia o registo)
+        try:
+            code = otp_service.create_otp(user, 'verification')
+            tasks.dispatch(tasks.send_verification_email, user.email, code)
+        except Exception as exc:
+            logger.warning(f'Falha ao enviar email de verificação para {user.email}: {exc}')
+
         return response
 
 
@@ -344,3 +358,112 @@ class CookieLogoutView(APIView):
         response = Response({'detail': 'Sessão terminada.'})
         clear_refresh_cookie(response)
         return response
+
+
+# ──────────────────────────────────────────────
+# Verificação de email e recuperação de password
+# ──────────────────────────────────────────────
+
+def _blacklist_user_tokens(user):
+    """Revoga todos os refresh tokens existentes do utilizador (blacklist)."""
+    try:
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+        for token in OutstandingToken.objects.filter(user_id=user.id):
+            BlacklistedToken.objects.get_or_create(token=token)
+    except Exception as exc:
+        logger.warning(f'Falha ao revogar tokens de {user.email}: {exc}')
+
+
+class VerifyEmailView(APIView):
+    """POST /api/v1/auth/verify-email/ — valida o OTP e marca a conta como verificada."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_verify'
+
+    def post(self, request):
+        serializer = VerifyEmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+        code = serializer.validated_data['code']
+
+        user = User.objects.filter(email__iexact=email).first()
+        if user is None:
+            return Response({'detail': 'Conta não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        valid, message = otp_service.verify_otp(user, 'verification', code)
+        if not valid:
+            return Response({'detail': message}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.is_verified = True
+        user.save(update_fields=['is_verified'])
+        return Response({'detail': 'Email verificado com sucesso.', 'user': _user_payload(user)})
+
+
+class ResendVerificationView(APIView):
+    """POST /api/v1/auth/resend-verification/ — reenvia o OTP de verificação."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_resend'
+
+    def post(self, request):
+        serializer = ResendVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+
+        user = User.objects.filter(email__iexact=email).first()
+        if user is None:
+            return Response({'detail': 'Conta não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if user.is_verified:
+            return Response({'detail': 'Conta já verificada.'})
+
+        code = otp_service.create_otp(user, 'verification')
+        tasks.dispatch(tasks.send_verification_email, user.email, code)
+        return Response({'detail': 'Código reenviado para o teu email.'})
+
+
+class PasswordResetRequestView(APIView):
+    """POST /api/v1/auth/password/reset/ — envia OTP de recuperação (resposta genérica)."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_reset'
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+
+        user = User.objects.filter(email__iexact=email).first()
+        if user is not None and user.is_active:
+            code = otp_service.create_otp(user, 'password_reset')
+            tasks.dispatch(tasks.send_password_reset_email, user.email, code)
+
+        # Resposta genérica para não revelar se o email existe
+        return Response({'detail': 'Se o email existir, receberás um código de recuperação.'})
+
+
+class PasswordResetConfirmView(APIView):
+    """POST /api/v1/auth/password/reset/confirm/ — valida OTP e define nova password."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_reset'
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        code = serializer.validated_data['code']
+        new_password = serializer.validated_data['new_password']
+
+        valid, message = otp_service.verify_otp(user, 'password_reset', code)
+        if not valid:
+            return Response({'detail': message}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+        otp_service.invalidate_otps(user, 'password_reset')
+        _blacklist_user_tokens(user)
+        return Response({'detail': 'Password redefinida com sucesso.'})

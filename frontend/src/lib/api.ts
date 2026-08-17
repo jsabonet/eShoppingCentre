@@ -430,11 +430,17 @@ export const authAPI = {
   refreshToken: (refresh: string) =>
     api.post<{ access: string; refresh?: string }>('/auth/token/refresh/', { refresh }),
 
-  requestPasswordReset: (email: string) =>
-    api.post('/auth/password/reset/', { email }),
+  verifyEmail: (data: { email: string; code: string }) =>
+    api.post<{ detail: string; user: User }>('/auth/verify-email/', data),
 
-  confirmPasswordReset: (data: { uid: string; token: string; new_password: string }) =>
-    api.post('/auth/password/reset/confirm/', data),
+  resendVerification: (email: string) =>
+    api.post<{ detail: string }>('/auth/resend-verification/', { email }),
+
+  requestPasswordReset: (email: string) =>
+    api.post<{ detail: string }>('/auth/password/reset/', { email }),
+
+  confirmPasswordReset: (data: { email: string; code: string; new_password: string }) =>
+    api.post<{ detail: string }>('/auth/password/reset/confirm/', data),
 
   changePassword: (data: { old_password: string; new_password: string }) =>
     api.post('/users/password/change/', data),

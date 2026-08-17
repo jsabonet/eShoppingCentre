@@ -10,4 +10,8 @@ urlpatterns = [
     path('refresh/', views.CookieTokenRefreshView.as_view(), name='cookie_token_refresh'),
     path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     path('logout/', views.CookieLogoutView.as_view(), name='logout'),
+    path('verify-email/', views.VerifyEmailView.as_view(), name='verify_email'),
+    path('resend-verification/', views.ResendVerificationView.as_view(), name='resend_verification'),
+    path('password/reset/', views.PasswordResetRequestView.as_view(), name='password_reset'),
+    path('password/reset/confirm/', views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
 ]

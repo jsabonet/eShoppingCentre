@@ -59,3 +59,6 @@ LOGGING = {
         },
     },
 }
+
+# ─── Email (Brevo via django-anymail) ───
+EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'

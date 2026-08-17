@@ -104,6 +104,9 @@ export default function LoginPage() {
             <p className="text-center text-sm text-muted-foreground mt-4">
               Não tem conta? <Link href="/signup" className="text-accent hover:underline">Criar Conta</Link>
             </p>
+            <p className="text-center text-sm mt-2">
+              <Link href="/forgot-password" className="text-accent hover:underline">Esqueceu a password?</Link>
+            </p>
           </>
         )}
 

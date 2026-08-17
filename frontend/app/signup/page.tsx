@@ -10,15 +10,20 @@ import PasswordInput from '@/src/components/PasswordInput';
 
 export default function SignupPage() {
   const router = useRouter();
-  const { register, isAuthenticated } = useAuth();
+  const { register, isAuthenticated, user } = useAuth();
   const [form, setForm] = useState({ email: '', username: '', password: '', password2: '', first_name: '', last_name: '', phone: '' });
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) { router.replace('/'); }
-  }, [isAuthenticated, router]);
+    if (!isAuthenticated) return;
+    if (user && !user.is_verified) {
+      router.replace('/verify-email');
+    } else {
+      router.replace('/');
+    }
+  }, [isAuthenticated, user, router]);
 
   const update = (field: string, value: string) => setForm({ ...form, [field]: value });
 
@@ -29,7 +34,7 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await register({ email: form.email, username: form.username, password: form.password, password2: form.password2, first_name: form.first_name, last_name: form.last_name, phone: form.phone });
-      router.push('/');
+      // O effect acima redirecciona para /verify-email
     } catch (err: any) {
       const data = err.response?.data;
       setError(typeof data === 'object' ? Object.values(data).flat().join('. ') : 'Erro ao criar conta.');

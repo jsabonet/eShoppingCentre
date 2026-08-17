@@ -117,6 +117,9 @@ REST_FRAMEWORK = {
         'anon': '100/hour',
         'user': '1000/hour',
         'login': '5/min',
+        'otp_verify': '10/min',
+        'otp_resend': '3/hour',
+        'otp_reset': '3/hour',
     },
 }
 
@@ -213,6 +216,11 @@ FILE_UPLOAD_MAX_SIZE = 500 * 1024 * 1024              # 500 MB maximo absoluto
 # ─── Email ───
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Development: prints to console
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@eshoppingcentre.co.mz')
+
+# Brevo (via django-anymail). Em produção, production.py substitui o EMAIL_BACKEND.
+ANYMAIL = {
+    'BREVO_API_KEY': config('BREVO_API_KEY', default=''),
+}
 
 # ─── Cloudflare Stream ───
 CLOUDFLARE_ACCOUNT_ID = config('CLOUDFLARE_ACCOUNT_ID', default='')

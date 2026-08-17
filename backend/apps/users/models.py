@@ -64,3 +64,21 @@ class Address(BaseModel):
 
     def __str__(self):
         return f'{self.label} - {self.full_name}'
+
+
+class OneTimeCode(BaseModel):
+    """Código de uso único (OTP) para verificação de email e recuperação de password."""
+
+    class Purpose(models.TextChoices):
+        VERIFICATION = 'verification', 'Verificação de email'
+        PASSWORD_RESET = 'password_reset', 'Recuperação de password'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='one_time_codes')
+    code_hash = models.CharField(max_length=255)
+    purpose = models.CharField(max_length=20, choices=Purpose.choices, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    attempts = models.PositiveIntegerField(default=0)
+    is_used = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f'OTP({self.purpose}) para {self.user.email}'
