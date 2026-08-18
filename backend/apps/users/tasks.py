@@ -1,4 +1,5 @@
 import base64
+import logging
 from pathlib import Path
 
 from celery import shared_task
@@ -8,16 +9,31 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 
 SITE_NAME = 'e-Shopping Centre'
+logger = logging.getLogger(__name__)
 
 _LOGO_FILE = Path(settings.BASE_DIR) / 'apps' / 'users' / 'static' / 'email-logo.png'
 
 
 def dispatch(task_func, *args):
-    """Envia via Celery em produção; síncrono em dev (o console backend mostra o OTP)."""
+    """Envia via Celery em produção; síncrono em dev (o console backend mostra o OTP).
+
+    Se o broker (Redis) estiver indisponível, cai para envio síncrono para
+    nunca bloquear o pedido HTTP nem perder o email.
+    """
     if settings.DEBUG:
-        task_func(*args)
-    else:
+        try:
+            task_func(*args)
+        except Exception:
+            logger.exception('Falha ao enviar email (dev).')
+        return
+    try:
         task_func.delay(*args)
+    except Exception:
+        logger.exception('Celery indisponível — a enviar email de forma síncrona.')
+        try:
+            task_func(*args)
+        except Exception:
+            logger.exception('Falha no envio síncrono do email.')
 
 
 def _logo_src() -> str:
