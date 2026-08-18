@@ -35,7 +35,7 @@ export default function PasswordStrength({ password }: PasswordStrengthProps) {
               key={r.label}
               className={`text-xs flex items-center gap-1 ${ok ? 'text-green-600' : 'text-muted-foreground'}`}
             >
-              {ok ? '✓' : '•'} {r.label}
+              • {r.label}
             </li>
           );
         })}

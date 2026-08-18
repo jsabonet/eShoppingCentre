@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { KeyRound, Loader2 } from 'lucide-react';
 import { authAPI } from '@/src/lib/api';
@@ -9,9 +9,11 @@ import PasswordInput from '@/src/components/PasswordInput';
 import PasswordStrength from '@/src/components/PasswordStrength';
 import OtpInput from '@/src/components/OtpInput';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const searchParams = useSearchParams();
+  const email = searchParams.get('email') || '';
+
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
@@ -20,6 +22,7 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
+    if (!email) { setError('Introduz primeiro o teu email na página de recuperação.'); return; }
     if (password !== password2) { setError('As passwords não coincidem.'); return; }
     if (code.length !== 6) { setError('O código tem 6 dígitos.'); return; }
     setLoading(true);
@@ -46,11 +49,15 @@ export default function ResetPasswordPage() {
         {error && <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-4">{error}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-              className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-          </div>
+          {email ? (
+            <p className="text-sm text-muted-foreground">
+              A redefinir a password de <strong className="text-foreground">{email}</strong>.
+            </p>
+          ) : (
+            <p className="text-sm text-amber-600">
+              <Link href="/forgot-password" className="text-accent hover:underline">Introduz o teu email</Link> para receberes o código de recuperação.
+            </p>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">Código</label>
             <OtpInput value={code} onChange={setCode} length={6} disabled={loading} />
@@ -76,5 +83,13 @@ export default function ResetPasswordPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><Loader2 size={28} className="animate-spin text-muted-foreground" /></div>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

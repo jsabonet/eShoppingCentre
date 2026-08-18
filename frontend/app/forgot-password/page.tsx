@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
             <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm">
               Se o email existir, receberás um código de recuperação.
             </div>
-            <Link href="/reset-password" className="inline-block px-6 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors">
+            <Link href={`/reset-password?email=${encodeURIComponent(email)}`} className="inline-block px-6 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors">
               Introduzir código
             </Link>
           </div>
