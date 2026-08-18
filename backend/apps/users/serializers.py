@@ -49,6 +49,11 @@ class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True, validators=[validate_password])
 
+    def validate(self, attrs):
+        if attrs['old_password'] == attrs['new_password']:
+            raise serializers.ValidationError({'new_password': 'A nova password deve ser diferente da anterior.'})
+        return attrs
+
 
 class FirebaseTokenSerializer(serializers.Serializer):
     """Serializer for Firebase ID token exchange."""
@@ -115,5 +120,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             validate_password(attrs['new_password'], user=user)
         except ValidationError as exc:
             raise serializers.ValidationError({'new_password': exc.messages})
+        if user.check_password(attrs['new_password']):
+            raise serializers.ValidationError({'new_password': 'A nova password deve ser diferente da anterior.'})
         attrs['user'] = user
         return attrs
