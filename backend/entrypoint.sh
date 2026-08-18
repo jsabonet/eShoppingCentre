@@ -16,6 +16,11 @@ chown -R django:django /app/media 2>/dev/null || true
 mkdir -p /home/django
 chown -R django:django /home/django 2>/dev/null || true
 
+# Garantir que o HOME aponta para o diretório do utilizador django
+# (o gunicorn cria ~/.gunicorn para o control server)
+export HOME=/home/django
+export XDG_RUNTIME_DIR=/tmp
+
 echo "✅ Permissões corrigidas. A iniciar como django..."
 
 # Desce de privilégio e executa o CMD como django

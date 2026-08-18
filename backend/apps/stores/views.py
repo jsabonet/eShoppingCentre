@@ -8,7 +8,7 @@ from apps.users.permissions import IsVerified
 
 
 class StoreListView(generics.ListAPIView):
-    queryset = Store.objects.filter(status='active')
+    queryset = Store.objects.filter(status='active').order_by('-created_at')
     serializer_class = StoreSerializer
     permission_classes = [permissions.AllowAny]
 
