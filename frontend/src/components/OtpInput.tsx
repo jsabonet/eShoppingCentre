@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface OtpInputProps {
   value: string;
@@ -11,34 +11,57 @@ interface OtpInputProps {
 
 export default function OtpInput({ value, onChange, length = 6, disabled = false }: OtpInputProps) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
+  const [chars, setChars] = useState<string[]>(() =>
+    Array.from({ length }, (_, i) => value[i] || ''),
+  );
+
+  // Limpa as caixas quando o valor externo é reposto a vazio
+  useEffect(() => {
+    if (value === '') setChars(Array.from({ length }, () => ''));
+  }, [value, length]);
+
+  const emit = (next: string[]) => {
+    setChars(next);
+    onChange(next.join(''));
+  };
 
   const handleChange = (index: number, raw: string) => {
-    const digit = raw.replace(/\D/g, '');
+    const digit = raw.replace(/\D/g, '').slice(-1);
     if (!digit) return;
-    const chars = value.split('');
-    chars[index] = digit;
-    onChange(chars.join(''));
+    const next = [...chars];
+    next[index] = digit;
+    emit(next);
     if (index < length - 1) refs.current[index + 1]?.focus();
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !value[index] && index > 0) {
-      refs.current[index - 1]?.focus();
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      const next = [...chars];
+      if (next[index]) {
+        next[index] = '';
+      } else if (index > 0) {
+        next[index - 1] = '';
+        refs.current[index - 1]?.focus();
+      }
+      emit(next);
     }
+    if (e.key === 'ArrowLeft' && index > 0) refs.current[index - 1]?.focus();
+    if (e.key === 'ArrowRight' && index < length - 1) refs.current[index + 1]?.focus();
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, length);
-    if (text) {
-      onChange(text);
-      refs.current[Math.min(text.length, length - 1)]?.focus();
-    }
+    if (!text) return;
+    const next = Array.from({ length }, (_, i) => text[i] || '');
+    emit(next);
+    refs.current[Math.min(text.length, length - 1)]?.focus();
   };
 
   return (
     <div className="flex justify-center gap-2">
-      {Array.from({ length }).map((_, i) => (
+      {chars.map((ch, i) => (
         <input
           key={i}
           ref={(el) => { refs.current[i] = el; }}
@@ -46,7 +69,7 @@ export default function OtpInput({ value, onChange, length = 6, disabled = false
           inputMode="numeric"
           autoComplete={i === 0 ? 'one-time-code' : 'off'}
           maxLength={1}
-          value={value[i] || ''}
+          value={ch}
           disabled={disabled}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
