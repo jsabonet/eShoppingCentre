@@ -395,8 +395,17 @@ class VerifyEmailView(APIView):
         if not valid:
             return Response({'detail': message}, status=status.HTTP_400_BAD_REQUEST)
 
+        was_verified = user.is_verified
         user.is_verified = True
         user.save(update_fields=['is_verified'])
+
+        # Email de boas-vindas (só na primeira verificação)
+        if not was_verified:
+            try:
+                tasks.dispatch(tasks.send_welcome_email, user.email, user.first_name)
+            except Exception as exc:
+                logger.warning(f'Falha ao enviar email de boas-vindas para {user.email}: {exc}')
+
         return Response({'detail': 'Email verificado com sucesso.', 'user': _user_payload(user)})
 
 

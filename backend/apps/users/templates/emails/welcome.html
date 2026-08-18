@@ -1,0 +1,45 @@
+{% extends "emails/base_email.html" %}
+
+{% block preheader %}Bem-vindo à eShopping Centre! A tua conta está pronta.{% endblock %}
+
+{% block content %}
+  <h1 style="margin:0 0 8px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;line-height:30px;color:#1b2a4a;font-weight:700;">
+    Bem-vindo{% if first_name %}, {{ first_name }}{% endif %}! 🎉
+  </h1>
+  <p style="margin:0 0 24px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#4b5563;">
+    A tua conta foi verificada com sucesso. Está tudo pronto para começar.
+  </p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+    <tr>
+      <td style="padding:8px 0;">
+        <span style="color:#f97316;font-weight:700;">●</span>&nbsp;&nbsp;
+        <span style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#4b5563;">Compra de vendedores locais em todo o país</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:8px 0;">
+        <span style="color:#f97316;font-weight:700;">●</span>&nbsp;&nbsp;
+        <span style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#4b5563;">Abre a tua loja e vende os teus produtos</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:8px 0;">
+        <span style="color:#f97316;font-weight:700;">●</span>&nbsp;&nbsp;
+        <span style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#4b5563;">Ganha comissões como afiliado</span>
+      </td>
+    </tr>
+  </table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+    <tr>
+      <td>
+        <a href="{{ frontend_url }}" style="display:inline-block;background-color:#f97316;color:#ffffff;text-decoration:none;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;">Começar a comprar</a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#9ca3af;">
+    Precisa de ajuda? Contacta <a href="mailto:{{ support_email }}" style="color:#f97316;text-decoration:none;">{{ support_email }}</a>.
+  </p>
+{% endblock %}

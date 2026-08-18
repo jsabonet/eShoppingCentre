@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>{{ subject }}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 12px;">
+    <tr>
+      <td align="center">
+
+        <!-- Preheader -->
+        <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">{% block preheader %}{% endblock %}</div>
+
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#1b2a4a;padding:28px 32px;border-radius:12px 12px 0 0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    {% if logo_url %}
+                      <img src="{{ logo_url }}" alt="{{ site_name }}" height="36" style="display:block;height:36px;width:auto;border:0;outline:none;">
+                    {% else %}
+                      <span style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">eShopping<span style="color:#f97316;">Centre</span></span>
+                    {% endif %}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background-color:#ffffff;padding:36px 32px 32px;">
+              {% block content %}{% endblock %}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f9fafb;padding:24px 32px;border-radius:0 0 12px 12px;border-top:1px solid #eef0f3;">
+              <p style="margin:0 0 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#6b7280;text-align:center;">
+                © {{ year }} {{ site_name }}. Todos os direitos reservados.
+              </p>
+              <p style="margin:0 0 8px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#9ca3af;text-align:center;">
+                <a href="{{ frontend_url }}/terms" style="color:#6b7280;text-decoration:underline;">Termos de Serviço</a>
+                &nbsp;·&nbsp;
+                <a href="{{ frontend_url }}/privacy" style="color:#6b7280;text-decoration:underline;">Política de Privacidade</a>
+              </p>
+              <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#9ca3af;text-align:center;">
+                Este é um email automático — por favor, não respondas a esta mensagem.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

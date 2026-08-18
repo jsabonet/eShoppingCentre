@@ -1,0 +1,26 @@
+{% extends "emails/base_email.html" %}
+
+{% block preheader %}O teu código de verificação é {{ code }}.{% endblock %}
+
+{% block content %}
+  <h1 style="margin:0 0 8px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;line-height:30px;color:#1b2a4a;font-weight:700;">Verifica o teu email</h1>
+  <p style="margin:0 0 24px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#4b5563;">
+    Olá! Obrigado por criares a tua conta. Usa o código abaixo para confirmar o teu endereço de email:
+  </p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+    <tr>
+      <td align="center" style="background-color:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:20px 16px;">
+        <span style="font-family:'Courier New',monospace;font-size:32px;font-weight:700;letter-spacing:8px;color:#1b2a4a;">{{ code }}</span>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0 0 24px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#6b7280;">
+    O código expira em <strong style="color:#1b2a4a;">10 minutos</strong>. Se não criaste esta conta, podes ignorar este email em segurança.
+  </p>
+
+  <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#9ca3af;">
+    Precisa de ajuda? Contacta <a href="mailto:{{ support_email }}" style="color:#f97316;text-decoration:none;">{{ support_email }}</a>.
+  </p>
+{% endblock %}

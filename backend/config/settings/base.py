@@ -227,6 +227,10 @@ ANYMAIL = {
     'RESEND_API_KEY': config('RESEND_API_KEY', default=''),
 }
 
+# URL absoluto do logótipo usado nos emails HTML (deve ser público).
+# Se vazio, os emails usam um wordmark em texto.
+EMAIL_LOGO_URL = config('EMAIL_LOGO_URL', default='')
+
 # ─── Cloudflare Stream ───
 CLOUDFLARE_ACCOUNT_ID = config('CLOUDFLARE_ACCOUNT_ID', default='')
 CLOUDFLARE_API_TOKEN = config('CLOUDFLARE_API_TOKEN', default='')
