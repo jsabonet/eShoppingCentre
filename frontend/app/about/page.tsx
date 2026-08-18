@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Sobre Nós | eShopping Centre',
+  title: 'Sobre Nós | e-Shopping Centre',
   description:
-    'Conheça a história, missão e filosofia do eShopping Centre — o seu marketplace de confiança com milhões de produtos e frete grátis.',
+    'Conheça a história, missão e filosofia do e-Shopping Centre — o seu marketplace de confiança com milhões de produtos e frete grátis.',
 };
 
 export default function AboutPage() {
@@ -14,7 +14,7 @@ export default function AboutPage() {
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-5xl md:text-6xl mb-6 font-heading">Nossa História</h1>
           <p className="text-lg text-muted-foreground">
-            O eShopping Centre nasceu da convicção de que fazer compras online deve ser simples, seguro e acessível para todos. Cada produto na nossa plataforma representa o nosso compromisso com qualidade e confiança.
+            O e-Shopping Centre nasceu da convicção de que fazer compras online deve ser simples, seguro e acessível para todos. Cada produto na nossa plataforma representa o nosso compromisso com qualidade e confiança.
           </p>
         </div>
       </section>
@@ -28,7 +28,7 @@ export default function AboutPage() {
               Acreditamos que o comércio eletrónico deve ser significativo. A nossa missão é conectar milhões de compradores aos melhores produtos, oferecendo uma experiência de compra que prima pela transparência, variedade e praticidade.
             </p>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              Trabalhamos com vendedores e marcas que partilham o nosso compromisso com a excelência. Cada compra no eShopping Centre é um investimento em qualidade, conveniência e satisfação garantida.
+              Trabalhamos com vendedores e marcas que partilham o nosso compromisso com a excelência. Cada compra no e-Shopping Centre é um investimento em qualidade, conveniência e satisfação garantida.
             </p>
           </div>
 
@@ -36,7 +36,7 @@ export default function AboutPage() {
             <div>
               <h3 className="text-2xl mb-4 font-heading">Variedade sem Igual</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Com milhares de produtos em categorias como eletrónicos, moda, casa, beleza e muito mais, o eShopping Centre é o destino único para todas as suas necessidades. Trabalhamos com fornecedores certificados para garantir a autenticidade de cada item.
+                Com milhares de produtos em categorias como eletrónicos, moda, casa, beleza e muito mais, o e-Shopping Centre é o destino único para todas as suas necessidades. Trabalhamos com fornecedores certificados para garantir a autenticidade de cada item.
               </p>
             </div>
             <div>
@@ -65,7 +65,7 @@ export default function AboutPage() {
           </blockquote>
 
           <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-            No eShopping Centre, acreditamos que a melhor tecnologia é aquela que simplifica a sua vida. Por isso, investimos continuamente em inovação para tornar a sua experiência de compra cada vez mais intuitiva, rápida e personalizada.
+            No e-Shopping Centre, acreditamos que a melhor tecnologia é aquela que simplifica a sua vida. Por isso, investimos continuamente em inovação para tornar a sua experiência de compra cada vez mais intuitiva, rápida e personalizada.
           </p>
 
           <p className="text-lg text-muted-foreground leading-relaxed">

@@ -43,7 +43,7 @@ export default function SignInForm() {
       {/* Header */}
       <div className="p-6 border-b border-border">
         <h1 className="text-3xl font-semibold">Entrar</h1>
-        <p className="text-muted-foreground text-sm mt-2">Aceda à sua conta eShopping Centre</p>
+        <p className="text-muted-foreground text-sm mt-2">Aceda à sua conta e-Shopping Centre</p>
       </div>
 
       {/* Content */}

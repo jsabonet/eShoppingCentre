@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import { ChevronDown } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Ajuda & Suporte | eShopping Centre',
+  title: 'Ajuda & Suporte | e-Shopping Centre',
   description:
-    'Central de ajuda do eShopping Centre. Encontre respostas para perguntas frequentes, informações de entrega e política de devoluções.',
+    'Central de ajuda do e-Shopping Centre. Encontre respostas para perguntas frequentes, informações de entrega e política de devoluções.',
 };
 
 const faqItems = [
@@ -12,7 +12,7 @@ const faqItems = [
     question: 'Como faço para criar uma conta?',
     answer: (
       <>
-        <p className="mb-3">Criar uma conta no eShopping Centre é rápido e gratuito:</p>
+        <p className="mb-3">Criar uma conta no e-Shopping Centre é rápido e gratuito:</p>
         <ul className="list-disc list-inside space-y-2 ml-2">
           <li>Clique em &ldquo;Entrar&rdquo; no canto superior direito</li>
           <li>Selecione &ldquo;Criar Conta&rdquo;</li>

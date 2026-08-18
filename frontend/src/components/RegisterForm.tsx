@@ -60,7 +60,7 @@ export default function RegisterForm() {
       {/* Header */}
       <div className="p-6 border-b border-border">
         <h1 className="text-3xl font-semibold">Criar Conta</h1>
-        <p className="text-muted-foreground text-sm mt-2">Junte-se ao eShopping Centre para ofertas exclusivas</p>
+        <p className="text-muted-foreground text-sm mt-2">Junte-se ao e-Shopping Centre para ofertas exclusivas</p>
       </div>
 
       {/* Content */}

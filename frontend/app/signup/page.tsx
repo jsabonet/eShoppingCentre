@@ -62,7 +62,7 @@ export default function SignupPage() {
               className="mt-1 accent-accent" required />
             <span className="text-sm text-muted-foreground">
               Concordo com os <Link href="/terms" className="text-accent hover:underline">Termos de Serviço</Link> e a{' '}
-              <Link href="/privacy" className="text-accent hover:underline">Política de Privacidade</Link> do eShoppingCentre.
+              <Link href="/privacy" className="text-accent hover:underline">Política de Privacidade</Link> do e-Shopping Centre.
             </span>
           </label>
 

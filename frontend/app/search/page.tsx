@@ -5,7 +5,7 @@ import SearchClient from '@/src/components/SearchClient';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-export const metadata: Metadata = { title: 'Pesquisa | eShoppingCentre' };
+export const metadata: Metadata = { title: 'Pesquisa | e-Shopping Centre' };
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const params = await searchParams;

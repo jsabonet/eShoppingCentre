@@ -14,10 +14,10 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   const { slug } = await params;
   try {
     const res = await fetch(`${API_URL}/categories/${slug}/`, { next: { revalidate: 60 } });
-    if (!res.ok) return { title: 'Categoria não encontrada | eShoppingCentre' };
+    if (!res.ok) return { title: 'Categoria não encontrada | e-Shopping Centre' };
     const cat = await res.json();
-    return { title: `${cat.name} | eShoppingCentre`, description: cat.description };
-  } catch { return { title: 'Categoria | eShoppingCentre' }; }
+    return { title: `${cat.name} | e-Shopping Centre`, description: cat.description };
+  } catch { return { title: 'Categoria | e-Shopping Centre' }; }
 }
 
 export default async function CategoryPage({ params }: CategoryPageProps) {

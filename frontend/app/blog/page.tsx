@@ -4,7 +4,7 @@ import { ChevronRight, Calendar, User, Tag, ArrowRight } from 'lucide-react';
 import BlogBannerSlider from '@/src/components/BlogBannerSlider';
 
 export const metadata: Metadata = {
-  title: 'Blog | eShoppingCentre',
+  title: 'Blog | e-Shopping Centre',
   description: 'Fique por dentro das novidades, dicas e tendências do mundo das compras online.',
 };
 
@@ -63,9 +63,9 @@ const blogPosts: BlogPost[] = [
   {
     slug: 'compras-online-seguras-mocambique',
     title: 'Como Fazer Compras Online Seguras em Moçambique',
-    excerpt: 'Dicas essenciais para garantir uma experiência de compra online segura e tranquila no eShoppingCentre.',
+    excerpt: 'Dicas essenciais para garantir uma experiência de compra online segura e tranquila no e-Shopping Centre.',
     image: 'https://cdn.b12.io/client_media/iKv1biKD/5783f32a-7e6e-11f1-a05c-0242ac110002-gL5f6HGZjVLK9tX7ZtneG.jpg',
-    author: 'Equipa eShoppingCentre',
+    author: 'Equipa e-Shopping Centre',
     date: '20 Junho, 2026',
     category: 'Segurança',
     readTime: '4 min',

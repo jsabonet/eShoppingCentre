@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Página não encontrada | eShoppingCentre',
+  title: 'Página não encontrada | e-Shopping Centre',
 };
 
 export default function NotFoundPage() {

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronRight, MapPin, Package, Star, Store as StoreIcon } from 'lucide-react';
 
-export const metadata: Metadata = { title: 'Lojas | eShoppingCentre' };
+export const metadata: Metadata = { title: 'Lojas | e-Shopping Centre' };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';

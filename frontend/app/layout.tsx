@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'eShoppingCentre — Marketplace em Moçambique',
-    template: '%s | eShoppingCentre',
+    default: 'e-Shopping Centre — Marketplace em Moçambique',
+    template: '%s | e-Shopping Centre',
   },
   description:
     'A sua plataforma global de e-commerce. Compre e venda produtos físicos, digitais e cursos online em Moçambique.',
@@ -31,23 +31,23 @@ export const metadata: Metadata = {
     'loja online',
     'produtos digitais',
     'cursos online',
-    'eShoppingCentre',
+    'e-Shopping Centre',
   ],
-  authors: [{ name: 'eShoppingCentre' }],
-  creator: 'eShoppingCentre',
-  publisher: 'eShoppingCentre',
+  authors: [{ name: 'e-Shopping Centre' }],
+  creator: 'e-Shopping Centre',
+  publisher: 'e-Shopping Centre',
   robots: { index: true, follow: true },
   openGraph: {
     type: 'website',
     locale: 'pt_MZ',
-    siteName: 'eShoppingCentre',
-    title: 'eShoppingCentre — Marketplace em Moçambique',
+    siteName: 'e-Shopping Centre',
+    title: 'e-Shopping Centre — Marketplace em Moçambique',
     description: 'Compre e venda produtos físicos, digitais e cursos online.',
     images: [{ url: '/icon.png', width: 512, height: 512 }],
   },
   twitter: {
     card: 'summary',
-    title: 'eShoppingCentre',
+    title: 'e-Shopping Centre',
     description: 'Marketplace em Moçambique',
     images: ['/icon.png'],
   },

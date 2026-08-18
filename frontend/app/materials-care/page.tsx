@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import { Zap, Droplets, Shield } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Qualidade & Cuidados | eShopping Centre',
+  title: 'Qualidade & Cuidados | e-Shopping Centre',
   description:
-    'Conheça os nossos padrões de qualidade, política de garantia e dicas para cuidar dos seus produtos comprados no eShopping Centre.',
+    'Conheça os nossos padrões de qualidade, política de garantia e dicas para cuidar dos seus produtos comprados no e-Shopping Centre.',
 };
 
 export default function MaterialsCarePage() {
@@ -15,7 +15,7 @@ export default function MaterialsCarePage() {
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-5xl md:text-6xl mb-6 font-heading">Qualidade & Cuidados</h1>
           <p className="text-lg text-muted-foreground">
-            Compreender a qualidade dos produtos e saber como cuidar deles garante que as suas compras no eShopping Centre durem muito mais tempo.
+            Compreender a qualidade dos produtos e saber como cuidar deles garante que as suas compras no e-Shopping Centre durem muito mais tempo.
           </p>
         </div>
       </section>
@@ -29,7 +29,7 @@ export default function MaterialsCarePage() {
             <div>
               <h3 className="text-2xl font-semibold mb-4">Eletrónicos & Tecnologia</h3>
               <p className="text-muted-foreground leading-relaxed mb-4">
-                Todos os produtos eletrónicos no eShopping Centre são provenientes de distribuidores oficiais e passam por rigorosos controlos de autenticidade. Trabalhamos apenas com marcas certificadas para garantir o melhor desempenho.
+                Todos os produtos eletrónicos no e-Shopping Centre são provenientes de distribuidores oficiais e passam por rigorosos controlos de autenticidade. Trabalhamos apenas com marcas certificadas para garantir o melhor desempenho.
               </p>
               <ul className="list-disc list-inside text-muted-foreground space-y-2">
                 <li>Garantia mínima de 12 meses em todos os eletrónicos</li>
@@ -83,7 +83,7 @@ export default function MaterialsCarePage() {
               <div>
                 <h3 className="text-xl font-semibold mb-2">Vendedores Verificados</h3>
                 <p className="text-muted-foreground">
-                  Todos os vendedores na nossa plataforma passam por um rigoroso processo de verificação. Exigimos documentação legal, histórico comercial e referências antes de autorizar qualquer loja a vender no eShopping Centre.
+                  Todos os vendedores na nossa plataforma passam por um rigoroso processo de verificação. Exigimos documentação legal, histórico comercial e referências antes de autorizar qualquer loja a vender no e-Shopping Centre.
                 </p>
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function MaterialsCarePage() {
             <div>
               <h3 className="text-2xl font-semibold mb-4">Garantia & Assistência</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Todos os produtos do eShopping Centre têm garantia mínima de 12 meses contra defeitos de fabrico. Para eletrónicos, a garantia cobre componentes e mão de obra. Guarde sempre a fatura de compra — é o seu comprovativo para acionar a garantia. Em caso de dúvidas, a nossa equipa de suporte está disponível para orientar.
+                Todos os produtos do e-Shopping Centre têm garantia mínima de 12 meses contra defeitos de fabrico. Para eletrónicos, a garantia cobre componentes e mão de obra. Guarde sempre a fatura de compra — é o seu comprovativo para acionar a garantia. Em caso de dúvidas, a nossa equipa de suporte está disponível para orientar.
               </p>
             </div>
           </div>

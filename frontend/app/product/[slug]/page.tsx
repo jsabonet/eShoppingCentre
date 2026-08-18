@@ -19,10 +19,10 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const { slug } = await params;
   try {
     const res = await fetch(`${API_URL}/products/${slug}/`, { next: { revalidate: 60 } });
-    if (!res.ok) return { title: 'Produto não encontrado | eShoppingCentre' };
+    if (!res.ok) return { title: 'Produto não encontrado | e-Shopping Centre' };
     const product = await res.json();
-    return { title: `${product.name} | eShoppingCentre`, description: product.description };
-  } catch { return { title: 'Produto | eShoppingCentre' }; }
+    return { title: `${product.name} | e-Shopping Centre`, description: product.description };
+  } catch { return { title: 'Produto | e-Shopping Centre' }; }
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {

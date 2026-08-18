@@ -246,7 +246,7 @@ export default function SellerRegisterPage() {
           <div className="inline-flex p-3 bg-accent/10 rounded-full mb-4">
             <Store size={32} className="text-accent" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">Abra sua Loja no eShoppingCentre</h1>
+          <h1 className="text-3xl font-bold mb-2">Abra sua Loja no e-Shopping Centre</h1>
           <p className="text-muted-foreground">
             Junte-se ao maior marketplace de Moçambique e comece a vender hoje mesmo.
           </p>
@@ -961,7 +961,7 @@ export default function SellerRegisterPage() {
                   className="mt-1 accent-accent" required />
                 <span className="text-sm text-muted-foreground">
                   Concordo com os <Link href="/terms" className="text-accent hover:underline">Termos de Serviço</Link> e a{' '}
-                  <Link href="/privacy" className="text-accent hover:underline">Política de Privacidade</Link> do eShoppingCentre.
+                  <Link href="/privacy" className="text-accent hover:underline">Política de Privacidade</Link> do e-Shopping Centre.
                 </span>
               </label>
             </>

@@ -164,7 +164,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Footer */}
         <footer className="border-t border-slate-200 py-3 px-6 text-center text-xs text-slate-400">
-          eShoppingCentre Admin &copy; 2026 — Ambiente Administrativo
+          e-Shopping Centre Admin &copy; 2026 — Ambiente Administrativo
         </footer>
       </div>
     </div>

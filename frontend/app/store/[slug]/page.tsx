@@ -22,10 +22,10 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
   const { slug } = await params;
   try {
     const res = await fetch(`${API_URL}/stores/${slug}/`, { next: { revalidate: 60 } });
-    if (!res.ok) return { title: 'Loja não encontrada | eShoppingCentre' };
+    if (!res.ok) return { title: 'Loja não encontrada | e-Shopping Centre' };
     const store = await res.json();
-    return { title: `${store.name} | eShoppingCentre`, description: store.description };
-  } catch { return { title: 'Loja | eShoppingCentre' }; }
+    return { title: `${store.name} | e-Shopping Centre`, description: store.description };
+  } catch { return { title: 'Loja | e-Shopping Centre' }; }
 }
 
 export default async function StorePage({ params }: StorePageProps) {

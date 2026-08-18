@@ -93,7 +93,7 @@ class Command(BaseCommand):
             ('tendencias-moda-2026', 'Tendências de Moda para o Inverno 2026',
              'Descubra as principais tendências da estação.', 'Ana Mondlane', 'Moda'),
             ('compras-online-seguras-mocambique', 'Como Fazer Compras Online Seguras em Moçambique',
-             'Dicas essenciais para compras online seguras.', 'Equipa eShoppingCentre', 'Segurança'),
+             'Dicas essenciais para compras online seguras.', 'Equipa e-Shopping Centre', 'Segurança'),
         ]
         for slug, title, excerpt, author, cat in blog_posts:
             BlogPost.objects.get_or_create(

@@ -129,10 +129,10 @@ class AdminStoreManageView(APIView):
             send_mail(
                 subject=f'A sua loja "{store_name}" foi removida',
                 message=f'Olá,\n\n'
-                        f'A sua loja "{store_name}" foi removida permanentemente do eShoppingCentre '
+                        f'A sua loja "{store_name}" foi removida permanentemente do e-Shopping Centre '
                         f'por um administrador.\n\n'
                         f'Para mais informações, contacte o suporte.\n\n'
-                        f'Equipa eShoppingCentre',
+                        f'Equipa e-Shopping Centre',
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[owner_email],
                 fail_silently=True,
@@ -198,9 +198,9 @@ class AdminStoreManageView(APIView):
                     send_mail(
                         subject=f'🎉 A sua loja "{store.name}" foi aprovada!',
                         message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
-                                f'A sua loja "{store.name}" foi aprovada e já está activa no eShoppingCentre.\n\n'
+                                f'A sua loja "{store.name}" foi aprovada e já está activa no e-Shopping Centre.\n\n'
                                 f'Aceda ao seu painel de vendedor: https://eshoppingcentre.co.mz/seller/dashboard\n\n'
-                                f'Obrigado por se juntar a nós!\nEquipa eShoppingCentre',
+                                f'Obrigado por se juntar a nós!\nEquipa e-Shopping Centre',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[owner_email],
                         fail_silently=True,
@@ -212,7 +212,7 @@ class AdminStoreManageView(APIView):
                                 f'A sua loja "{store.name}" foi suspensa por um administrador.\n\n'
                                 f'Os seus produtos foram removidos do marketplace. '
                                 f'Contacte o suporte para mais informações.\n\n'
-                                f'Equipa eShoppingCentre',
+                                f'Equipa e-Shopping Centre',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[owner_email],
                         fail_silently=True,
@@ -222,9 +222,9 @@ class AdminStoreManageView(APIView):
                         subject=f'A sua loja "{store.name}" foi reactivada!',
                         message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
                                 f'A sua loja "{store.name}" foi reactivada e já está novamente activa '
-                                f'no eShoppingCentre.\n\n'
+                                f'no e-Shopping Centre.\n\n'
                                 f'Aceda ao seu painel: https://eshoppingcentre.co.mz/seller/dashboard\n\n'
-                                f'Equipa eShoppingCentre',
+                                f'Equipa e-Shopping Centre',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[owner_email],
                         fail_silently=True,
@@ -238,7 +238,7 @@ class AdminStoreManageView(APIView):
                                 f'Motivo: {reason_text}\n\n'
                                 f'Por favor, corrija os dados e submeta novamente.\n'
                                 f'Aceda: https://eshoppingcentre.co.mz/seller/register\n\n'
-                                f'Equipa eShoppingCentre',
+                                f'Equipa e-Shopping Centre',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[owner_email],
                         fail_silently=True,
@@ -252,7 +252,7 @@ class AdminStoreManageView(APIView):
                                 f'Motivo: {reason_text}\n\n'
                                 f'Por favor, aceda ao seu painel e envie os documentos solicitados:\n'
                                 f'https://eshoppingcentre.co.mz/seller/settings\n\n'
-                                f'Equipa eShoppingCentre',
+                                f'Equipa e-Shopping Centre',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[owner_email],
                         fail_silently=True,

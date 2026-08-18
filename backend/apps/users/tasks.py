@@ -1,10 +1,15 @@
+import base64
+from pathlib import Path
+
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-SITE_NAME = 'eShopping Centre'
+SITE_NAME = 'e-Shopping Centre'
+
+_LOGO_FILE = Path(settings.BASE_DIR) / 'apps' / 'users' / 'static' / 'email-logo.png'
 
 
 def dispatch(task_func, *args):
@@ -15,10 +20,24 @@ def dispatch(task_func, *args):
         task_func.delay(*args)
 
 
+def _logo_src() -> str:
+    """Devolve o src do logótipo: URL pública se definida, senão base64 embutido."""
+    url = getattr(settings, 'EMAIL_LOGO_URL', '')
+    if url:
+        return url
+    try:
+        if _LOGO_FILE.exists():
+            data = base64.b64encode(_LOGO_FILE.read_bytes()).decode('ascii')
+            return f'data:image/png;base64,{data}'
+    except Exception:
+        pass
+    return ''
+
+
 def _base_context(**extra):
     context = {
         'site_name': SITE_NAME,
-        'logo_url': settings.EMAIL_LOGO_URL,
+        'logo_src': _logo_src(),
         'frontend_url': settings.FRONTEND_URL,
         'support_email': settings.DEFAULT_FROM_EMAIL,
         'year': timezone.now().year,

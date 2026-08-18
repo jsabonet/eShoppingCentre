@@ -155,7 +155,7 @@ def recover_abandoned_carts():
         message = (
             f'Olá {user.get_full_name() or user.email},\n\n'
             f'Ainda tem {len(items)} item(ns) no seu carrinho: {item_names}.\n'
-            f'Volte ao eShoppingCentre para concluir a sua compra!\n\n'
+            f'Volte ao e-Shopping Centre para concluir a sua compra!\n\n'
             f'https://e-shoppingcentre.com/cart'
         )
 

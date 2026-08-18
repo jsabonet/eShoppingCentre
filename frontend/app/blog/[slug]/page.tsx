@@ -30,7 +30,7 @@ const blogPosts = [
       <h2>5. Bateria</h2>
       <p>Uma bateria de 4000mAh a 5000mAh garante um dia inteiro de uso moderado. Carregamento rápido e sem fio são diferenciais importantes.</p>
       
-      <p>No eShoppingCentre, você encontra as melhores marcas com preços imperdíveis e garantia de qualidade.</p>
+      <p>No e-Shopping Centre, você encontra as melhores marcas com preços imperdíveis e garantia de qualidade.</p>
     `,
     image: 'https://cdn.b12.io/client_media/iKv1biKD/5aa3154d-7e6e-11f1-82d2-0242ac110002-9e8FSvH-aRUq9K6kB6vgg.jpg',
     author: 'Maria Santos',
@@ -57,7 +57,7 @@ const blogPosts = [
       <h2>Camadas</h2>
       <p>O segredo do inverno está nas camadas. Combine peças leves com pesadas para criar looks versáteis e elegantes.</p>
       
-      <p>Renove seu guarda-roupa no eShoppingCentre com as melhores marcas e preços imperdíveis.</p>
+      <p>Renove seu guarda-roupa no e-Shopping Centre com as melhores marcas e preços imperdíveis.</p>
     `,
     image: 'https://cdn.b12.io/client_media/iKv1biKD/573236fc-7e6e-11f1-b28a-0242ac110002-Mx9rZvBhnQsQIHRgeCPAG.jpg',
     author: 'Ana Mondlane',
@@ -87,7 +87,7 @@ const blogPosts = [
       <h2>5. Espelhos</h2>
       <p>Espelhos ampliam o espaço e refletem a luz natural. São funcionais e decorativos ao mesmo tempo.</p>
       
-      <p>Encontre tudo para sua casa no eShoppingCentre!</p>
+      <p>Encontre tudo para sua casa no e-Shopping Centre!</p>
     `,
     image: 'https://cdn.b12.io/client_media/iKv1biKD/56e3e86a-7e6e-11f1-9b16-0242ac110002-lV9iFfIRaKz-QW2YWUhD6.jpg',
     author: 'Carlos Macamo',
@@ -114,7 +114,7 @@ const blogPosts = [
       <h2>Alimentação</h2>
       <p>Alimentos ricos em antioxidantes como frutas vermelhas, tomate e cenoura ajudam a proteger a pele de dentro para fora.</p>
       
-      <p>No eShoppingCentre, você encontra os melhores produtos de skincare para todas as estações.</p>
+      <p>No e-Shopping Centre, você encontra os melhores produtos de skincare para todas as estações.</p>
     `,
     image: 'https://cdn.b12.io/client_media/iKv1biKD/5b3d4eeb-7e6e-11f1-a4fd-0242ac110002-Laj5wp2staB6CEmJSAMHj.jpg',
     author: 'Dra. Joana Silva',
@@ -130,7 +130,7 @@ const blogPosts = [
       <p>Comprar online é prático e seguro quando se toma os devidos cuidados. Confira nossas dicas para uma experiência tranquila.</p>
       
       <h2>Escolha Plataformas Confiáveis</h2>
-      <p>Opte por marketplaces conhecidos como o eShoppingCentre, que oferecem proteção ao comprador e suporte dedicado.</p>
+      <p>Opte por marketplaces conhecidos como o e-Shopping Centre, que oferecem proteção ao comprador e suporte dedicado.</p>
       
       <h2>Verifique a Reputação do Vendedor</h2>
       <p>Leia avaliações de outros compradores e verifique a classificação do vendedor antes de finalizar a compra.</p>
@@ -144,10 +144,10 @@ const blogPosts = [
       <h2>Desconfie de Ofertas Milagrosas</h2>
       <p>Se o preço é muito abaixo do mercado, desconfie. Compare preços e leia a descrição do produto com atenção.</p>
       
-      <p>No eShoppingCentre, sua segurança é nossa prioridade. Compre com confiança!</p>
+      <p>No e-Shopping Centre, sua segurança é nossa prioridade. Compre com confiança!</p>
     `,
     image: 'https://cdn.b12.io/client_media/iKv1biKD/5783f32a-7e6e-11f1-a05c-0242ac110002-gL5f6HGZjVLK9tX7ZtneG.jpg',
-    author: 'Equipa eShoppingCentre',
+    author: 'Equipa e-Shopping Centre',
     date: '20 Junho, 2026',
     category: 'Segurança',
     readTime: '4 min',
@@ -174,7 +174,7 @@ const blogPosts = [
       <h2>Presentes Personalizados</h2>
       <p>Canecas, camisetas ou quadros personalizados mostram carinho e atenção aos detalhes.</p>
       
-      <p>No eShoppingCentre, você encontra o presente ideal para o seu pai com frete grátis para todo Moçambique!</p>
+      <p>No e-Shopping Centre, você encontra o presente ideal para o seu pai com frete grátis para todo Moçambique!</p>
     `,
     image: 'https://cdn.b12.io/client_media/iKv1biKD/5b14c4b0-7e6e-11f1-b1e8-0242ac110002-oyS3W01yYqyLQZ3o0OyFG.jpg',
     author: 'Maria Santos',
@@ -187,9 +187,9 @@ const blogPosts = [
 export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
   const post = blogPosts.find((p) => p.slug === slug);
-  if (!post) return { title: 'Post não encontrado | eShoppingCentre' };
+  if (!post) return { title: 'Post não encontrado | e-Shopping Centre' };
   return {
-    title: `${post.title} | Blog eShoppingCentre`,
+    title: `${post.title} | Blog e-Shopping Centre`,
     description: post.excerpt,
   };
 }

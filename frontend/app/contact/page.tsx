@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import { Mail, Phone, Clock } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Contactos | eShopping Centre',
+  title: 'Contactos | e-Shopping Centre',
   description:
-    'Entre em contacto com o eShopping Centre. Dúvidas sobre produtos, encomendas, ou suporte — a nossa equipa está pronta para ajudar.',
+    'Entre em contacto com o e-Shopping Centre. Dúvidas sobre produtos, encomendas, ou suporte — a nossa equipa está pronta para ajudar.',
 };
 
 export default function ContactPage() {
@@ -175,7 +175,7 @@ export default function ContactPage() {
 
             <a href="/about" className="p-6 bg-background rounded border border-border hover:border-accent transition-colors group">
               <h3 className="font-semibold mb-2 group-hover:text-accent transition-colors">
-                Sobre o eShopping Centre
+                Sobre o e-Shopping Centre
               </h3>
               <p className="text-sm text-muted-foreground">
                 Conheça a nossa história, missão e compromisso com a qualidade.

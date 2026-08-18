@@ -205,7 +205,7 @@ export default function MobileMenu({ categories }: MobileMenuProps) {
             {/* Footer */}
             <div className="p-4 border-t border-border bg-muted/30">
               <p className="text-xs text-center text-muted-foreground">
-                &copy; 2026 eShoppingCentre. Todos os direitos reservados.
+                &copy; 2026 e-Shopping Centre. Todos os direitos reservados.
               </p>
             </div>
           </div>

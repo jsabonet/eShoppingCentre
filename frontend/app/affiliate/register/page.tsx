@@ -49,7 +49,7 @@ export default function AffiliateRegisterPage() {
           </div>
           <h1 className="text-3xl md:text-4xl font-bold mb-3">Torne-se um Afiliado</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Ganhe dinheiro promovendo produtos do eShoppingCentre. Partilhe links, ganhe comissões e acompanhe tudo pelo seu painel.
+            Ganhe dinheiro promovendo produtos do e-Shopping Centre. Partilhe links, ganhe comissões e acompanhe tudo pelo seu painel.
           </p>
         </div>
 

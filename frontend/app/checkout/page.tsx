@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import CheckoutContent from '@/src/components/CheckoutContent';
 
 export const metadata: Metadata = {
-  title: 'Checkout | eShopping Centre',
+  title: 'Checkout | e-Shopping Centre',
   description:
-    'Finalize sua compra no eShopping Centre. Entrega em todo Moçambique com múltiplas opções de pagamento.',
+    'Finalize sua compra no e-Shopping Centre. Entrega em todo Moçambique com múltiplas opções de pagamento.',
 };
 
 export default function CheckoutPage() {
