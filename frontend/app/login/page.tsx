@@ -9,10 +9,20 @@ import GoogleSignInButton from '@/src/components/GoogleSignInButton';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import PasswordInput from '@/src/components/PasswordInput';
 
+/** Só permite redirecionar para caminhos internos (evita open redirect). */
+function safeRedirect(target: string): string {
+  if (!target) return '/';
+  // Bloqueia URLs absolutas (http://, https://) e protocol-relative (//)
+  if (/^(https?:)?\/\//i.test(target)) return '/';
+  // Bloqueia o truque de backslash (/\ → //)
+  if (/^\/\\/.test(target)) return '/';
+  return target.startsWith('/') ? target : '/';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/';
+  const redirect = safeRedirect(searchParams.get('redirect') || '');
   const isAdminLogin = redirect.startsWith('/admin');
   const { login, isAuthenticated, isAdmin } = useAuth();
   const [email, setEmail] = useState('');
