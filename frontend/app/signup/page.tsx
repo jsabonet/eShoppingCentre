@@ -7,11 +7,12 @@ import { useAuth } from '@/src/hooks/useAuth';
 import GoogleSignInButton from '@/src/components/GoogleSignInButton';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import PasswordInput from '@/src/components/PasswordInput';
+import PasswordStrength from '@/src/components/PasswordStrength';
 
 export default function SignupPage() {
   const router = useRouter();
   const { register, isAuthenticated, user } = useAuth();
-  const [form, setForm] = useState({ email: '', username: '', password: '', password2: '', first_name: '', last_name: '', phone: '' });
+  const [form, setForm] = useState({ email: '', password: '', password2: '', first_name: '', last_name: '', phone: '' });
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +34,7 @@ export default function SignupPage() {
     if (!agreeTerms) { setError('Deve aceitar os Termos de Serviço e a Política de Privacidade para continuar.'); return; }
     setLoading(true);
     try {
-      await register({ email: form.email, username: form.username, password: form.password, password2: form.password2, first_name: form.first_name, last_name: form.last_name, phone: form.phone });
+      await register({ email: form.email, password: form.password, password2: form.password2, first_name: form.first_name, last_name: form.last_name, phone: form.phone });
       // O effect acima redirecciona para /verify-email
     } catch (err: any) {
       const data = err.response?.data;
@@ -48,14 +49,13 @@ export default function SignupPage() {
         {error && <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-4">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="block text-sm font-medium mb-1">Nome</label><input type="text" value={form.first_name} onChange={(e) => update('first_name', e.target.value)} className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-            <div><label className="block text-sm font-medium mb-1">Apelido</label><input type="text" value={form.last_name} onChange={(e) => update('last_name', e.target.value)} className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
+            <div><label className="block text-sm font-medium mb-1">Nome</label><input type="text" autoComplete="given-name" value={form.first_name} onChange={(e) => update('first_name', e.target.value)} className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
+            <div><label className="block text-sm font-medium mb-1">Apelido</label><input type="text" autoComplete="family-name" value={form.last_name} onChange={(e) => update('last_name', e.target.value)} className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
           </div>
-          <div><label className="block text-sm font-medium mb-1">Email *</label><input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} required className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-          <div><label className="block text-sm font-medium mb-1">Username *</label><input type="text" value={form.username} onChange={(e) => update('username', e.target.value)} required className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-          <div><label className="block text-sm font-medium mb-1">Telefone</label><input type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-          <div><label className="block text-sm font-medium mb-1">Password *</label><PasswordInput value={form.password} onChange={(e) => update('password', e.target.value)} required /></div>
-          <div><label className="block text-sm font-medium mb-1">Confirmar Password *</label><PasswordInput value={form.password2} onChange={(e) => update('password2', e.target.value)} required /></div>
+          <div><label className="block text-sm font-medium mb-1">Email *</label><input type="email" autoComplete="email" value={form.email} onChange={(e) => update('email', e.target.value)} required className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
+          <div><label className="block text-sm font-medium mb-1">Telefone</label><input type="tel" autoComplete="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" /></div>
+          <div><label className="block text-sm font-medium mb-1">Password *</label><PasswordInput value={form.password} onChange={(e) => update('password', e.target.value)} required autoComplete="new-password" /><PasswordStrength password={form.password} /></div>
+          <div><label className="block text-sm font-medium mb-1">Confirmar Password *</label><PasswordInput value={form.password2} onChange={(e) => update('password2', e.target.value)} required autoComplete="new-password" /></div>
 
           <label className="flex items-start gap-3 cursor-pointer">
             <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)}

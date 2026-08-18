@@ -10,9 +10,10 @@ interface PasswordInputProps {
   placeholder?: string;
   required?: boolean;
   id?: string;
+  autoComplete?: string;
 }
 
-export default function PasswordInput({ value, onChange, className = '', placeholder = '••••••••', required, id }: PasswordInputProps) {
+export default function PasswordInput({ value, onChange, className = '', placeholder = '••••••••', required, id, autoComplete }: PasswordInputProps) {
   const [show, setShow] = useState(false);
 
   return (
@@ -24,6 +25,7 @@ export default function PasswordInput({ value, onChange, className = '', placeho
         onChange={onChange}
         required={required}
         placeholder={placeholder}
+        autoComplete={autoComplete}
         className={`w-full px-4 py-2.5 pr-10 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring ${className}`}
       />
       <button

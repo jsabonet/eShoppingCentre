@@ -84,6 +84,14 @@ ASGI_APPLICATION = 'config.asgi.application'
 
 AUTH_USER_MODEL = 'users.User'
 
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 10}},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {'NAME': 'apps.users.password_validators.MixedCharacterValidator'},
+]
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',

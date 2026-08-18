@@ -1,11 +1,12 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 import { authAPI } from '@/src/lib/api';
+import OtpInput from '@/src/components/OtpInput';
 
 function VerifyEmailForm() {
   const router = useRouter();
@@ -18,6 +19,13 @@ function VerifyEmailForm() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setSuccess('');
@@ -39,6 +47,7 @@ function VerifyEmailForm() {
     try {
       const { data } = await authAPI.resendVerification(email);
       setSuccess(data.detail || 'Código reenviado.');
+      setCooldown(60);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Erro ao reenviar o código.');
     } finally { setResending(false); }
@@ -59,15 +68,7 @@ function VerifyEmailForm() {
         {success && <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm mb-4">{success}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            inputMode="numeric"
-            maxLength={6}
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-            placeholder="000000"
-            className="w-full text-center text-2xl tracking-[0.5em] px-4 py-3 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <OtpInput value={code} onChange={setCode} length={6} disabled={loading} />
           <button type="submit" disabled={loading || !email}
             className="w-full py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
             {loading ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
@@ -75,10 +76,10 @@ function VerifyEmailForm() {
           </button>
         </form>
 
-        <button onClick={handleResend} disabled={resending || !email}
+        <button onClick={handleResend} disabled={resending || !email || cooldown > 0}
           className="mt-4 text-sm text-accent hover:underline disabled:opacity-50 flex items-center justify-center gap-1 mx-auto">
           {resending && <Loader2 size={14} className="animate-spin" />}
-          Reenviar código
+          {cooldown > 0 ? `Reenviar em ${cooldown}s` : 'Reenviar código'}
         </button>
 
         <p className="text-center text-sm text-muted-foreground mt-6">

@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Email</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
+                <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required
                   className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
               <button type="submit" disabled={loading}

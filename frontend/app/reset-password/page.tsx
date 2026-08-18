@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { KeyRound, Loader2 } from 'lucide-react';
 import { authAPI } from '@/src/lib/api';
 import PasswordInput from '@/src/components/PasswordInput';
+import PasswordStrength from '@/src/components/PasswordStrength';
+import OtpInput from '@/src/components/OtpInput';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -46,22 +48,21 @@ export default function ResetPasswordPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
+            <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required
               className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Código</label>
-            <input type="text" inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              placeholder="000000" required
-              className="w-full text-center text-xl tracking-[0.5em] px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+            <OtpInput value={code} onChange={setCode} length={6} disabled={loading} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Nova Password</label>
-            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
+            <PasswordStrength password={password} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Confirmar Nova Password</label>
-            <PasswordInput value={password2} onChange={(e) => setPassword2(e.target.value)} required />
+            <PasswordInput value={password2} onChange={(e) => setPassword2(e.target.value)} required autoComplete="new-password" />
           </div>
           <button type="submit" disabled={loading}
             className="w-full py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">

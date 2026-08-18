@@ -18,7 +18,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<{ isNewUser: boolean }>;
   register: (data: {
     email: string;
-    username: string;
+    username?: string;
     password: string;
     password2: string;
     first_name?: string;
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerFn = async (formData: {
     email: string;
-    username: string;
+    username?: string;
     password: string;
     password2: string;
     first_name?: string;

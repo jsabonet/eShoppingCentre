@@ -414,7 +414,7 @@ export interface BlogPostDetail extends BlogPost {
 // ─── Funções da API ───
 
 export const authAPI = {
-  register: (data: { email: string; username: string; password: string; password2: string; first_name?: string; last_name?: string; phone?: string }) =>
+  register: (data: { email: string; username?: string; password: string; password2: string; first_name?: string; last_name?: string; phone?: string }) =>
     api.post<{ access: string; refresh: string; user: User }>('/auth/register/', data),
 
   login: (data: { email: string; password: string }) =>

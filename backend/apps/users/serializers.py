@@ -10,6 +10,7 @@ User = get_user_model()
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True)
+    username = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -22,11 +23,25 @@ class RegisterSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        username = (validated_data.pop('username', '') or '').strip()
+        if not username:
+            username = self._generate_username(validated_data['email'])
+        validated_data['username'] = username
         user = User.objects.create_user(**validated_data)
         user.roles = ['buyer']
         user.save()
         UserProfile.objects.create(user=user)
         return user
+
+    @staticmethod
+    def _generate_username(email):
+        base = email.split('@')[0][:30] or 'user'
+        username = base
+        counter = 1
+        while User.objects.filter(username=username).exists():
+            username = f'{base}{counter}'
+            counter += 1
+        return username
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
