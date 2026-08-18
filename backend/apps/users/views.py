@@ -374,7 +374,16 @@ def _blacklist_user_tokens(user):
         logger.warning(f'Falha ao revogar tokens de {user.email}: {exc}')
 
 
-class VerifyEmailView(APIView):
+class ThrottledPTMixin:
+    """Mensagem amigável (PT) quando um pedido é limitado por throttle."""
+
+    def throttled(self, request, wait):
+        from rest_framework.exceptions import Throttled
+        minutes = max(1, round(wait / 60))
+        raise Throttled(wait=wait, detail=f'Muitas tentativas. Tenta novamente em {minutes} minuto(s).')
+
+
+class VerifyEmailView(ThrottledPTMixin, APIView):
     """POST /api/v1/auth/verify-email/ — valida o OTP e marca a conta como verificada."""
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
@@ -409,7 +418,7 @@ class VerifyEmailView(APIView):
         return Response({'detail': 'Email verificado com sucesso.', 'user': _user_payload(user)})
 
 
-class ResendVerificationView(APIView):
+class ResendVerificationView(ThrottledPTMixin, APIView):
     """POST /api/v1/auth/resend-verification/ — reenvia o OTP de verificação."""
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
@@ -432,7 +441,7 @@ class ResendVerificationView(APIView):
         return Response({'detail': 'Código reenviado para o teu email.'})
 
 
-class PasswordResetRequestView(APIView):
+class PasswordResetRequestView(ThrottledPTMixin, APIView):
     """POST /api/v1/auth/password/reset/ — envia OTP de recuperação (resposta genérica)."""
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
@@ -453,7 +462,7 @@ class PasswordResetRequestView(APIView):
         return Response({'detail': 'Se o email existir, receberás um código de recuperação.'})
 
 
-class PasswordResetConfirmView(APIView):
+class PasswordResetConfirmView(ThrottledPTMixin, APIView):
     """POST /api/v1/auth/password/reset/confirm/ — valida OTP e define nova password."""
     permission_classes = [permissions.AllowAny]
     authentication_classes = []

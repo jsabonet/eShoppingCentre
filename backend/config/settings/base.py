@@ -127,8 +127,8 @@ REST_FRAMEWORK = {
         'user': '1000/hour',
         'login': '5/min',
         'otp_verify': '10/min',
-        'otp_resend': '3/hour',
-        'otp_reset': '3/hour',
+        'otp_resend': '5/hour',
+        'otp_reset': '5/hour',
     },
 }
 
