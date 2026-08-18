@@ -56,6 +56,10 @@ services:
       - CORS_ORIGINS=https://${DOMAIN}
       - FIREBASE_SERVICE_ACCOUNT_KEY=/app/credentials/firebase-adminsdk.json
       - FRONTEND_URL=https://${DOMAIN}
+      - EMAIL_LOGO_URL=https://${DOMAIN}/icon.png
+      # Email (Resend)
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-suporte@e-shoppingcentre.com}
       # AWS S3 / Spaces (para media files)
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
@@ -98,6 +102,11 @@ services:
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - FIREBASE_SERVICE_ACCOUNT_KEY=/app/credentials/firebase-adminsdk.json
+      - FRONTEND_URL=https://${DOMAIN}
+      - EMAIL_LOGO_URL=https://${DOMAIN}/icon.png
+      # Email (Resend)
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-suporte@e-shoppingcentre.com}
       # AWS S3 / Spaces (para media files)
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}

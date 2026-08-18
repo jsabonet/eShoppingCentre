@@ -1,6 +1,4 @@
-import base64
 import logging
-from pathlib import Path
 
 from celery import shared_task
 from django.conf import settings
@@ -10,8 +8,6 @@ from django.utils import timezone
 
 SITE_NAME = 'e-Shopping Centre'
 logger = logging.getLogger(__name__)
-
-_LOGO_FILE = Path(settings.BASE_DIR) / 'apps' / 'users' / 'static' / 'email-logo.png'
 
 
 def dispatch(task_func, *args):
@@ -37,17 +33,8 @@ def dispatch(task_func, *args):
 
 
 def _logo_src() -> str:
-    """Devolve o src do logótipo: URL pública se definida, senão base64 embutido."""
-    url = getattr(settings, 'EMAIL_LOGO_URL', '')
-    if url:
-        return url
-    try:
-        if _LOGO_FILE.exists():
-            data = base64.b64encode(_LOGO_FILE.read_bytes()).decode('ascii')
-            return f'data:image/png;base64,{data}'
-    except Exception:
-        pass
-    return ''
+    """Devolve o URL público do logótipo; vazio → o template usa o wordmark em texto."""
+    return getattr(settings, 'EMAIL_LOGO_URL', '')
 
 
 def _base_context(**extra):
