@@ -15,6 +15,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(','
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 SITE_URL = config('SITE_URL', default='https://e-shoppingcentre.com')
 BACKEND_URL = config('BACKEND_URL', default='http://localhost:8000')
+UNVERIFIED_ACCOUNT_DAYS = config('UNVERIFIED_ACCOUNT_DAYS', default=7, cast=int)
 
 INSTALLED_APPS = [
     'daphne',
@@ -188,6 +189,14 @@ CELERY_BEAT_SCHEDULE = {
     'release-escrow-after-return-window': {
         'task': 'apps.orders.tasks.release_escrow_after_return_window',
         'schedule': 3600.0,  # a cada hora
+    },
+    'delete-stale-unverified-users': {
+        'task': 'apps.users.tasks.delete_stale_unverified_users',
+        'schedule': 86400.0,  # diariamente
+    },
+    'send-verification-reminders': {
+        'task': 'apps.users.tasks.send_verification_reminders',
+        'schedule': 86400.0,  # diariamente
     },
 }
 

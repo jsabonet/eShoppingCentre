@@ -5,6 +5,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket, SupportTicketImage, AbandonedCart
+from apps.users.permissions import IsVerified
 
 
 # --- Transições de status permitidas ---
@@ -40,7 +41,7 @@ from .serializers import OrderSerializer, CreateOrderSerializer, ReturnRequestSe
 
 
 class CreateOrderView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsVerified]
 
     def post(self, request):
         serializer = CreateOrderSerializer(data=request.data, context={'request': request})

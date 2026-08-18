@@ -4,6 +4,7 @@ from django.db import IntegrityError
 from django.http import Http404
 from .models import Store
 from .serializers import StoreSerializer, StoreDetailSerializer
+from apps.users.permissions import IsVerified
 
 
 class StoreListView(generics.ListAPIView):
@@ -32,7 +33,7 @@ class MyStoreView(generics.RetrieveUpdateAPIView):
 
 class StoreRegisterView(generics.CreateAPIView):
     serializer_class = StoreDetailSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsVerified]
 
     def create(self, request, *args, **kwargs):
         # Check if user already has a store

@@ -12,10 +12,11 @@ from .models import AffiliateProfile, AffiliateLink, AffiliateCommission, Affili
 from .serializers import (AffiliateProfileSerializer, AffiliateLinkSerializer, AffiliateCommissionSerializer,
                           AffiliateSettingsSerializer, AffiliatePayoutSerializer, AffiliateKYCSerializer)
 from apps.products.models import Product
+from apps.users.permissions import IsVerified
 
 
 class AffiliateRegisterView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsVerified]
 
     def post(self, request):
         profile, created = AffiliateProfile.objects.get_or_create(
@@ -99,7 +100,7 @@ class MyCommissionsView(generics.ListAPIView):
 
 
 class AffiliatePayoutView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsVerified]
 
     def get(self, request):
         payouts = request.user.affiliate_profile.payouts.all()

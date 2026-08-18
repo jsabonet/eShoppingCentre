@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/src/components/ui/tooltip";
 import { Toaster } from "@/src/components/ui/sonner";
 import Header from "@/src/components/Header";
 import Footer from "@/src/components/Footer";
+import VerificationBanner from "@/src/components/VerificationBanner";
 import PWAInstall from "@/src/components/PWAInstall";
 import NavigationLoader from "@/src/components/NavigationLoader";
 import ChatWidget from "@/src/components/ChatWidget";
@@ -58,6 +59,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <TooltipProvider>
           <AuthGate>
             <Header />
+            <VerificationBanner />
             <div className="flex-1">{children}</div>
             <Footer />
           </AuthGate>

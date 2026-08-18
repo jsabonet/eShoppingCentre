@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from celery import shared_task
 from django.conf import settings
@@ -93,3 +94,42 @@ def send_welcome_email(email: str, first_name: str = '') -> None:
         text_message='Bem-vindo! A tua conta foi verificada com sucesso.',
         context=_base_context(first_name=first_name),
     )
+
+
+@shared_task
+def delete_stale_unverified_users():
+    """Apaga contas não verificadas após N dias (limpeza automática)."""
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    days = getattr(settings, 'UNVERIFIED_ACCOUNT_DAYS', 7)
+    cutoff = timezone.now() - timedelta(days=days)
+
+    stale = User.objects.filter(is_verified=False, is_staff=False, date_joined__lte=cutoff)
+    deleted = 0
+    for user in stale:
+        try:
+            user.delete()
+            deleted += 1
+        except Exception as exc:
+            logger.warning(f'Não foi possível apagar {user.email}: {exc}')
+    logger.info(f'Contas não verificadas removidas: {deleted}')
+
+
+@shared_task
+def send_verification_reminders():
+    """Envia lembrete de verificação a contas não verificadas criadas há ~24h."""
+    from django.contrib.auth import get_user_model
+    from . import otp_service
+
+    User = get_user_model()
+    now = timezone.now()
+    start = now - timedelta(hours=48)
+    end = now - timedelta(hours=20)
+
+    for user in User.objects.filter(is_verified=False, date_joined__gte=start, date_joined__lte=end):
+        try:
+            code = otp_service.create_otp(user, 'verification')
+            send_verification_email(user.email, code)
+        except Exception as exc:
+            logger.warning(f'Falha ao enviar lembrete para {user.email}: {exc}')

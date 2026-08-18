@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404
 from .models import PayoutRequest
 from .serializers import WalletSerializer, WalletTransactionSerializer, PayoutRequestSerializer
 from .services import request_payout, approve_payout, pay_payout, reject_payout, InsufficientFunds
+from apps.users.permissions import IsVerified
 
 
 class MyWalletView(generics.RetrieveAPIView):
@@ -25,7 +26,7 @@ class MyTransactionsView(generics.ListAPIView):
 
 class WalletPayoutView(APIView):
     """GET: listar os meus pedidos de saque; POST: solicitar saque (pagamento manual pelo admin)."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsVerified]
 
     def get(self, request):
         payouts = PayoutRequest.objects.filter(user=request.user).order_by('-created_at')
