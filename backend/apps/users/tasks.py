@@ -68,7 +68,7 @@ def _send_templated(subject, template_name, recipient, text_message, context):
     send_mail(
         subject=subject,
         message=text_message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=f'{SITE_NAME} <{settings.DEFAULT_FROM_EMAIL}>',
         recipient_list=[recipient],
         html_message=html,
         fail_silently=False,
