@@ -13,6 +13,7 @@ if not DEBUG and SECRET_KEY == 'dev-secret-key-change-in-production':
     )
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+SITE_URL = config('SITE_URL', default='https://e-shoppingcentre.com')
 BACKEND_URL = config('BACKEND_URL', default='http://localhost:8000')
 
 INSTALLED_APPS = [

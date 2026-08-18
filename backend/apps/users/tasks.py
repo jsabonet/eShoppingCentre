@@ -41,7 +41,7 @@ def _base_context(**extra):
     context = {
         'site_name': SITE_NAME,
         'logo_src': _logo_src(),
-        'frontend_url': settings.FRONTEND_URL,
+        'frontend_url': settings.SITE_URL,
         'support_email': settings.DEFAULT_FROM_EMAIL,
         'year': timezone.now().year,
     }
