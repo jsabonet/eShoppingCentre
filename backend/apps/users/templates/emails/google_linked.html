@@ -1,0 +1,28 @@
+{% extends "emails/base_email.html" %}
+
+{% block preheader %}Alerta de segurança: a tua conta foi ligada ao login com Google.{% endblock %}
+
+{% block content %}
+  <h1 style="margin:0 0 8px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;line-height:30px;color:#1b2a4a;font-weight:700;">
+    Ligação ao Google{% if first_name %}, {{ first_name }}{% endif %}
+  </h1>
+  <p style="margin:0 0 24px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#4b5563;">
+    A conta <strong style="color:#1b2a4a;">{{ account_email }}</strong> foi ligada ao login com Google.
+    A partir de agora podes entrar na e-Shopping Centre com o botão "Continuar com Google".
+  </p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+    <tr>
+      <td style="background-color:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px 20px;">
+        <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#9a3412;">
+          <strong>Se não foste tu</strong> que fizeste esta ligação, contacta o suporte imediatamente:
+          <a href="mailto:{{ support_email }}" style="color:#f97316;text-decoration:none;font-weight:600;">{{ support_email }}</a>.
+        </p>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#9ca3af;">
+    Recebeste este email porque a tua conta foi associada a um início de sessão com Google.
+  </p>
+{% endblock %}

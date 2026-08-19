@@ -437,7 +437,7 @@ export const authAPI = {
     api.post<{ detail: string }>('/auth/resend-verification/', { email }),
 
   requestPasswordReset: (email: string) =>
-    api.post<{ detail: string }>('/auth/password/reset/', { email }),
+    api.post<{ detail: string; google_only?: boolean }>('/auth/password/reset/', { email }),
 
   confirmPasswordReset: (data: { email: string; code: string; new_password: string }) =>
     api.post<{ detail: string }>('/auth/password/reset/confirm/', data),

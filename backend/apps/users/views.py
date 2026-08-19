@@ -222,6 +222,7 @@ class FirebaseTokenObtainPairView(APIView):
             )
 
         is_new_user = False
+        was_linked = False
 
         # Try to find existing user by firebase_uid
         try:
@@ -244,6 +245,7 @@ class FirebaseTokenObtainPairView(APIView):
                     user.firebase_uid = firebase_uid
                     user.auth_provider = firebase_provider
                     user.save(update_fields=['firebase_uid', 'auth_provider'])
+                    was_linked = True
                     logger.info(f'[FirebaseLogin] Conta ligada ao Google: {email}')
                 except User.DoesNotExist:
                     user = self._create_user_from_firebase(
@@ -262,6 +264,18 @@ class FirebaseTokenObtainPairView(APIView):
                 {'error': 'Conta de utilizador desativada.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        # Emails transacionais: boas-vindas (conta nova) e alerta de segurança (vinculação)
+        if is_new_user:
+            try:
+                tasks.dispatch(tasks.send_welcome_email, user.email, user.first_name)
+            except Exception as exc:
+                logger.warning(f'[FirebaseLogin] Falha ao enviar email de boas-vindas para {user.email}: {exc}')
+        elif was_linked:
+            try:
+                tasks.dispatch(tasks.send_google_linked_email, user.email, user.first_name)
+            except Exception as exc:
+                logger.warning(f'[FirebaseLogin] Falha ao enviar email de ligação ao Google para {user.email}: {exc}')
 
         # Generate JWT tokens
         logger.info(f'[FirebaseLogin] A gerar JWT para {user.email} (is_new_user={is_new_user})')
@@ -463,6 +477,12 @@ class PasswordResetRequestView(ThrottledPTMixin, APIView):
 
         user = User.objects.filter(email__iexact=email).first()
         if user is not None and user.is_active:
+            # Contas Google-only não têm password para redefinir — apontar para o Google
+            if user.auth_provider == 'google' and not user.has_usable_password():
+                return Response({
+                    'detail': 'Esta conta usa o login com Google. Usa "Continuar com Google" para entrar.',
+                    'google_only': True,
+                })
             code = otp_service.create_otp(user, 'password_reset')
             tasks.dispatch(tasks.send_password_reset_email, user.email, code)
 

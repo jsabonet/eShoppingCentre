@@ -97,6 +97,21 @@ def send_welcome_email(email: str, first_name: str = '') -> None:
 
 
 @shared_task
+def send_google_linked_email(email: str, first_name: str = '') -> None:
+    """Alerta de segurança: uma conta foi ligada ao login com Google."""
+    _send_templated(
+        subject=f'Alerta de segurança: ligação ao Google — {SITE_NAME}',
+        template_name='google_linked.html',
+        recipient=email,
+        text_message=(
+            f'A tua conta ({email}) foi ligada ao login com Google. '
+            'Se não foste tu, contacta o suporte imediatamente.'
+        ),
+        context=_base_context(first_name=first_name, account_email=email),
+    )
+
+
+@shared_task
 def delete_stale_unverified_users():
     """Apaga contas não verificadas após N dias (limpeza automática)."""
     from django.contrib.auth import get_user_model

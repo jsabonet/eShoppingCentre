@@ -8,14 +8,19 @@ import { authAPI } from '@/src/lib/api';
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [googleOnly, setGoogleOnly] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      await authAPI.requestPasswordReset(email);
-      setSent(true);
+      const { data } = await authAPI.requestPasswordReset(email);
+      if (data.google_only) {
+        setGoogleOnly(true);
+      } else {
+        setSent(true);
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Erro ao enviar. Tenta novamente.');
     } finally { setLoading(false); }
@@ -32,7 +37,16 @@ export default function ForgotPasswordPage() {
           <p className="text-sm text-muted-foreground mt-1">Indica o teu email para receberes um código.</p>
         </div>
 
-        {sent ? (
+        {googleOnly ? (
+          <div className="text-center space-y-4">
+            <div className="bg-amber-50 text-amber-700 p-3 rounded-lg text-sm">
+              Esta conta usa o login com Google. Usa o botão &quot;Continuar com Google&quot; para entrar.
+            </div>
+            <Link href="/login" className="inline-block px-6 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors">
+              Ir para o login
+            </Link>
+          </div>
+        ) : sent ? (
           <div className="text-center space-y-4">
             <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm">
               Se o email existir, receberás um código de recuperação.
