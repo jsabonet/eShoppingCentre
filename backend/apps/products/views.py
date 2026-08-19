@@ -42,9 +42,11 @@ class CategoryListView(generics.ListAPIView):
         if product_type:
             qs = qs.filter(product_type=product_type)
 
-        # Apenas categorias com imagem principal
+        # Apenas categorias com imagem principal.
+        # NOTA: NÃO filtramos por nº de produtos — categorias sem produtos
+        # (mas com imagem) também são exibidas na home.
         if with_image in ('true', '1'):
-            qs = qs.exclude(image='').exclude(image__isnull=True)
+            qs = qs.exclude(Q(image='') | Q(image__isnull=True))
 
         # Ordenação por relevância
         if sort == 'most_products':
