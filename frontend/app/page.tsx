@@ -189,11 +189,15 @@ export default async function Home() {
         </div>
       </section>
 
-      <TrendingCourses courses={trendingCourses} />
 
       <FeaturedStores stores={featuredStores} />
 
-      <HomepageShop sections={shopSections} />
+      <HomepageShop sections={shopSections.slice(0, 3)} />
+
+      <TrendingCourses courses={trendingCourses} />
+
+      <HomepageShop sections={shopSections.slice(3)} />
+
     </main>
   );
 }
