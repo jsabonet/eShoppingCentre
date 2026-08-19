@@ -55,13 +55,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Handle Firebase redirect sign-in on page load
   useEffect(() => {
     const handleRedirect = async () => {
+      console.log('[GoogleLogin] handleRedirect: a correr no mount da página.');
       try {
         const redirectData = await completeRedirectSignIn();
         if (redirectData) {
           // Exchange Firebase ID token for backend JWT
+          console.log('[GoogleLogin] redirectData obtido | email=', redirectData.email, '| idToken len=', redirectData.idToken.length);
           const { data } = await authAPI.firebaseLogin(redirectData.idToken);
+          console.log('[GoogleLogin] backend respondeu OK | user=', data.user?.email, '| is_new_user=', data.is_new_user);
           localStorage.setItem('access_token', data.access);
           setUser(data.user);
+        } else {
+          console.log('[GoogleLogin] Sem redirectData — nada a trocar com o backend.');
         }
       } catch (err: any) {
         console.error(

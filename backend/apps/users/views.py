@@ -185,6 +185,7 @@ class FirebaseTokenObtainPairView(APIView):
     throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
+        logger.info(f'[FirebaseLogin] POST /auth/firebase/ recebido | body keys={list(request.data.keys())} | id_token len={len(request.data.get("id_token", ""))}')
         serializer = FirebaseTokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -194,7 +195,7 @@ class FirebaseTokenObtainPairView(APIView):
             _init_firebase()
             decoded_token = firebase_auth_module.verify_id_token(id_token)
         except Exception as e:
-            logger.warning(f'Firebase token exchange failed: {e}')
+            logger.warning(f'[FirebaseLogin] Falha a verificar id_token: {type(e).__name__}: {e}')
             return Response(
                 {'error': f'Token Firebase inválido: {str(e)}'},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -205,6 +206,7 @@ class FirebaseTokenObtainPairView(APIView):
         email_verified = decoded_token.get('email_verified', False)
         name = decoded_token.get('name', '')
         firebase_provider = decoded_token.get('firebase', {}).get('sign_in_provider', 'google')
+        logger.info(f'[FirebaseLogin] Token OK | uid={firebase_uid} email={email} email_verified={email_verified} provider={firebase_provider}')
 
         if not firebase_uid:
             return Response(
@@ -224,13 +226,16 @@ class FirebaseTokenObtainPairView(APIView):
         # Try to find existing user by firebase_uid
         try:
             user = User.objects.get(firebase_uid=firebase_uid)
+            logger.info(f'[FirebaseLogin] Utilizador encontrado por firebase_uid: {user.email} (id={user.id})')
         except User.DoesNotExist:
             # Try to find by email (account linking)
             if email:
                 try:
                     user = User.objects.get(email=email)
+                    logger.info(f'[FirebaseLogin] Utilizador encontrado por email: {email} | is_verified={user.is_verified}')
                     # Segurança: só ligar Google a contas com email já verificado (anti pre-hijacking)
                     if not user.is_verified:
+                        logger.warning(f'[FirebaseLogin] Bloqueado: email {email} registado mas NÃO verificado')
                         return Response(
                             {'error': 'Este email já está registado mas não foi verificado. '
                                       'Entre com email/password e verifique o seu email primeiro.'},
@@ -239,11 +244,13 @@ class FirebaseTokenObtainPairView(APIView):
                     user.firebase_uid = firebase_uid
                     user.auth_provider = firebase_provider
                     user.save(update_fields=['firebase_uid', 'auth_provider'])
+                    logger.info(f'[FirebaseLogin] Conta ligada ao Google: {email}')
                 except User.DoesNotExist:
                     user = self._create_user_from_firebase(
                         firebase_uid, email, name, firebase_provider
                     )
                     is_new_user = True
+                    logger.info(f'[FirebaseLogin] Novo utilizador criado: {email}')
             else:
                 user = self._create_user_from_firebase(
                     firebase_uid, email, name, firebase_provider
@@ -257,6 +264,7 @@ class FirebaseTokenObtainPairView(APIView):
             )
 
         # Generate JWT tokens
+        logger.info(f'[FirebaseLogin] A gerar JWT para {user.email} (is_new_user={is_new_user})')
         refresh = RefreshToken.for_user(user)
 
         from .token_cookies import set_refresh_cookie

@@ -17,6 +17,40 @@ SITE_URL = config('SITE_URL', default='https://e-shoppingcentre.com')
 BACKEND_URL = config('BACKEND_URL', default='http://localhost:8000')
 UNVERIFIED_ACCOUNT_DAYS = config('UNVERIFIED_ACCOUNT_DAYS', default=7, cast=int)
 
+# ─── Logging (visível também em desenvolvimento) ───
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
+
 INSTALLED_APPS = [
     'daphne',
     'django.contrib.admin',

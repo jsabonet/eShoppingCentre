@@ -24,14 +24,17 @@ export default function GoogleSignInButton({
   const [error, setError] = useState('');
 
   const handleGoogleSignIn = async () => {
+    console.log('[GoogleSignInButton] Clique no botão Google — redirectTo=', redirectTo);
     setLoading(true);
     setError('');
     onLoadingChange?.(true);
 
     try {
       await loginWithGoogle();
+      console.log('[GoogleSignInButton] loginWithGoogle concluído, a navegar para', redirectTo);
       router.push(redirectTo);
     } catch (err: any) {
+      console.error('[GoogleSignInButton] Erro no clique Google:', err?.code || err?.response?.data || err?.message || err);
       // User closed the popup or auth failed
       const message =
         err.code === 'auth/popup-closed-by-user'

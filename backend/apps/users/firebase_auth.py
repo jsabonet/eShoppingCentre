@@ -41,13 +41,17 @@ def _init_firebase():
                 cred_path_resolved = os.path.join(
                     settings.BASE_DIR, cred_path
                 )
-            logger.info(f'Initializing Firebase with credentials: {cred_path_resolved}')
+            logger.info(f'[FirebaseLogin] Inicializando Firebase com credenciais: {cred_path_resolved}')
             cred = firebase_credentials.Certificate(cred_path_resolved)
             firebase_admin.initialize_app(cred)
         else:
             # Use default application credentials (e.g., GOOGLE_APPLICATION_CREDENTIALS env var)
-            logger.info('Initializing Firebase with default credentials')
+            logger.info('[FirebaseLogin] Inicializando Firebase com credenciais default')
             firebase_admin.initialize_app()
+        try:
+            logger.info(f'[FirebaseLogin] Firebase pronto | project_id={firebase_admin.get_app().project_id}')
+        except Exception:
+            pass
 
 
 class FirebaseAuthBackend(BaseBackend):
@@ -118,11 +122,12 @@ class FirebaseIDTokenAuthentication(authentication.BaseAuthentication):
         return self.authenticate_credentials(token)
 
     def authenticate_credentials(self, token):
+        logger.info(f'[FirebaseLogin] authenticate_credentials chamado | token len={len(token)}')
         try:
             _init_firebase()
             decoded_token = firebase_auth_module.verify_id_token(token)
         except Exception as e:
-            logger.warning(f'Firebase token verification failed: {e}')
+            logger.warning(f'[FirebaseLogin] Falha na verificação: {type(e).__name__}: {e}')
             raise exceptions.AuthenticationFailed(f'Token Firebase inválido: {str(e)}')
 
         firebase_uid = decoded_token.get('uid')

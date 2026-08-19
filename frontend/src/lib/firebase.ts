@@ -70,8 +70,10 @@ function getGoogleProvider(): GoogleAuthProvider {
  * chamada uma única vez no carregamento da página.
  */
 export async function signInWithGoogle(): Promise<void> {
+  console.log('[Firebase] signInWithRedirect: a iniciar redirect para o Google...');
   const auth = getFirebaseAuth();
   await signInWithRedirect(auth, getGoogleProvider());
+  console.log('[Firebase] signInWithRedirect: chamada concluída (browser vai sair da página).');
 }
 
 /**
@@ -87,11 +89,17 @@ export async function completeRedirectSignIn(): Promise<{
   firebaseUid: string;
 } | null> {
   const auth = getFirebaseAuth();
+  console.log('[Firebase] completeRedirectSignIn: a chamar getRedirectResult()...');
   try {
     const result = await getRedirectResult(auth);
-    if (!result) return null;
+    if (!result) {
+      console.log('[Firebase] getRedirectResult: SEM resultado pendente (null) — nenhum redirect em curso.');
+      return null;
+    }
 
+    console.log('[Firebase] getRedirectResult: utilizador obtido | uid=', result.user.uid, '| email=', result.user.email);
     const idToken = await result.user.getIdToken();
+    console.log('[Firebase] getIdToken OK | idToken len=', idToken.length);
     return {
       idToken,
       email: result.user.email,
@@ -102,6 +110,7 @@ export async function completeRedirectSignIn(): Promise<{
   } catch (error: any) {
     // Ignore errors from getRedirectResult (e.g., no pending redirect)
     if (error?.code === 'auth/no-current-user') {
+      console.log('[Firebase] getRedirectResult: auth/no-current-user (sem sessão pendente).');
       return null;
     }
     console.error('[Firebase] Erro no redirect sign-in:', error?.code, error?.message);
