@@ -127,7 +127,9 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Rating + sales */}
         <div className="flex items-center gap-1 mb-2">
-          <div className="flex">{renderStars(product.rating)}</div>
+          {product.rating > 0 && (
+            <div className="flex">{renderStars(product.rating)}</div>
+          )}
           {typeof product.salesCount === 'number' && product.salesCount > 0 && (
             <span className="text-xs text-muted-foreground ml-auto">
               {product.salesCount} vendidos
