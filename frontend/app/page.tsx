@@ -82,6 +82,7 @@ export default async function Home() {
   if (!sectionsEmpty) {
     homeSections = sectionsData;
   } else {
+    console.warn('[Home] home-sections vazio — a usar fallback individual');
     // Fallback: se o endpoint curado falhar, busca secções individualmente
     const [sale, best, newest, feat] = await Promise.all([
       fetchJSON(`${API_URL}/products/?is_on_sale=true&page_size=10`),
@@ -96,6 +97,14 @@ export default async function Home() {
       featured: feat?.results || [],
     };
   }
+
+  console.log('[Home] categorias=%d lojas=%d secções=%o',
+    categories.length, featuredStores.length, {
+      deals: homeSections.deals?.length || 0,
+      bestsellers: homeSections.bestsellers?.length || 0,
+      new_arrivals: homeSections.new_arrivals?.length || 0,
+      featured: homeSections.featured?.length || 0,
+    });
 
   const deals = (homeSections.deals || []).map(apiProductToCard);
   const bestsellers = (homeSections.bestsellers || []).map(apiProductToCard);

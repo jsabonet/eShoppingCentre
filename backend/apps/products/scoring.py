@@ -114,6 +114,7 @@ def _build_featured(active):
 def build_home_sections():
     """Devolve {'deals','bestsellers','new_arrivals','featured'} com listas de IDs."""
     active = Product.objects.filter(status='active', store__status='active')
+    logger.info('[scoring] build_home_sections: %d produtos ativos', active.count())
 
     # 1. Ofertas do Dia: desconto real >= limiar
     deals_ids = [
@@ -159,19 +160,23 @@ def build_home_sections():
     # 4. Destaques
     featured_ids = _build_featured(active)
 
-    return {
+    data = {
         'deals': deals_ids,
         'bestsellers': best_ids,
         'new_arrivals': new_ids,
         'featured': featured_ids,
     }
+    logger.info('[scoring] secções construídas: %s', {k: len(v) for k, v in data.items()})
+    return data
 
 
 def compute_and_cache_home_sections():
     """Recomputa scores, constrói secções e guarda em cache. Devolve os dados."""
+    logger.info('[scoring] compute_and_cache_home_sections: a recomputar...')
     refresh_featured_scores()
     data = build_home_sections()
     cache.set(HOME_SECTIONS_CACHE_KEY, data, CACHE_TIMEOUT)
+    logger.info('[scoring] cache home_sections atualizada')
     return data
 
 
@@ -179,5 +184,8 @@ def get_home_sections():
     """Devolve as secções (cache ou recomputa se vazio/em falta)."""
     data = cache.get(HOME_SECTIONS_CACHE_KEY)
     if not data or not any(data.get(k) for k in ('deals', 'bestsellers', 'new_arrivals', 'featured')):
+        logger.info('[scoring] cache home_sections vazia/ausente — recomputar')
         data = compute_and_cache_home_sections()
+    else:
+        logger.info('[scoring] cache hit home_sections: %s', {k: len(v) for k, v in data.items()})
     return data

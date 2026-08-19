@@ -84,13 +84,18 @@ def build_featured_stores(limit=FEATURED_STORES_CAP):
         .order_by('-total_sales')[:CANDIDATE_LIMIT]
     )
     candidates.sort(key=_store_score, reverse=True)
-    return [_store_payload(s) for s in candidates[:limit]]
+    payload = [_store_payload(s) for s in candidates[:limit]]
+    logger.info('[featured] build_featured_stores: %d lojas (candidatos=%d)', len(payload), len(candidates))
+    return payload
 
 
 def get_featured_stores():
     """Devolve as lojas em destaque (cache ou recomputa se vazio)."""
     data = cache.get(FEATURED_STORES_CACHE_KEY)
     if not data:
+        logger.info('[featured] cache vazia/ausente — recomputar')
         data = build_featured_stores()
         cache.set(FEATURED_STORES_CACHE_KEY, data, CACHE_TIMEOUT)
+    else:
+        logger.info('[featured] cache hit: %d lojas', len(data))
     return data
