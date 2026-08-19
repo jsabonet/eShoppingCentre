@@ -29,18 +29,22 @@ export default function BannerSlider({ banners }: BannerSliderProps) {
         className="flex transition-transform duration-500 ease-in-out"
         style={{ transform: `translateX(-${current * 100}%)` }}
       >
-        {banners.map((banner) => (
+        {banners.map((banner, index) => (
           <a
             key={banner.id}
             href={banner.link}
-            className="min-w-full relative block aspect-[2.5/1] md:aspect-[3/1]"
+            className="min-w-full relative block aspect-3/2 sm:aspect-2/1 md:aspect-3/1"
           >
             <img
               src={banner.image}
               alt={banner.title}
               className="w-full h-full object-cover"
+              sizes="100vw"
+              decoding="async"
+              loading={index === 0 ? 'eager' : 'lazy'}
+              fetchPriority={index === 0 ? 'high' : 'auto'}
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent flex items-center">
+            <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/40 to-transparent flex items-center">
               <div className="px-6 md:px-16 max-w-2xl">
                 <h2 className="text-2xl md:text-4xl font-bold text-white mb-3 drop-shadow-lg">
                   {banner.title}
