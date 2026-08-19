@@ -97,6 +97,10 @@ class ChangePasswordView(APIView):
 
         user.set_password(serializer.validated_data['new_password'])
         user.save()
+
+        from apps.notifications import email_service
+        email_service.dispatch(email_service.send_password_changed_email, user.email, user.first_name)
+
         return Response({'detail': 'Password alterada com sucesso.'})
 
 

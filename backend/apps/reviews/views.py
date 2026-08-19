@@ -21,6 +21,17 @@ class ReviewCreateView(generics.CreateAPIView):
                 return Response(serializer.data)
         return super().create(request, *args, **kwargs)
 
+    def perform_create(self, serializer):
+        review = serializer.save()
+        from apps.notifications import email_service
+        owner = review.product.store.owner if review.product and review.product.store else None
+        if owner and owner.email:
+            email_service.dispatch(
+                email_service.send_new_review_email,
+                owner.email, owner.first_name, review.product.name, review.rating,
+                f'/product/{review.product.slug}',
+            )
+
 
 class ProductReviewsView(generics.ListAPIView):
     serializer_class = ReviewSerializer
@@ -64,6 +75,15 @@ class ReviewReplyView(APIView):
         review.seller_reply = reply
         review.seller_replied_at = timezone.now()
         review.save(update_fields=['seller_reply', 'seller_replied_at'])
+
+        from apps.notifications import email_service
+        if review.user and review.user.email:
+            email_service.dispatch(
+                email_service.send_review_reply_email,
+                review.user.email, review.user.first_name, review.product.name,
+                f'/product/{review.product.slug}',
+            )
+
         return Response(ReviewSerializer(review, context={'request': request}).data)
 
 
@@ -115,7 +135,14 @@ class StoreReviewListView(generics.ListCreateAPIView):
         from apps.stores.models import Store
         store = get_object_or_404(Store, slug=self.kwargs['slug'])
         serializer.context['store'] = store
-        serializer.save(store=store)
+        review = serializer.save(store=store)
+        from apps.notifications import email_service
+        if store.owner and store.owner.email:
+            email_service.dispatch(
+                email_service.send_new_review_email,
+                store.owner.email, store.owner.first_name, store.name, review.overall_rating,
+                f'/store/{store.slug}',
+            )
 
 
 class StoreReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -143,6 +170,15 @@ class StoreReviewReplyView(APIView):
         review.seller_reply = reply
         review.seller_replied_at = timezone.now()
         review.save(update_fields=['seller_reply', 'seller_replied_at'])
+
+        from apps.notifications import email_service
+        if review.user and review.user.email:
+            email_service.dispatch(
+                email_service.send_review_reply_email,
+                review.user.email, review.user.first_name, review.store.name,
+                f'/store/{review.store.slug}',
+            )
+
         return Response(StoreReviewSerializer(review, context={'request': request}).data)
 
 

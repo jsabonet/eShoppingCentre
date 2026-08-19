@@ -1,0 +1,7 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}{{ message }}{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Verificação de conta</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">{{ message }}</p>
+  <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#6b7280;">Estado: <strong>{{ status_label }}</strong></p>
+{% endblock %}

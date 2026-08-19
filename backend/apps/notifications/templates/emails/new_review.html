@@ -1,0 +1,7 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}Nova avaliação ({{ rating }}★) em {{ item_name }}.{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Nova avaliação ⭐</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Recebeste uma nova avaliação de <strong>{{ rating }}★</strong> em <strong>{{ item_name }}</strong>.</p>
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ review_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Ver avaliação →</a></p>
+{% endblock %}

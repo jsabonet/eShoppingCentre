@@ -468,6 +468,110 @@ def send_unread_chat_digests() -> None:
         dispatch(send_chat_digest_email, str(uid))
 
 
+# ─────────────────────────────────────────────────────────────
+# Segurança & Conta
+# ─────────────────────────────────────────────────────────────
+
+@shared_task
+def send_password_changed_email(email, first_name) -> None:
+    """Alerta de segurança: password alterada."""
+    send_templated(
+        subject=f'A tua password foi alterada — {SITE_NAME}',
+        template_name='password_changed.html',
+        recipient=email,
+        text_message='A tua password foi alterada com sucesso. Se não foste tu, contacta o suporte.',
+        context=base_context(first_name=first_name),
+    )
+
+
+@shared_task
+def send_account_blocked_email(email, first_name) -> None:
+    """Aviso de conta desativada/bloqueada."""
+    send_templated(
+        subject=f'A tua conta foi desativada — {SITE_NAME}',
+        template_name='account_blocked.html',
+        recipient=email,
+        text_message='A tua conta foi desativada. Contacta o suporte para mais informações.',
+        context=base_context(first_name=first_name),
+    )
+
+
+@shared_task
+def send_kyc_status_email(email, first_name, approved) -> None:
+    """Resultado da verificação KYC de afiliado."""
+    if approved:
+        subject = f'Verificação de conta aprovada — {SITE_NAME}'
+        message = 'A tua verificação de conta (KYC) foi aprovada. Já podes solicitar saques.'
+        status_label = 'Aprovada'
+    else:
+        subject = f'Verificação de conta rejeitada — {SITE_NAME}'
+        message = 'A tua verificação de conta (KYC) foi rejeitada. Revê os dados e tenta novamente.'
+        status_label = 'Rejeitada'
+    send_templated(
+        subject=subject,
+        template_name='kyc_status.html',
+        recipient=email,
+        text_message=message,
+        context=base_context(first_name=first_name, message=message, status_label=status_label),
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# Avaliações
+# ─────────────────────────────────────────────────────────────
+
+@shared_task
+def send_new_review_email(email, first_name, item_name, rating, link) -> None:
+    """Aviso de nova avaliação ao vendedor."""
+    send_templated(
+        subject=f'Nova avaliação ({rating}★) — {SITE_NAME}',
+        template_name='new_review.html',
+        recipient=email,
+        text_message=f'Recebeste uma nova avaliação de {rating}★ em "{item_name}".',
+        context=base_context(first_name=first_name, item_name=item_name, rating=rating, review_link=link),
+    )
+
+
+@shared_task
+def send_review_reply_email(email, first_name, item_name, link) -> None:
+    """Aviso de resposta do vendedor ao comprador."""
+    send_templated(
+        subject=f'O vendedor respondeu à tua avaliação — {SITE_NAME}',
+        template_name='review_reply.html',
+        recipient=email,
+        text_message=f'O vendedor respondeu à tua avaliação de "{item_name}".',
+        context=base_context(first_name=first_name, item_name=item_name, review_link=link),
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# Cursos
+# ─────────────────────────────────────────────────────────────
+
+@shared_task
+def send_course_enrollment_email(email, first_name, course_title, link) -> None:
+    """Confirmação de matrícula num curso."""
+    send_templated(
+        subject=f'Matriculado em "{course_title}" — {SITE_NAME}',
+        template_name='course_enrollment.html',
+        recipient=email,
+        text_message=f'Estás matriculado no curso "{course_title}". Bom estudo!',
+        context=base_context(first_name=first_name, course_title=course_title, course_link=link),
+    )
+
+
+@shared_task
+def send_course_completion_email(email, first_name, course_title, link) -> None:
+    """Parabéns pela conclusão de um curso."""
+    send_templated(
+        subject=f'Parabéns! Concluíste "{course_title}" — {SITE_NAME}',
+        template_name='course_completion.html',
+        recipient=email,
+        text_message=f'Concluíste o curso "{course_title}". Parabéns!',
+        context=base_context(first_name=first_name, course_title=course_title, course_link=link),
+    )
+
+
 @shared_task
 def send_admin_alert_email(subject: str, message: str) -> None:
     """Alerta operacional simples para a equipa (email de texto)."""

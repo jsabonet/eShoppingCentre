@@ -82,9 +82,18 @@ class CompleteLessonView(APIView):
             total = enrollment.course.total_lessons
             completed_count = enrollment.lesson_progress.filter(completed=True).count()
             enrollment.progress = (completed_count / total) * 100 if total > 0 else 0
+            was_completed = enrollment.completed
             if enrollment.progress == 100:
                 enrollment.completed = True
             enrollment.save()
+
+            if enrollment.completed and not was_completed:
+                from apps.notifications import email_service
+                email_service.dispatch(
+                    email_service.send_course_completion_email,
+                    request.user.email, request.user.first_name, enrollment.course.product.name,
+                    f'/my-courses/{enrollment.course.id}',
+                )
 
             return Response({'progress': enrollment.progress, 'completed': enrollment.completed})
         except (CourseLesson.DoesNotExist, Enrollment.DoesNotExist):
@@ -367,6 +376,12 @@ class EnrollView(APIView):
             course=course,
         )
         if created:
+            from apps.notifications import email_service
+            email_service.dispatch(
+                email_service.send_course_enrollment_email,
+                request.user.email, request.user.first_name, course.product.name,
+                f'/my-courses/{course.id}',
+            )
             return Response({'detail': 'Matriculado com sucesso.'}, status=201)
         return Response({'detail': 'Ja esta matriculado.', 'enrollment_id': str(enrollment.id)})
 

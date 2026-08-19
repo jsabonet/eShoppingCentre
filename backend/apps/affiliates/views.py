@@ -403,4 +403,10 @@ class AdminAffiliateKYCActionView(APIView):
             notification_type='affiliate',
             link='/affiliate/earnings',
         )
+        from apps.notifications import email_service
+        email_service.dispatch(
+            email_service.send_kyc_status_email,
+            kyc.affiliate.user.email, kyc.affiliate.user.first_name,
+            kyc.status == 'approved',
+        )
         return Response(AffiliateKYCSerializer(kyc).data)

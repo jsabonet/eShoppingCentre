@@ -315,6 +315,8 @@ class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
         if was_active and not user.is_active:
             # Conta desativada/bloqueada → revoga sessões ativas
             _blacklist_user_tokens(user)
+            from apps.notifications import email_service
+            email_service.dispatch(email_service.send_account_blocked_email, user.email, user.first_name)
         elif not was_active and user.is_active:
             # Reativação → limpa a marca de eliminação suave
             if user.deleted_at:
