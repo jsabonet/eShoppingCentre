@@ -5,7 +5,7 @@ from rest_framework import generics, permissions, status, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q
+from django.db.models import Q, Count, Sum
 from decimal import Decimal, InvalidOperation
 from .models import Category, Product, ProductImage, ProductVariant, Coupon, WishlistItem, StockLog
 from .serializers import (
@@ -26,6 +26,8 @@ class CategoryListView(generics.ListAPIView):
         parent = self.request.query_params.get('parent', None)
         root = self.request.query_params.get('root', None)
         product_type = self.request.query_params.get('product_type', None)
+        with_image = self.request.query_params.get('with_image', None)
+        sort = self.request.query_params.get('sort', None)
 
         if parent is not None:
             # Filter children of a specific parent (by slug)
@@ -40,7 +42,23 @@ class CategoryListView(generics.ListAPIView):
         if product_type:
             qs = qs.filter(product_type=product_type)
 
-        return qs.select_related('parent').order_by('sort_order', 'name')
+        # Apenas categorias com imagem principal
+        if with_image in ('true', '1'):
+            qs = qs.exclude(image='').exclude(image__isnull=True)
+
+        # Ordenação por relevância
+        if sort == 'most_products':
+            qs = qs.annotate(
+                _product_count=Count('products', filter=Q(products__status='active'))
+            ).order_by('-_product_count', 'name')
+        elif sort == 'top_sales':
+            qs = qs.annotate(
+                _total_sales=Sum('products__sales_count')
+            ).order_by('-_total_sales', 'name')
+        else:
+            qs = qs.order_by('sort_order', 'name')
+
+        return qs.select_related('parent')
 
 
 class CategoryDetailView(generics.RetrieveAPIView):
