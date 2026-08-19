@@ -98,19 +98,21 @@ export default function FeaturedStores({ stores }: { stores: FeaturedStore[] }) 
                 )}
               </div>
               <h3 className="font-semibold text-sm line-clamp-1 w-full">{s.name}</h3>
-              {s.rating > 0 && (
-                <div className="flex items-center gap-1 mt-1">
-                  <Stars rating={s.rating} />
-                  <span className="text-xs text-muted-foreground">
-                    {s.rating.toFixed(1)}
+              <div className="flex items-center justify-center gap-1.5 mt-1 flex-wrap">
+                {s.rating > 0 && (
+                  <>
+                    <Stars rating={s.rating} />
+                    <span className="text-xs text-muted-foreground">
+                      {s.rating.toFixed(1)}
+                    </span>
+                  </>
+                )}
+                {s.owner_verified && (
+                  <span className="flex items-center gap-0.5 text-[10px] text-emerald-600">
+                    <BadgeCheck size={12} /> Verificada
                   </span>
-                </div>
-              )}
-              {s.owner_verified && (
-                <span className="flex items-center gap-1 text-[10px] text-emerald-600 mt-1">
-                  <BadgeCheck size={12} /> Verificada
-                </span>
-              )}
+                )}
+              </div>
             </Link>
           );
         })}
@@ -204,15 +206,15 @@ export default function FeaturedStores({ stores }: { stores: FeaturedStore[] }) 
               {s.tagline && (
                 <p className="text-xs text-muted-foreground line-clamp-1 w-full mt-0.5">{s.tagline}</p>
               )}
-              {s.rating > 0 && (
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <Stars rating={s.rating} />
-                  <span className="text-xs text-muted-foreground">
-                    {s.rating.toFixed(1)}
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center gap-1 mt-1.5">
+              <div className="flex items-center justify-center gap-1.5 mt-1.5 flex-wrap">
+                {s.rating > 0 && (
+                  <>
+                    <Stars rating={s.rating} />
+                    <span className="text-xs text-muted-foreground">
+                      {s.rating.toFixed(1)}
+                    </span>
+                  </>
+                )}
                 <TierBadge tier={s.tier} display={s.tier_display} />
                 {s.owner_verified && <BadgeCheck size={14} className="text-emerald-500" />}
               </div>
