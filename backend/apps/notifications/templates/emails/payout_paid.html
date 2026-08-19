@@ -1,0 +1,13 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}O teu saque de {{ amount }} MZN foi pago.{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Saque pago 💰</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">O teu saque foi processado com sucesso.</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border:1px solid #eef0f3;border-radius:8px;margin:0 0 20px;">
+    <tr><td style="padding:16px 20px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">
+      <p style="margin:0 0 6px;">Valor: <strong>{{ amount }} MZN</strong></p>
+      <p style="margin:0 0 6px;">Método: {{ method }}</p>
+      <p style="margin:0;">Referência: <strong style="font-size:16px;">{{ reference }}</strong></p>
+    </td></tr>
+  </table>
+{% endblock %}

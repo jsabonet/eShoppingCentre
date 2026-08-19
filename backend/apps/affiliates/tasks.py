@@ -15,6 +15,7 @@ def auto_approve_affiliate_commissions():
     from django.db.models import F, Q
     from .models import AffiliateCommission, AffiliateProfile
     from .services import update_tier
+    from apps.notifications import email_service
 
     cutoff = timezone.now() - timedelta(days=APPROVE_AFTER_DAYS)
     pending = AffiliateCommission.objects.filter(
@@ -40,6 +41,10 @@ def auto_approve_affiliate_commissions():
             notification_type='affiliate',
             link='/affiliate/earnings',
         )
+        try:
+            email_service.send_affiliate_commission_email(str(comm.id))
+        except Exception:
+            pass
         affected_ids.add(comm.affiliate_id)
         count += 1
 

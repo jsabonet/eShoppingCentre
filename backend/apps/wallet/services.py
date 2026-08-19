@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from .models import Wallet, WalletTransaction, WalletEntry, EscrowHolding
+from apps.notifications import email_service
 
 
 class InsufficientFunds(Exception):
@@ -227,6 +228,10 @@ def pay_payout(payout, admin, reference=''):
     payout.paid_at = timezone.now()
     payout.admin_reference = reference or ''
     payout.save(update_fields=['status', 'paid_by', 'paid_at', 'admin_reference'])
+
+    transaction.on_commit(
+        lambda: email_service.dispatch(email_service.send_payout_paid_email, str(payout.id))
+    )
     return payout
 
 
@@ -242,4 +247,8 @@ def reject_payout(payout, admin, reason=''):
     payout.status = 'rejected'
     payout.rejection_reason = reason or 'Rejeitado pelo admin'
     payout.save(update_fields=['status', 'rejection_reason'])
+
+    transaction.on_commit(
+        lambda: email_service.dispatch(email_service.send_payout_rejected_email, str(payout.id))
+    )
     return payout

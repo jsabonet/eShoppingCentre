@@ -1,0 +1,8 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}Recebemos a tua loja "{{ store_name }}".{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Loja recebida 🏪</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">A tua loja <strong>{{ store_name }}</strong> foi recebida e está em análise pela nossa equipa.</p>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Vais receber um email assim que for aprovada ou se precisarmos de documentos adicionais.</p>
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ dashboard_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Ir para o painel →</a></p>
+{% endblock %}

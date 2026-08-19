@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket, SupportTicketImage, AbandonedCart
 from apps.users.permissions import IsVerified
+from apps.notifications import email_service
 
 
 # --- Transições de status permitidas ---
@@ -49,6 +50,8 @@ class CreateOrderView(APIView):
         orders = serializer.save()
         for order in orders:
             log_status_change(order, order.status, request.user, 'Encomenda criada')
+            email_service.dispatch(email_service.send_order_confirmation_email, str(order.id))
+            email_service.dispatch(email_service.send_new_sale_email, str(order.id))
 
         # Marcar carrinho como recuperado
         AbandonedCart.objects.filter(user=request.user).update(
@@ -147,6 +150,9 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
 
         # Auditoria
         log_status_change(instance, new_status, self.request.user, notes)
+
+        if new_status == 'shipped':
+            email_service.dispatch(email_service.send_order_shipped_email, str(instance.id))
 
 
 class ConfirmDeliveryView(APIView):

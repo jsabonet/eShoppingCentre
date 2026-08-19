@@ -9,6 +9,7 @@ from .models import Store
 from .serializers import StoreSerializer, StoreDetailSerializer
 from .featured import get_featured_stores
 from apps.users.permissions import IsVerified
+from apps.notifications import email_service
 
 
 @method_decorator(cache_page(60), name='dispatch')
@@ -87,6 +88,14 @@ class StoreRegisterView(generics.CreateAPIView):
 
         store = serializer.save(owner=self.request.user, status='pending',
                                 **{k: v for k, v in defaults.items() if k not in serializer.validated_data})
+
+        # Emails: confirmação ao vendedor + alerta ao admin
+        email_service.dispatch(email_service.send_store_submitted_email, str(store.id))
+        email_service.dispatch(
+            email_service.send_admin_alert_email,
+            'Nova loja a rever',
+            f'A loja "{store.name}" (owner {self.request.user.email}) foi submetida e aguarda revisão.',
+        )
 
         # ── Sincronizar telefone do vendedor com o da loja ──
         # O formulário de registo captura um telefone que serve para ambos.

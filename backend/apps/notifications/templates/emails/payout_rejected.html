@@ -1,0 +1,8 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}O teu saque de {{ amount }} MZN foi rejeitado.{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Saque rejeitado</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">O teu saque de <strong>{{ amount }} MZN</strong> não foi processado.</p>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Motivo: {{ reason }}</p>
+  <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#6b7280;">Se tiveres dúvidas, contacta o suporte em {{ support_email }}.</p>
+{% endblock %}
