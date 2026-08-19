@@ -73,15 +73,15 @@ export default function FeaturedStores({ stores }: { stores: FeaturedStore[] }) 
         </Link>
       </div>
 
-      {/* Todos os cards em linha, sem destaque */}
-      <div className="grid grid-cols-2 gap-4 sm:flex sm:gap-4 sm:overflow-x-auto scrollbar-hide pb-2">
+      {/* Mobile: tira horizontal · Desktop: duas linhas (grid 4 colunas) */}
+      <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 md:grid md:grid-cols-4 md:overflow-visible">
         {stores.map((s) => {
           const logo = mediaUrl(s.logo);
           return (
             <Link
               key={s.slug}
               href={`/store/${s.slug}`}
-              className="w-full sm:shrink-0 sm:w-44 bg-card border border-border rounded-lg p-4 flex flex-col items-center text-center hover:shadow-md transition-all"
+              className="shrink-0 w-40 sm:w-44 md:w-full bg-card border border-border rounded-lg p-4 flex flex-col items-center text-center hover:shadow-md transition-all"
             >
               <div className="w-16 h-16 mb-2 rounded-full bg-muted overflow-hidden flex items-center justify-center">
                 {logo ? (
