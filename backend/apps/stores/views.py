@@ -1,3 +1,5 @@
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.db import IntegrityError
@@ -7,6 +9,7 @@ from .serializers import StoreSerializer, StoreDetailSerializer
 from apps.users.permissions import IsVerified
 
 
+@method_decorator(cache_page(60), name='dispatch')
 class StoreListView(generics.ListAPIView):
     queryset = Store.objects.filter(status='active').order_by('-created_at')
     serializer_class = StoreSerializer

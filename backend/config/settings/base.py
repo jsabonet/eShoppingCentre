@@ -203,6 +203,22 @@ AUTHENTICATION_BACKENDS = [
 CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 
+# Cache: Redis em produção (DB 1 — separado do broker/Channels na DB 0);
+# em desenvolvimento usa memória local para não depender de Redis.
+if DEBUG:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        },
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': config('REDIS_CACHE_URL', default='redis://localhost:6379/1'),
+        },
+    }
+
 CELERY_BEAT_SCHEDULE = {
     'auto-refund-unprocessed-returns': {
         'task': 'apps.orders.tasks.auto_refund_unprocessed_returns',
