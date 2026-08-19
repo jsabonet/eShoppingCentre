@@ -529,7 +529,11 @@ class DisputeReturnView(APIView):
             link=f'/account/orders/{return_req.order_id}',
         )
         email_service.dispatch(email_service.send_return_status_email, str(return_req.id), 'buyer')
-        # Notify admins could be added here
+        email_service.dispatch(
+            email_service.send_admin_alert_email,
+            'Devolução em disputa',
+            f'A devolução #{return_req.rma_number} (encomenda {return_req.order.order_number}) foi escalada para análise.',
+        )
 
         return Response(ReturnRequestSerializer(return_req).data)
 
@@ -592,6 +596,11 @@ class TicketListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         ticket = serializer.save(buyer=self.request.user)
         email_service.dispatch(email_service.send_ticket_email, str(ticket.id), 'created')
+        email_service.dispatch(
+            email_service.send_admin_alert_email,
+            'Novo ticket de suporte',
+            f'Ticket #{ticket.id} "{ticket.subject}" criado por {self.request.user.email}.',
+        )
 
 
 class AdminTicketListView(generics.ListAPIView):

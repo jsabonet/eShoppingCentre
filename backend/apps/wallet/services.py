@@ -182,6 +182,14 @@ def request_payout(user, *, role, amount, method, account_details):
     wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
     wallet.reserved_balance += amount
     wallet.save(update_fields=['reserved_balance'])
+
+    transaction.on_commit(
+        lambda: email_service.dispatch(
+            email_service.send_admin_alert_email,
+            'Novo pedido de saque',
+            f'{user.email} solicitou um saque de {amount} MZN ({role}).',
+        )
+    )
     return payout
 
 

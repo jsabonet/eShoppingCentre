@@ -29,6 +29,9 @@ R2_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='')
 R2_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default='')
 R2_REGION = config('AWS_S3_REGION_NAME', default='auto')
 
+# ─── Alertas operacionais por email (erros 5xx) ───
+ADMINS = [('Equipa e-Shopping Centre', config('ADMIN_EMAIL', default=DEFAULT_FROM_EMAIL))]
+
 # ─── Logging ───
 LOGGING = {
     'version': 1,
@@ -44,6 +47,11 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'mail_admins': {
+            'class': 'django.utils.log.AdminEmailHandler',
+            'level': 'ERROR',
+            'include_html': False,
+        },
     },
     'root': {
         'handlers': ['console'],
@@ -53,6 +61,11 @@ LOGGING = {
         'django': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['mail_admins'],
+            'level': 'ERROR',
             'propagate': False,
         },
         'apps': {
