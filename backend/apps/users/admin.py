@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.utils import timezone
 from .models import User
 
 
@@ -23,7 +24,8 @@ def _soft_delete_user(user):
 
     _blacklist_user_tokens(user)
     user.is_active = False
-    user.save(update_fields=['is_active'])
+    user.deleted_at = timezone.now()
+    user.save(update_fields=['is_active', 'deleted_at'])
 
     store = Store.objects.filter(owner=user).first()
     if store is not None:
@@ -61,7 +63,7 @@ def block_users(modeladmin, request, queryset):
 
 @admin.action(description='🔓 Ativar (desbloquear) utilizadores selecionados')
 def activate_users(modeladmin, request, queryset):
-    updated = queryset.update(is_active=True)
+    updated = queryset.update(is_active=True, deleted_at=None)
     modeladmin.message_user(request, f'{updated} utilizador(es) ativado(s).', messages.SUCCESS)
 
 
@@ -79,13 +81,32 @@ def soft_delete_users(modeladmin, request, queryset):
     )
 
 
+class DeletedFilter(admin.SimpleListFilter):
+    """Filtra contas eliminadas (soft-delete) vs. ativas/bloqueadas."""
+    title = 'Eliminado (soft)'
+    parameter_name = 'deleted'
+
+    def lookups(self, request, model_admin):
+        return [
+            ('yes', 'Sim'),
+            ('no', 'Não'),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == 'yes':
+            return queryset.filter(deleted_at__isnull=False)
+        if self.value() == 'no':
+            return queryset.filter(deleted_at__isnull=True)
+        return queryset
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     list_display = (
         'email', 'username', 'phone',
-        'is_verified', 'is_active', 'is_staff', 'auth_provider', 'date_joined',
+        'is_verified', 'is_active', 'is_staff', 'is_deleted', 'auth_provider', 'date_joined',
     )
-    list_filter = ('is_verified', 'is_active', 'is_staff', 'auth_provider')
+    list_filter = ('is_verified', 'is_active', 'is_staff', DeletedFilter, 'auth_provider')
     search_fields = ('email', 'username', 'phone', 'first_name', 'last_name')
     ordering = ('-date_joined',)
     actions = [verify_users, unverify_users, block_users, activate_users, soft_delete_users]
@@ -95,6 +116,10 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('is_verified', 'auth_provider', 'firebase_uid', 'phone', 'avatar', 'roles', 'bio'),
         }),
     )
+
+    @admin.display(boolean=True, description='Eliminado (soft)')
+    def is_deleted(self, obj):
+        return obj.deleted_at is not None
 
     # ─── Soft-delete: o botão "Eliminar" deixa de apagar dados ───
     def delete_model(self, request, obj):

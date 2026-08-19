@@ -22,6 +22,10 @@ class User(AbstractUser):
         choices=[('email', 'Email'), ('google', 'Google'), ('facebook', 'Facebook')],
         default='email',
     )
+    deleted_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Data da eliminação suave (soft-delete). Distingue conta eliminada de conta bloqueada.',
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
