@@ -63,8 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('access_token', data.access);
           setUser(data.user);
         }
-      } catch (err) {
-        console.error('Error handling redirect sign-in:', err);
+      } catch (err: any) {
+        console.error(
+          '[GoogleLogin] Falha ao concluir login:',
+          err?.response?.data || err?.code || err?.message || err,
+        );
       } finally {
         checkAuth();
       }

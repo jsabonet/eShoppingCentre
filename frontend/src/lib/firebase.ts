@@ -104,8 +104,8 @@ export async function completeRedirectSignIn(): Promise<{
     if (error?.code === 'auth/no-current-user') {
       return null;
     }
-    console.error('Firebase redirect sign-in error:', error);
-    return null;
+    console.error('[Firebase] Erro no redirect sign-in:', error?.code, error?.message);
+    throw error;
   }
 }
 
