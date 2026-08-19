@@ -90,7 +90,7 @@ def build_featured_stores(limit=FEATURED_STORES_CAP):
 def get_featured_stores():
     """Devolve as lojas em destaque (cache ou recomputa se vazio)."""
     data = cache.get(FEATURED_STORES_CACHE_KEY)
-    if data is None:
+    if not data:
         data = build_featured_stores()
         cache.set(FEATURED_STORES_CACHE_KEY, data, CACHE_TIMEOUT)
     return data

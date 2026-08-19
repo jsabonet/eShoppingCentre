@@ -176,8 +176,8 @@ def compute_and_cache_home_sections():
 
 
 def get_home_sections():
-    """Devolve as secções (cache ou recomputa se vazio)."""
+    """Devolve as secções (cache ou recomputa se vazio/em falta)."""
     data = cache.get(HOME_SECTIONS_CACHE_KEY)
-    if data is None:
+    if not data or not any(data.get(k) for k in ('deals', 'bestsellers', 'new_arrivals', 'featured')):
         data = compute_and_cache_home_sections()
     return data

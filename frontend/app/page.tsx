@@ -72,7 +72,14 @@ export default async function Home() {
   categories = Array.isArray(catsData) ? catsData : (catsData?.results || []);
   featuredStores = Array.isArray(storesData) ? storesData : [];
 
-  if (sectionsData) {
+  const sectionsEmpty = !sectionsData || (
+    !(sectionsData.deals?.length || 0) &&
+    !(sectionsData.bestsellers?.length || 0) &&
+    !(sectionsData.new_arrivals?.length || 0) &&
+    !(sectionsData.featured?.length || 0)
+  );
+
+  if (!sectionsEmpty) {
     homeSections = sectionsData;
   } else {
     // Fallback: se o endpoint curado falhar, busca secções individualmente
