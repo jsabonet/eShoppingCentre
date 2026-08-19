@@ -227,9 +227,18 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ('id', 'name', 'slug', 'description', 'image', 'parent_slug',
+        fields = ('id', 'name', 'slug', 'description', 'image', 'parent', 'parent_slug',
                   'product_count', 'children', 'product_type', 'sort_order')
         read_only_fields = ('slug',)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.image:
+            request = self.context.get('request')
+            data['image'] = request.build_absolute_uri(instance.image.url) if request else instance.image.url
+        else:
+            data['image'] = None
+        return data
 
     def get_product_count(self, obj):
         return obj.products.filter(status='active').count()

@@ -120,7 +120,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', image: '', sort_order: '0' });
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', image: '', sort_order: '0', product_type: 'physical', parent: '' });
   const [categoryImageFile, setCategoryImageFile] = useState<File | null>(null);
 
   // Blog state
@@ -345,6 +345,10 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
       formData.append('name', categoryForm.name);
       formData.append('description', categoryForm.description);
       formData.append('sort_order', String(parseInt(categoryForm.sort_order) || 0));
+      formData.append('product_type', categoryForm.product_type || 'physical');
+      if (categoryForm.parent) {
+        formData.append('parent', categoryForm.parent);
+      }
       if (categoryImageFile) {
         formData.append('image', categoryImageFile);
       }
@@ -369,7 +373,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   };
 
   const resetCategoryForm = () => {
-    setCategoryForm({ name: '', description: '', image: '', sort_order: '0' });
+    setCategoryForm({ name: '', description: '', image: '', sort_order: '0', product_type: 'physical', parent: '' });
     setCategoryImageFile(null);
     setEditingCategory(null);
     setShowCategoryForm(false);
@@ -876,7 +880,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Gestão de Categorias</h2>
-              <button onClick={() => { setEditingCategory(null); setCategoryForm({ name: '', description: '', image: '', sort_order: '0' }); setShowCategoryForm(true); }}
+              <button onClick={() => { setEditingCategory(null); setCategoryForm({ name: '', description: '', image: '', sort_order: '0', product_type: 'physical', parent: '' }); setShowCategoryForm(true); }}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground font-medium rounded-md transition-colors">
                 <Plus size={16} /> Nova Categoria
               </button>
@@ -896,6 +900,21 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                     <div><label className="block text-sm font-medium mb-1">Descrição</label>
                       <textarea value={categoryForm.description} onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })} rows={2}
                         className="w-full px-3 py-2 border rounded-md" /></div>
+                    <div><label className="block text-sm font-medium mb-1">Tipo</label>
+                      <select value={categoryForm.product_type} onChange={(e) => setCategoryForm({ ...categoryForm, product_type: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-md">
+                        <option value="physical">Produtos Físicos</option>
+                        <option value="digital">Produtos Digitais</option>
+                        <option value="course">Cursos</option>
+                      </select></div>
+                    <div><label className="block text-sm font-medium mb-1">Categoria pai (opcional)</label>
+                      <select value={categoryForm.parent} onChange={(e) => setCategoryForm({ ...categoryForm, parent: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-md">
+                        <option value="">Nenhuma (categoria raiz)</option>
+                        {categories.filter((c: any) => c.id !== editingCategory?.id).map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select></div>
                     <div><label className="block text-sm font-medium mb-1">Imagem</label>
                       <input type="file" accept="image/*"
                         onChange={(e) => setCategoryImageFile(e.target.files?.[0] || null)}
@@ -954,7 +973,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                         <td className="px-4 py-3 text-sm text-muted-foreground">{cat.product_count || 0}</td>
                         <td className="px-4 py-3 text-sm">{cat.sort_order}</td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => { setEditingCategory(cat); setCategoryForm({ name: cat.name, description: cat.description || '', image: cat.image || '', sort_order: String(cat.sort_order || 0) }); setShowCategoryForm(true); }}
+                          <button onClick={() => { setEditingCategory(cat); setCategoryForm({ name: cat.name, description: cat.description || '', image: cat.image || '', sort_order: String(cat.sort_order || 0), product_type: cat.product_type || 'physical', parent: cat.parent || '' }); setShowCategoryForm(true); }}
                             className="p-1.5 hover:bg-muted rounded-md"><Edit size={16} className="text-muted-foreground" /></button>
                           <button onClick={() => handleDeleteCategory(cat.id)} className="p-1.5 hover:bg-destructive/10 rounded-md"><Trash2 size={16} className="text-destructive" /></button>
                         </td>
