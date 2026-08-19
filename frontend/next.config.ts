@@ -14,6 +14,21 @@ const nextConfig: NextConfig = {
       static: 300,   // páginas estáticas 5min
     },
   },
+  async redirects() {
+    return [
+      {
+        // Cursos são listados em /courses (não são categorias do marketplace)
+        source: '/category/cursos-online',
+        destination: '/courses',
+        permanent: true,
+      },
+      {
+        source: '/category/curso-online',
+        destination: '/courses',
+        permanent: true,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {
