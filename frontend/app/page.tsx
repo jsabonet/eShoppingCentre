@@ -6,18 +6,31 @@ import { Truck, Shield, CreditCard, Headphones } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-async function fetchJSON(url: string, revalidate = 60) {
-  try {
-    const res = await fetch(url, { next: { revalidate } });
-    if (!res.ok) {
-      console.error(`[Home] Falha HTTP ${res.status} ao buscar: ${url}`);
+async function fetchJSON(url: string, revalidate = 60, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, { next: { revalidate } });
+      if (!res.ok) {
+        // Retenta falhas transitórias (5xx) antes de desistir
+        if (res.status >= 500 && attempt < retries) {
+          await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+          continue;
+        }
+        console.error(`[Home] Falha HTTP ${res.status} ao buscar: ${url}`);
+        return null;
+      }
+      return await res.json();
+    } catch (err: any) {
+      // Erro de rede (ex.: ligação caída após inatividade) — retenta
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+        continue;
+      }
+      console.error(`[Home] Erro de rede ao buscar ${url}: ${err?.message || err}`);
       return null;
     }
-    return await res.json();
-  } catch (err: any) {
-    console.error(`[Home] Erro de rede ao buscar ${url}: ${err?.message || err}`);
-    return null;
   }
+  return null;
 }
 
 const banners = [
@@ -58,7 +71,24 @@ export default async function Home() {
 
   categories = Array.isArray(catsData) ? catsData : (catsData?.results || []);
   featuredStores = Array.isArray(storesData) ? storesData : [];
-  homeSections = sectionsData || { deals: [], bestsellers: [], new_arrivals: [], featured: [] };
+
+  if (sectionsData) {
+    homeSections = sectionsData;
+  } else {
+    // Fallback: se o endpoint curado falhar, busca secções individualmente
+    const [sale, best, newest, feat] = await Promise.all([
+      fetchJSON(`${API_URL}/products/?is_on_sale=true&page_size=10`),
+      fetchJSON(`${API_URL}/products/?ordering=-sales_count&page_size=10`),
+      fetchJSON(`${API_URL}/products/?ordering=-created_at&page_size=10`),
+      fetchJSON(`${API_URL}/products/?is_featured=true&page_size=10`),
+    ]);
+    homeSections = {
+      deals: sale?.results || [],
+      bestsellers: best?.results || [],
+      new_arrivals: newest?.results || [],
+      featured: feat?.results || [],
+    };
+  }
 
   const deals = (homeSections.deals || []).map(apiProductToCard);
   const bestsellers = (homeSections.bestsellers || []).map(apiProductToCard);
