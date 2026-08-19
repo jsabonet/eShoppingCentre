@@ -14,8 +14,8 @@ interface AuthContextType {
   isSeller: boolean;
   isAffiliate: boolean;
   login: (email: string, password: string) => Promise<void>;
-  /** Sign in with Google via Firebase popup. */
-  loginWithGoogle: () => Promise<{ isNewUser: boolean }>;
+  /** Sign in with Google (popup, com fallback para redirect). Devolve null se iniciou redirect. */
+  loginWithGoogle: () => Promise<{ isNewUser: boolean } | null>;
   register: (data: {
     email: string;
     username?: string;
@@ -156,8 +156,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onLogout: logout,
   });
 
-  const loginWithGoogle = useCallback(async (): Promise<{ isNewUser: boolean }> => {
-    // Dev/localhost: popup (fiável). Produção: redirect (capturado no reload).
+  const loginWithGoogle = useCallback(async (): Promise<{ isNewUser: boolean } | null> => {
+    // Popup primeiro (fiável em desktop). Se o popup for bloqueado, inicia redirect;
+    // nesse caso devolve null e o token é trocado no reload via onAuthStateChanged.
     const result = await signInWithGoogle();
     if (result) {
       const exchanged = await exchangeFirebaseToken({
@@ -167,8 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return exchanged ?? { isNewUser: false };
     }
-    // Caminho redirect (produção): o token é trocado no reload via onAuthStateChanged.
-    return { isNewUser: false };
+    return null;
   }, [exchangeFirebaseToken]);
 
   return (

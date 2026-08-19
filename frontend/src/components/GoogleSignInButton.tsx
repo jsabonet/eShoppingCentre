@@ -30,9 +30,13 @@ export default function GoogleSignInButton({
     onLoadingChange?.(true);
 
     try {
-      await loginWithGoogle();
-      console.log('[GoogleSignInButton] loginWithGoogle concluído, a navegar para', redirectTo);
-      router.push(redirectTo);
+      const result = await loginWithGoogle();
+      if (result) {
+        console.log('[GoogleSignInButton] login concluído (popup), a navegar para', redirectTo);
+        router.push(redirectTo);
+      } else {
+        console.log('[GoogleSignInButton] redirect iniciado — o browser vai sair da página.');
+      }
     } catch (err: any) {
       console.error('[GoogleSignInButton] Erro no clique Google:', err?.code || err?.response?.data || err?.message || err);
       // User closed the popup or auth failed

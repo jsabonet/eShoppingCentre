@@ -70,8 +70,8 @@ export interface FirebaseSignInResult {
 
 /**
  * Inicia o login com Google.
- * - Desenvolvimento/localhost: usa POPUP (fiável em desktop).
- * - Produção: usa REDIRECT (necessário em mobile, onde popups são bloqueados).
+ * - Popup primeiro (fiável em desktop).
+ * - Se o browser bloquear o popup (ex: mobile), cai para redirect.
  *
  * Devolve o idToken/uid quando o popup resolve logo; devolve null quando usa
  * redirect (o resultado é capturado no reload via `completeRedirectSignIn`/listener).
@@ -79,15 +79,11 @@ export interface FirebaseSignInResult {
 export async function signInWithGoogle(): Promise<FirebaseSignInResult | null> {
   const auth = getFirebaseAuth();
   const provider = getGoogleProvider();
+  const cfg = getFirebaseConfig();
+  console.log('[Firebase] Config | authDomain=', cfg.authDomain, '| projectId=', cfg.projectId);
 
-  if (process.env.NODE_ENV === 'production') {
-    console.log('[Firebase] signInWithRedirect (produção): a iniciar redirect para o Google...');
-    await signInWithRedirect(auth, provider);
-    return null;
-  }
-
-  console.log('[Firebase] signInWithPopup (dev): a abrir popup do Google...');
   try {
+    console.log('[Firebase] signInWithPopup: a abrir popup do Google...');
     const result = await signInWithPopup(auth, provider);
     const idToken = await result.user.getIdToken();
     console.log('[Firebase] popup OK | email=', result.user.email, '| idToken len=', idToken.length);
