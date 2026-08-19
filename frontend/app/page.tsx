@@ -53,53 +53,47 @@ function apiProductToCard(p: APIProduct) {
 
 export default async function Home() {
   let categories: APICategory[] = [];
-  let featuredProducts: APIProduct[] = [];
-  let saleProducts: APIProduct[] = [];
-  let bestSellers: APIProduct[] = [];
-  let newArrivals: APIProduct[] = [];
   let stores: any[] = [];
+  let homeSections: any = { deals: [], bestsellers: [], new_arrivals: [], featured: [] };
 
-  try {
-    const [catsData, featuredData, saleData, bestData, newData, storesData] = await Promise.all([
-      fetchJSON(`${API_URL}/categories/?root=true&with_image=true&sort=most_products`),
-      fetchJSON(`${API_URL}/products/?is_featured=true&page_size=10`),
-      fetchJSON(`${API_URL}/products/?is_on_sale=true&page_size=10`),
-      fetchJSON(`${API_URL}/products/?ordering=-sales_count&page_size=10`),
-      fetchJSON(`${API_URL}/products/?ordering=-created_at&page_size=10`),
-      fetchJSON(`${API_URL}/stores/?page_size=12`, 300),
-    ]);
+  const [catsData, storesData, sectionsData] = await Promise.all([
+    fetchJSON(`${API_URL}/categories/?root=true&with_image=true&sort=most_products`),
+    fetchJSON(`${API_URL}/stores/?page_size=12`, 300),
+    fetchJSON(`${API_URL}/products/home-sections/`),
+  ]);
 
-    categories = Array.isArray(catsData) ? catsData : (catsData?.results || []);
-    featuredProducts = featuredData?.results || [];
-    saleProducts = saleData?.results || [];
-    bestSellers = bestData?.results || [];
-    newArrivals = newData?.results || [];
-    stores = (storesData?.results || []).filter((s: any) => s.slug);
-  } catch { /* erros individuais já foram registados pelo fetchJSON */ }
+  categories = Array.isArray(catsData) ? catsData : (catsData?.results || []);
+  stores = (storesData?.results || []).filter((s: any) => s.slug);
+  homeSections = sectionsData || { deals: [], bestsellers: [], new_arrivals: [], featured: [] };
 
   const featuredStores = [...stores]
     .sort((a, b) => (b.rating || 0) - (a.rating || 0))
     .slice(0, 8);
 
+  const deals = (homeSections.deals || []).map(apiProductToCard);
+  const bestsellers = (homeSections.bestsellers || []).map(apiProductToCard);
+  const newArrivals = (homeSections.new_arrivals || []).map(apiProductToCard);
+  const featured = (homeSections.featured || []).map(apiProductToCard);
+
   const shopSections = [
     {
       id: 'ofertas', title: 'Ofertas do Dia', titleIcon: '⚡',
-      products: saleProducts.slice(0, 10).map(apiProductToCard),
+      products: deals,
       viewAllLink: '/#ofertas', viewAllLabel: 'Ver todas →', bgClass: 'bg-accent/5',
     },
     {
       id: 'mais-vendidos', title: 'Mais Vendidos', titleIcon: '🔥',
-      products: bestSellers.slice(0, 10).map(apiProductToCard),
+      products: bestsellers,
       bgClass: '',
     },
     {
       id: 'novidades', title: 'Novidades', titleIcon: '✨',
-      products: newArrivals.slice(0, 10).map(apiProductToCard),
+      products: newArrivals,
       bgClass: '',
     },
     {
       id: 'destaques', title: 'Produtos em Destaque', titleIcon: '⭐',
-      products: (featuredProducts.length > 0 ? featuredProducts : saleProducts).slice(0, 10).map(apiProductToCard),
+      products: featured.length > 0 ? featured : bestsellers,
       viewAllLink: '/#destaques', viewAllLabel: 'Ver mais →', bgClass: 'bg-accent/5',
     },
   ];

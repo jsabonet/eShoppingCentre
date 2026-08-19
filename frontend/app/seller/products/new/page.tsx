@@ -809,7 +809,7 @@ export default function NewProductPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {[
                     { key: 'is_active', label: 'Produto Activo', desc: 'Disponivel para venda no site', checked: form.is_active },
-                    { key: 'is_featured', label: 'Destaque na Home', desc: 'Aparece na colecao exclusiva', checked: form.is_featured },
+                    { key: 'is_featured', label: 'Destaque na Loja', desc: 'Aparece em destaque na página da sua loja', checked: form.is_featured },
                     { key: 'is_on_sale', label: 'Em Promocao', desc: 'Badge de desconto visivel', checked: form.is_on_sale },
                   ].map((t) => (
                     <label key={t.key} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${t.checked ? 'border-accent bg-accent/3' : 'border-border hover:bg-muted/20'}`}>

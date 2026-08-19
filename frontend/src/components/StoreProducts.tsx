@@ -23,7 +23,7 @@ export default function StoreProducts({ storeSlug, initialProducts, initialHasMo
     setLoading(true);
     try {
       const next = page + 1;
-      const { data } = await productsAPI.list({ store: storeSlug, page: next, page_size: 12 });
+      const { data } = await productsAPI.list({ store: storeSlug, page: next, page_size: 12, ordering: '-is_featured,-created_at' });
       const mapped = (data.results || []).map(mapProduct);
       setProducts((prev) => [...prev, ...mapped]);
       setHasMore(!!data.next);

@@ -79,6 +79,8 @@ class Product(BaseModel):
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00, db_index=True)
     review_count = models.PositiveIntegerField(default=0)
     sales_count = models.PositiveIntegerField(default=0, db_index=True)
+    sale_ends_at = models.DateTimeField(null=True, blank=True, help_text='Fim da oferta — permite countdown na home.')
+    featured_score = models.FloatField(default=0.0, db_index=True, help_text='Score de curadoria calculado pela plataforma.')
     affiliate_commission = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
     affiliate_enabled = models.BooleanField(default=True, help_text='Produto disponível para o programa de afiliados')
     affiliate_cookie_days = models.PositiveIntegerField(null=True, blank=True, help_text='Janela de cookie específica (dias). Vazio = usa a global.')
@@ -127,6 +129,21 @@ class Product(BaseModel):
 
     def __str__(self):
         return self.name
+
+
+class ProductView(BaseModel):
+    """Registo de visualização de produto (análise/recomendações)."""
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='views')
+    user = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='product_views')
+
+    class Meta:
+        indexes = [models.Index(fields=['product', '-created_at'])]
+
+
+class SearchLog(BaseModel):
+    """Registo de pesquisas (para 'mais pesquisadas' e análise)."""
+    term = models.CharField(max_length=255, db_index=True)
+    user = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='searches')
 
 
 class ProductImage(BaseModel):

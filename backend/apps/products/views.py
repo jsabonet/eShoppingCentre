@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Count, Sum
 from decimal import Decimal, InvalidOperation
-from .models import Category, Product, ProductImage, ProductVariant, Coupon, WishlistItem, StockLog
+from .models import Category, Product, ProductImage, ProductVariant, Coupon, WishlistItem, StockLog, ProductView, SearchLog
 from .serializers import (
     CategorySerializer, ProductListSerializer, ProductDetailSerializer,
     ProductImageSerializer, ProductVariantSerializer, SellerProductSerializer, WishlistItemSerializer,
@@ -74,7 +74,7 @@ class ProductListView(generics.ListCreateAPIView):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = ProductFilter
     search_fields = ['name', 'description', 'tags']
-    ordering_fields = ['price', 'created_at', 'rating', 'sales_count', 'name']
+    ordering_fields = ['price', 'created_at', 'rating', 'sales_count', 'name', 'is_featured']
     ordering = ['-created_at']
 
     def get_serializer_class(self):
@@ -127,6 +127,7 @@ class ProductSearchView(generics.ListAPIView):
         query = self.request.query_params.get('q', '').strip()
         if not query:
             return Product.objects.none()
+        self._record_search(query)
         normalized = query.lower()
         words = normalized.split()
         qs = Product.objects.filter(
@@ -141,12 +142,62 @@ class ProductSearchView(generics.ListAPIView):
             )
         return qs.distinct()
 
+    def _record_search(self, term):
+        try:
+            user = self.request.user if self.request.user.is_authenticated else None
+            SearchLog.objects.create(term=term[:255], user=user)
+        except Exception:
+            pass
+
 
 class ProductDetailView(generics.RetrieveAPIView):
     queryset = Product.objects.filter(status='active', store__status='active')
     serializer_class = ProductDetailSerializer
     lookup_field = 'slug'
     permission_classes = [permissions.AllowAny]
+
+    def get_object(self):
+        obj = super().get_object()
+        self._record_view(obj)
+        return obj
+
+    def _record_view(self, product):
+        try:
+            user = self.request.user if self.request.user.is_authenticated else None
+            ProductView.objects.create(product=product, user=user)
+        except Exception:
+            pass
+
+
+class HomeSectionsView(APIView):
+    """GET /products/home-sections/ — secções curadas da home (pré-computadas/cache)."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from .scoring import get_home_sections
+        from .serializers import ProductListSerializer
+
+        ids_map = get_home_sections()
+
+        all_ids = []
+        for key in ('deals', 'bestsellers', 'new_arrivals', 'featured'):
+            all_ids.extend(ids_map.get(key, []))
+
+        products = {
+            str(p.id): p
+            for p in Product.objects.filter(id__in=all_ids).select_related('store', 'category')
+        }
+
+        def ordered(key):
+            return [products[i] for i in ids_map.get(key, []) if i in products]
+
+        ctx = {'request': request}
+        return Response({
+            'deals': ProductListSerializer(ordered('deals'), many=True, context=ctx).data,
+            'bestsellers': ProductListSerializer(ordered('bestsellers'), many=True, context=ctx).data,
+            'new_arrivals': ProductListSerializer(ordered('new_arrivals'), many=True, context=ctx).data,
+            'featured': ProductListSerializer(ordered('featured'), many=True, context=ctx).data,
+        })
 
 
 class MyProductListView(generics.ListAPIView):

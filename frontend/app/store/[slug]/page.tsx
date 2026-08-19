@@ -32,7 +32,7 @@ export default async function StorePage({ params }: StorePageProps) {
   try {
     const [storeRes, prodRes] = await Promise.all([
       fetch(`${API_URL}/stores/${slug}/`, { next: { revalidate: 60 } }),
-      fetch(`${API_URL}/products/?store=${slug}&page=1&page_size=12`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/products/?store=${slug}&page=1&page_size=12&ordering=-is_featured,-created_at`, { next: { revalidate: 60 } }),
     ]);
 
     if (!storeRes.ok) notFound();
