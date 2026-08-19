@@ -3,6 +3,7 @@ from django.dispatch import receiver
 from apps.products.models import Product
 from apps.stores.models import StoreFollower
 from apps.notifications.models import Notification
+from apps.notifications import email_service
 
 
 @receiver(post_save, sender=Product)
@@ -28,6 +29,12 @@ def notify_followers_new_product(sender, instance, created, **kwargs):
             notification_type='new_product',
             link=f'/product/{instance.slug}',
         ))
+        if follower.user.email:
+            email_service.dispatch(
+                email_service.send_new_product_email,
+                follower.user.email, follower.user.first_name, store.name, instance.name,
+                f'{instance.price:.0f}', f'/product/{instance.slug}',
+            )
 
     if notifications:
         Notification.objects.bulk_create(notifications)

@@ -2,6 +2,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from .models import Product, ProductVariant, StockLog
 from apps.notifications.models import Notification
+from apps.notifications import email_service
 
 
 def check_low_stock(store, product, variant_name=None, stock=None):
@@ -36,6 +37,11 @@ def check_low_stock(store, product, variant_name=None, stock=None):
                     notification_type='low_stock',
                     link=link,
                 )
+                if store.owner.email:
+                    email_service.dispatch(
+                        email_service.send_low_stock_email,
+                        store.owner.email, store.owner.first_name, label, current_stock, link,
+                    )
 
 
 @receiver(post_save, sender=Product)

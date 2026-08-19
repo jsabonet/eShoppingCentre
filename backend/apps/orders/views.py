@@ -329,6 +329,7 @@ class ResolveReturnView(APIView):
             notification_type='return_update',
             link=f'/account/orders/{return_req.order_id}',
         )
+        email_service.dispatch(email_service.send_return_status_email, str(return_req.id), 'buyer')
 
         return Response(ReturnRequestSerializer(return_req).data)
 
@@ -363,6 +364,7 @@ class ShipReturnView(APIView):
             notification_type='return_update',
             link=f'/seller/orders/{return_req.order_id}',
         )
+        email_service.dispatch(email_service.send_return_status_email, str(return_req.id), 'seller')
 
         return Response(ReturnRequestSerializer(return_req).data)
 
@@ -408,6 +410,7 @@ class ReceiveReturnView(APIView):
             notification_type='return_update',
             link=f'/account/orders/{return_req.order_id}',
         )
+        email_service.dispatch(email_service.send_return_status_email, str(return_req.id), 'buyer')
 
         return Response(ReturnRequestSerializer(return_req).data)
 
@@ -458,6 +461,7 @@ class RefundReturnView(APIView):
             notification_type='return_update',
             link=f'/account/orders/{return_req.order_id}',
         )
+        email_service.dispatch(email_service.send_return_status_email, str(return_req.id), 'buyer')
 
         return Response(ReturnRequestSerializer(return_req).data)
 
@@ -524,6 +528,7 @@ class DisputeReturnView(APIView):
             notification_type='return_update',
             link=f'/account/orders/{return_req.order_id}',
         )
+        email_service.dispatch(email_service.send_return_status_email, str(return_req.id), 'buyer')
         # Notify admins could be added here
 
         return Response(ReturnRequestSerializer(return_req).data)
@@ -569,6 +574,7 @@ class AdminOverrideView(APIView):
             notification_type='return_update',
             link=f'/account/orders/{return_req.order_id}',
         )
+        email_service.dispatch(email_service.send_return_status_email, str(return_req.id), 'buyer')
 
         return Response(ReturnRequestSerializer(return_req).data)
 
@@ -584,7 +590,8 @@ class TicketListCreateView(generics.ListCreateAPIView):
         return SupportTicket.objects.filter(buyer=self.request.user).prefetch_related('images').order_by('-created_at')
 
     def perform_create(self, serializer):
-        serializer.save(buyer=self.request.user)
+        ticket = serializer.save(buyer=self.request.user)
+        email_service.dispatch(email_service.send_ticket_email, str(ticket.id), 'created')
 
 
 class AdminTicketListView(generics.ListAPIView):
@@ -632,6 +639,7 @@ class ResolveTicketView(APIView):
             notification_type='support',
             link=f'/account/orders/{ticket.order_id}',
         )
+        email_service.dispatch(email_service.send_ticket_email, str(ticket.id), 'updated')
 
         return Response(SupportTicketSerializer(ticket).data)
 

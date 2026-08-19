@@ -278,6 +278,196 @@ def send_store_submitted_email(store_id: str) -> None:
     )
 
 
+# ─────────────────────────────────────────────────────────────
+# Inventário / Seguidores
+# ─────────────────────────────────────────────────────────────
+
+@shared_task
+def send_low_stock_email(email, first_name, product_name, current_stock, link) -> None:
+    """Aviso de stock baixo ao vendedor."""
+    send_templated(
+        subject=f'⚠️ Stock baixo: {product_name} — {SITE_NAME}',
+        template_name='low_stock.html',
+        recipient=email,
+        text_message=f'{product_name} está com apenas {current_stock} unidade(s) em stock.',
+        context=base_context(
+            first_name=first_name,
+            product_name=product_name,
+            current_stock=current_stock,
+            product_link=link,
+        ),
+    )
+
+
+@shared_task
+def send_new_product_email(email, first_name, store_name, product_name, price, link) -> None:
+    """Aviso de novo produto a seguidores da loja."""
+    send_templated(
+        subject=f'Novo produto na {store_name} — {SITE_NAME}',
+        template_name='new_product.html',
+        recipient=email,
+        text_message=f'{store_name} publicou "{product_name}" — {price} MZN.',
+        context=base_context(
+            first_name=first_name,
+            store_name=store_name,
+            product_name=product_name,
+            price=price,
+            product_link=link,
+        ),
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# Devoluções
+# ─────────────────────────────────────────────────────────────
+
+@shared_task
+def send_return_status_email(return_id: str, recipient: str = 'buyer') -> None:
+    """Atualização do estado de uma devolução (buyer ou seller)."""
+    from apps.orders.models import ReturnRequest
+    try:
+        rr = ReturnRequest.objects.select_related('buyer', 'store__owner', 'order').get(id=return_id)
+    except ReturnRequest.DoesNotExist:
+        return
+
+    if recipient == 'seller':
+        user = rr.store.owner if rr.store else None
+        if not user or not user.email:
+            return
+        subject = f'Devolução #{rr.rma_number} enviada pelo cliente — {SITE_NAME}'
+        message = f'O cliente enviou a devolução #{rr.rma_number} (encomenda {rr.order.order_number}).'
+        status_label = rr.get_status_display()
+        action_link = f'/seller/orders/{rr.order_id}'
+        action_label = 'Ver encomenda'
+    else:
+        user = rr.buyer
+        if not user.email:
+            return
+        status_label = rr.get_status_display()
+        msgs = {
+            'approved': f'A tua devolução #{rr.rma_number} foi aprovada. Segue as instruções de envio.',
+            'rejected': f'A tua devolução #{rr.rma_number} foi rejeitada pelo vendedor.',
+            'received': f'O vendedor recebeu a tua devolução #{rr.rma_number}.',
+            'refunded': f'O reembolso da devolução #{rr.rma_number} foi processado.',
+            'disputed': f'A tua contestação da devolução #{rr.rma_number} foi enviada para análise.',
+        }
+        message = msgs.get(rr.status, f'A tua devolução #{rr.rma_number} foi atualizada para "{status_label}".')
+        subject = f'Devolução #{rr.rma_number} — {status_label} — {SITE_NAME}'
+        action_link = f'/account/orders/{rr.order_id}'
+        action_label = 'Ver encomenda'
+
+    send_templated(
+        subject=subject,
+        template_name='return_update.html',
+        recipient=user.email,
+        text_message=message,
+        context=base_context(
+            first_name=user.first_name,
+            message=message,
+            status_label=status_label,
+            rma=rr.rma_number,
+            action_link=action_link,
+            action_label=action_label,
+        ),
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# Suporte
+# ─────────────────────────────────────────────────────────────
+
+@shared_task
+def send_ticket_email(ticket_id: str, event: str = 'updated') -> None:
+    """Email de confirmação/actualização de ticket de suporte."""
+    from apps.orders.models import SupportTicket
+    try:
+        ticket = SupportTicket.objects.select_related('buyer').get(id=ticket_id)
+    except SupportTicket.DoesNotExist:
+        return
+    if not ticket.buyer.email:
+        return
+
+    if event == 'created':
+        subject = f'Ticket #{ticket.id} recebido — {SITE_NAME}'
+        message = f'Recebemos o teu ticket "{ticket.subject}". A nossa equipa vai responder em breve.'
+        status_label = 'Recebido'
+    else:
+        subject = f'Ticket #{ticket.id} actualizado — {SITE_NAME}'
+        message = f'O teu ticket "{ticket.subject}" foi {ticket.get_status_display().lower()}.'
+        status_label = ticket.get_status_display()
+
+    send_templated(
+        subject=subject,
+        template_name='support_ticket.html',
+        recipient=ticket.buyer.email,
+        text_message=message,
+        context=base_context(
+            first_name=ticket.buyer.first_name,
+            ticket_subject=ticket.subject,
+            message=message,
+            status_label=status_label,
+            action_link=f'/account/orders/{ticket.order_id}',
+            action_label='Ver encomenda',
+        ),
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# Chat — resumo diário
+# ─────────────────────────────────────────────────────────────
+
+@shared_task
+def send_chat_digest_email(user_id: str) -> None:
+    """Resumo de mensagens não lidas para um utilizador."""
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+    from apps.chat.models import Message
+
+    User = get_user_model()
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return
+    if not user.email:
+        return
+
+    unread = Message.objects.filter(
+        Q(conversation__buyer=user) | Q(conversation__seller=user),
+        is_read=False,
+        is_deleted=False,
+    ).exclude(sender=user).count()
+    if unread <= 0:
+        return
+
+    send_templated(
+        subject=f'Tens {unread} mensagens por ler — {SITE_NAME}',
+        template_name='chat_digest.html',
+        recipient=user.email,
+        text_message=f'Tens {unread} mensagens por ler no e-Shopping Centre.',
+        context=base_context(
+            first_name=user.first_name,
+            unread_count=unread,
+            inbox_link='/account/messages',
+        ),
+    )
+
+
+@shared_task
+def send_unread_chat_digests() -> None:
+    """Tarefa agendada: envia resumo diário a utilizadores com mensagens não lidas."""
+    from apps.chat.models import Message
+
+    buyer_ids = set(Message.objects.filter(
+        is_read=False, is_deleted=False
+    ).values_list('conversation__buyer_id', flat=True).distinct())
+    seller_ids = set(Message.objects.filter(
+        is_read=False, is_deleted=False
+    ).values_list('conversation__seller_id', flat=True).distinct())
+
+    for uid in {u for u in (buyer_ids | seller_ids) if u}:
+        dispatch(send_chat_digest_email, str(uid))
+
+
 @shared_task
 def send_admin_alert_email(subject: str, message: str) -> None:
     """Alerta operacional simples para a equipa (email de texto)."""

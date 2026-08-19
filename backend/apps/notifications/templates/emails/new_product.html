@@ -1,0 +1,7 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}Novo produto na {{ store_name }}.{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Novo produto 🛍️</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;"><strong>{{ store_name }}</strong> publicou <strong>{{ product_name }}</strong> — {{ price }} MZN.</p>
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ product_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Ver produto →</a></p>
+{% endblock %}

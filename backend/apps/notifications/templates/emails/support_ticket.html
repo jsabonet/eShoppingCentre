@@ -1,0 +1,8 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}{{ message }}{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Ticket de suporte</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">{{ message }}</p>
+  <p style="margin:0 0 24px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#6b7280;">Estado: <strong>{{ status_label }}</strong></p>
+  <p style="margin:0;"><a href="{{ frontend_url }}{{ action_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">{{ action_label }} →</a></p>
+{% endblock %}

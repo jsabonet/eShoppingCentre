@@ -250,6 +250,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.users.tasks.send_verification_reminders',
         'schedule': 86400.0,  # diariamente
     },
+    'send-unread-chat-digests': {
+        'task': 'apps.notifications.email_service.send_unread_chat_digests',
+        'schedule': 86400.0,  # diariamente
+    },
     'refresh-home-sections': {
         'task': 'apps.products.tasks.refresh_home_sections',
         'schedule': 3600.0,  # a cada hora

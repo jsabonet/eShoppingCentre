@@ -1,0 +1,7 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}Stock baixo: {{ product_name }}.{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">⚠️ Stock baixo</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">O produto <strong>{{ product_name }}</strong> está com apenas <strong>{{ current_stock }} unidade(s)</strong> em stock.</p>
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ product_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Repor stock →</a></p>
+{% endblock %}
