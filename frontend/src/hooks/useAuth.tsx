@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, createContext, useContext, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, createContext, useContext, useCallback, useRef, type ReactNode } from 'react';
 import { authAPI, usersAPI, type User } from '@/src/lib/api';
 import { signInWithGoogle, signOutFirebase, completeRedirectSignIn, onFirebaseAuthStateChanged } from '@/src/lib/firebase';
 import { useInactivityTimer } from '@/src/hooks/useInactivityTimer';
@@ -52,17 +52,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Handle Firebase redirect sign-in on page load
-  useEffect(() => {
-    let handledUid: string | null = null;
+  // Dedup do exchange entre o caminho popup e o listener onAuthStateChanged
+  const lastHandledUid = useRef<string | null>(null);
 
-    const exchangeToken = async (firebaseUser: {
+  const exchangeFirebaseToken = useCallback(
+    async (firebaseUser: {
       uid: string;
       email: string | null;
       getIdToken: () => Promise<string>;
-    }) => {
-      if (!firebaseUser || handledUid === firebaseUser.uid) return;
-      handledUid = firebaseUser.uid;
+    }): Promise<{ isNewUser: boolean } | null> => {
+      if (!firebaseUser || lastHandledUid.current === firebaseUser.uid) return null;
+      lastHandledUid.current = firebaseUser.uid;
       try {
         console.log('[GoogleLogin] Utilizador Firebase detetado | email=', firebaseUser.email);
         const idToken = await firebaseUser.getIdToken();
@@ -71,24 +71,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[GoogleLogin] backend OK | user=', data.user?.email, '| is_new_user=', data.is_new_user);
         localStorage.setItem('access_token', data.access);
         setUser(data.user);
+        return { isNewUser: data.is_new_user };
       } catch (err: any) {
         console.error(
           '[GoogleLogin] Falha ao concluir login:',
           err?.response?.data || err?.code || err?.message || err,
         );
+        throw err;
       }
-    };
+    },
+    [],
+  );
 
+  // Captura o resultado do redirect (produção) + mantém sessão Google via listener
+  useEffect(() => {
     // Caminho 1: resultado do redirect (getRedirectResult)
     const handleRedirect = async () => {
       console.log('[GoogleLogin] handleRedirect: a correr no mount da página.');
       const redirectData = await completeRedirectSignIn();
       if (redirectData) {
-        await exchangeToken({
+        await exchangeFirebaseToken({
           uid: redirectData.firebaseUid,
           email: redirectData.email,
           getIdToken: async () => redirectData.idToken,
-        });
+        }).catch(() => {});
       } else {
         console.log('[GoogleLogin] Sem redirectData no getRedirectResult — a aguardar onAuthStateChanged.');
       }
@@ -99,14 +105,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onFirebaseAuthStateChanged((fbUser) => {
       if (fbUser) {
         console.log('[GoogleLogin] onAuthStateChanged disparou | email=', fbUser.email);
-        exchangeToken(fbUser);
+        exchangeFirebaseToken(fbUser).catch(() => {});
+      } else {
+        // Firebase sem sessão — permite reutilizar a mesma conta mais tarde
+        lastHandledUid.current = null;
       }
     });
 
     handleRedirect();
 
     return unsubscribe;
-  }, [checkAuth]);
+  }, [checkAuth, exchangeFirebaseToken]);
 
   const login = async (email: string, password: string) => {
     const { data } = await authAPI.login({ email, password });
@@ -137,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOutFirebase().catch(() => {});
     authAPI.logout();
     setUser(null);
+    lastHandledUid.current = null;
   };
 
   // ─── Session inactivity timer (only active when authenticated) ───
@@ -147,12 +157,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const loginWithGoogle = useCallback(async (): Promise<{ isNewUser: boolean }> => {
-    // Fluxo redirect: inicia o redirect para o Google.
-    // Ao regressar ao site, o effect `handleRedirect` captura o resultado via
-    // getRedirectResult() e faz o exchange do ID token pelo JWT do backend.
-    await signInWithGoogle();
+    // Dev/localhost: popup (fiável). Produção: redirect (capturado no reload).
+    const result = await signInWithGoogle();
+    if (result) {
+      const exchanged = await exchangeFirebaseToken({
+        uid: result.uid,
+        email: result.email,
+        getIdToken: async () => result.idToken,
+      });
+      return exchanged ?? { isNewUser: false };
+    }
+    // Caminho redirect (produção): o token é trocado no reload via onAuthStateChanged.
     return { isNewUser: false };
-  }, []);
+  }, [exchangeFirebaseToken]);
 
   return (
     <AuthContext.Provider

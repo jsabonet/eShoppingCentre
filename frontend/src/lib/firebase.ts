@@ -6,6 +6,7 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithRedirect,
+  signInWithPopup,
   getRedirectResult,
   signOut,
   onAuthStateChanged,
@@ -61,19 +62,44 @@ function getGoogleProvider(): GoogleAuthProvider {
   return _googleProvider;
 }
 
+export interface FirebaseSignInResult {
+  idToken: string;
+  uid: string;
+  email: string | null;
+}
+
 /**
- * Inicia o login com Google usando REDIRECT (fluxo recomendado para browsers
- * modernos que bloqueiam cookies de terceiros — Chrome, Safari, Brave).
+ * Inicia o login com Google.
+ * - Desenvolvimento/localhost: usa POPUP (fiável em desktop).
+ * - Produção: usa REDIRECT (necessário em mobile, onde popups são bloqueados).
  *
- * Após o utilizador escolher a conta, o browser regressa ao site e o token é
- * capturado por `completeRedirectSignIn()` (que usa `getRedirectResult`),
- * chamada uma única vez no carregamento da página.
+ * Devolve o idToken/uid quando o popup resolve logo; devolve null quando usa
+ * redirect (o resultado é capturado no reload via `completeRedirectSignIn`/listener).
  */
-export async function signInWithGoogle(): Promise<void> {
-  console.log('[Firebase] signInWithRedirect: a iniciar redirect para o Google...');
+export async function signInWithGoogle(): Promise<FirebaseSignInResult | null> {
   const auth = getFirebaseAuth();
-  await signInWithRedirect(auth, getGoogleProvider());
-  console.log('[Firebase] signInWithRedirect: chamada concluída (browser vai sair da página).');
+  const provider = getGoogleProvider();
+
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[Firebase] signInWithRedirect (produção): a iniciar redirect para o Google...');
+    await signInWithRedirect(auth, provider);
+    return null;
+  }
+
+  console.log('[Firebase] signInWithPopup (dev): a abrir popup do Google...');
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const idToken = await result.user.getIdToken();
+    console.log('[Firebase] popup OK | email=', result.user.email, '| idToken len=', idToken.length);
+    return { idToken, uid: result.user.uid, email: result.user.email };
+  } catch (error: any) {
+    if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/cancelled-popup-request') {
+      console.log('[Firebase] popup bloqueado — fallback para redirect.');
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+    throw error;
+  }
 }
 
 /**
