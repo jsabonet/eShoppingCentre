@@ -76,9 +76,9 @@ class Product(BaseModel):
     # ─── Campos existentes ───
     is_featured = models.BooleanField(default=False)
     is_on_sale = models.BooleanField(default=False)
-    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00, db_index=True)
     review_count = models.PositiveIntegerField(default=0)
-    sales_count = models.PositiveIntegerField(default=0)
+    sales_count = models.PositiveIntegerField(default=0, db_index=True)
     affiliate_commission = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
     affiliate_enabled = models.BooleanField(default=True, help_text='Produto disponível para o programa de afiliados')
     affiliate_cookie_days = models.PositiveIntegerField(null=True, blank=True, help_text='Janela de cookie específica (dias). Vazio = usa a global.')
@@ -102,6 +102,8 @@ class Product(BaseModel):
             models.Index(fields=['slug']),
             models.Index(fields=['status', 'product_type']),
             models.Index(fields=['store', 'status']),
+            models.Index(fields=['is_on_sale', 'sales_count']),
+            models.Index(fields=['is_featured', 'sales_count']),
         ]
         unique_together = [['store', 'slug']]
 

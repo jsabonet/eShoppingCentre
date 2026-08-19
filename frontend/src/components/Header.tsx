@@ -1,6 +1,8 @@
 ﻿"use client";
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { ChevronDown } from 'lucide-react';
 import SearchBar from './SearchBar';
 import CartHeaderStandalone from './CartHeaderStandalone';
 import MobileMenu from './MobileMenu';
@@ -10,6 +12,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 
 export default function Header() {
   const { isAuthenticated, isAdmin, logout } = useAuth();
+  const [catsOpen, setCatsOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -77,12 +80,16 @@ export default function Header() {
             </div>
           </div>
         </div>
-        <div className="bg-blue-600 text-white">
+        <div className="bg-blue-600 text-white relative">
           <div className="max-w-[1500px] mx-auto px-4">
             <nav className="flex items-center gap-1 py-2 overflow-x-auto scrollbar-hide text-sm">
-              <Link href="/#categories" className="flex items-center gap-1 font-bold hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap text-white">
+              <button
+                onClick={() => setCatsOpen(!catsOpen)}
+                className="flex items-center gap-1 font-bold hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap text-white"
+              >
                 <span>☰</span> Todas as Categorias
-              </Link>
+                <ChevronDown size={14} className={`transition-transform ${catsOpen ? 'rotate-180' : ''}`} />
+              </button>
               {categories.slice(0, 6).map((cat) => (
                 <Link key={cat.slug} href={'/category/' + cat.slug} className="hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap transition-colors text-white">
                   {cat.name}
@@ -91,6 +98,29 @@ export default function Header() {
               <Link href="/#ofertas" className="font-bold hover:bg-blue-700 px-2 py-1 rounded whitespace-nowrap text-white">Ofertas do Dia</Link>
             </nav>
           </div>
+          {catsOpen && (
+            <div className="absolute left-0 right-0 top-full z-50 bg-white text-foreground shadow-lg border-t border-border">
+              <div className="max-w-[1500px] mx-auto px-4 py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {categories.map((cat) => (
+                  <Link
+                    key={cat.slug}
+                    href={'/category/' + cat.slug}
+                    onClick={() => setCatsOpen(false)}
+                    className="flex items-center gap-3 p-2 rounded-md hover:bg-muted transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-muted overflow-hidden flex items-center justify-center shrink-0">
+                      {cat.image ? (
+                        <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg">{cat.name.charAt(0)}</span>
+                      )}
+                    </div>
+                    <span className="text-sm font-medium">{cat.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </header>
       <CartDrawer />
