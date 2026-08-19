@@ -355,12 +355,16 @@ class CookieTokenRefreshView(APIView):
 
         from rest_framework_simplejwt import settings as jwt_settings
         if jwt_settings.api_settings.ROTATE_REFRESH_TOKENS:
+            user_id = refresh.get(jwt_settings.api_settings.USER_ID_CLAIM)
             try:
                 refresh.blacklist()
             except Exception:
                 pass
-            new_refresh = RefreshToken.for_user(refresh.user)
-            set_refresh_cookie(response, str(new_refresh))
+            if user_id is not None:
+                user = User.objects.filter(pk=user_id).first()
+                if user is not None:
+                    new_refresh = RefreshToken.for_user(user)
+                    set_refresh_cookie(response, str(new_refresh))
         return response
 
 

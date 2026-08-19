@@ -158,8 +158,10 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
+        # O home é renderizado no servidor (SSR) e dispara várias chamadas anónimas
+        # a partir do mesmo IP (nginx). 100/hour era atingido em segundos → 429.
+        'anon': '1000/min',
+        'user': '5000/hour',
         'login': '5/min',
         'otp_verify': '10/min',
         'otp_resend': '5/hour',

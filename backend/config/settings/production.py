@@ -7,6 +7,9 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 # ─── Security ───
 SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# Nginx é o único proxy à frente do Django. Permite ao DRF usar o IP real do
+# cliente (X-Forwarded-For) no throttling/logs em vez do IP do nginx.
+REST_FRAMEWORK['NUM_PROXIES'] = 1
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
