@@ -16,6 +16,22 @@ def _blacklist_user_tokens(user):
         pass
 
 
+def _soft_delete_user(user):
+    """Eliminação suave (soft-delete): desativa a conta e, em cascata,
+    suspende a loja e inativa os produtos — sem remover nenhum dado."""
+    from apps.stores.models import Store
+
+    _blacklist_user_tokens(user)
+    user.is_active = False
+    user.save(update_fields=['is_active'])
+
+    store = Store.objects.filter(owner=user).first()
+    if store is not None:
+        store.status = 'suspended'
+        store.save(update_fields=['status'])
+        store.products.update(status='inactive')
+
+
 @admin.action(description='✅ Verificar utilizadores selecionados')
 def verify_users(modeladmin, request, queryset):
     updated = queryset.update(is_verified=True)
@@ -49,6 +65,20 @@ def activate_users(modeladmin, request, queryset):
     modeladmin.message_user(request, f'{updated} utilizador(es) ativado(s).', messages.SUCCESS)
 
 
+@admin.action(description='🗑️ Eliminar (soft-delete) utilizadores selecionados')
+def soft_delete_users(modeladmin, request, queryset):
+    count = 0
+    for user in queryset:
+        _soft_delete_user(user)
+        count += 1
+    modeladmin.message_user(
+        request,
+        f'{count} conta(s) eliminada(s) em modo suave: conta, loja e produtos desativados. '
+        'Nenhum dado foi removido.',
+        messages.WARNING,
+    )
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     list_display = (
@@ -58,10 +88,29 @@ class UserAdmin(BaseUserAdmin):
     list_filter = ('is_verified', 'is_active', 'is_staff', 'auth_provider')
     search_fields = ('email', 'username', 'phone', 'first_name', 'last_name')
     ordering = ('-date_joined',)
-    actions = [verify_users, unverify_users, block_users, activate_users]
+    actions = [verify_users, unverify_users, block_users, activate_users, soft_delete_users]
     readonly_fields = BaseUserAdmin.readonly_fields + ('firebase_uid',)
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Verificação e autenticação', {
             'fields': ('is_verified', 'auth_provider', 'firebase_uid', 'phone', 'avatar', 'roles', 'bio'),
         }),
     )
+
+    # ─── Soft-delete: o botão "Eliminar" deixa de apagar dados ───
+    def delete_model(self, request, obj):
+        _soft_delete_user(obj)
+        self.message_user(
+            request,
+            f'Conta {obj.email} eliminada em modo suave: conta, loja e produtos desativados. '
+            'Nenhum dado foi removido.',
+            messages.WARNING,
+        )
+
+    def delete_queryset(self, request, queryset):
+        for user in queryset:
+            _soft_delete_user(user)
+        self.message_user(
+            request,
+            f'{queryset.count()} conta(s) eliminada(s) em modo suave. Nenhum dado foi removido.',
+            messages.WARNING,
+        )
