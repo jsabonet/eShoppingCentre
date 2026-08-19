@@ -12,6 +12,20 @@ function mediaUrl(path: string | null): string | null {
   return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
+async function fetchJSON(url: string, revalidate = 60) {
+  try {
+    const res = await fetch(url, { next: { revalidate } });
+    if (!res.ok) {
+      console.error(`[Home] Falha HTTP ${res.status} ao buscar: ${url}`);
+      return null;
+    }
+    return await res.json();
+  } catch (err: any) {
+    console.error(`[Home] Erro de rede ao buscar ${url}: ${err?.message || err}`);
+    return null;
+  }
+}
+
 const banners = [
   { id: '1', image: 'https://cdn.b12.io/client_media/iKv1biKD/5783f32a-7e6e-11f1-a05c-0242ac110002-gL5f6HGZjVLK9tX7ZtneG.jpg', title: 'Ofertas em Eletrônicos', subtitle: 'Até 30% OFF em smartphones, laptops e acessórios', cta: 'Comprar Agora', link: '/category/eletronicos' },
   { id: '2', image: 'https://cdn.b12.io/client_media/iKv1biKD/573d35e0-7e6e-11f1-a56d-0242ac110002-m84D8GY8ROKweXe5v3qi3.jpg', title: 'Nova Coleção de Moda', subtitle: 'As últimas tendências com preços imperdíveis', cta: 'Ver Coleção', link: '/category/moda' },
@@ -46,23 +60,22 @@ export default async function Home() {
   let stores: any[] = [];
 
   try {
-    const [catsRes, featuredRes, saleRes, bestRes, newRes, storesRes] = await Promise.all([
-      fetch(`${API_URL}/categories/?root=true&with_image=true&sort=most_products`, { next: { revalidate: 60 } }),
-      fetch(`${API_URL}/products/?is_featured=true&page_size=10`, { next: { revalidate: 60 } }),
-      fetch(`${API_URL}/products/?is_on_sale=true&page_size=10`, { next: { revalidate: 60 } }),
-      fetch(`${API_URL}/products/?ordering=-sales_count&page_size=10`, { next: { revalidate: 60 } }),
-      fetch(`${API_URL}/products/?ordering=-created_at&page_size=10`, { next: { revalidate: 60 } }),
-      fetch(`${API_URL}/stores/?page_size=12`, { next: { revalidate: 300 } }),
+    const [catsData, featuredData, saleData, bestData, newData, storesData] = await Promise.all([
+      fetchJSON(`${API_URL}/categories/?root=true&with_image=true&sort=most_products`),
+      fetchJSON(`${API_URL}/products/?is_featured=true&page_size=10`),
+      fetchJSON(`${API_URL}/products/?is_on_sale=true&page_size=10`),
+      fetchJSON(`${API_URL}/products/?ordering=-sales_count&page_size=10`),
+      fetchJSON(`${API_URL}/products/?ordering=-created_at&page_size=10`),
+      fetchJSON(`${API_URL}/stores/?page_size=12`, 300),
     ]);
-    const catsJson = await catsRes.json();
-    categories = Array.isArray(catsJson) ? catsJson : (catsJson.results || []);
-    featuredProducts = featuredRes.ok ? (await featuredRes.json()).results : [];
-    saleProducts = saleRes.ok ? (await saleRes.json()).results : [];
-    bestSellers = bestRes.ok ? (await bestRes.json()).results : [];
-    newArrivals = newRes.ok ? (await newRes.json()).results : [];
-    const storesJson = storesRes.ok ? await storesRes.json() : { results: [] };
-    stores = (storesJson.results || []).filter((s: any) => s.slug);
-  } catch { console.error('API offline, using empty data'); }
+
+    categories = Array.isArray(catsData) ? catsData : (catsData?.results || []);
+    featuredProducts = featuredData?.results || [];
+    saleProducts = saleData?.results || [];
+    bestSellers = bestData?.results || [];
+    newArrivals = newData?.results || [];
+    stores = (storesData?.results || []).filter((s: any) => s.slug);
+  } catch { /* erros individuais já foram registados pelo fetchJSON */ }
 
   const featuredStores = [...stores]
     .sort((a, b) => (b.rating || 0) - (a.rating || 0))
