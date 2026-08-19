@@ -647,23 +647,6 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                   <p className="text-sm text-muted-foreground">{product.reviewCount} avaliações</p>
                 </div>
               </div>
-              <div className="space-y-2 text-sm">
-                {[
-                  { stars: '5 ★', pct: 75 },
-                  { stars: '4 ★', pct: 15 },
-                  { stars: '3 ★', pct: 6 },
-                  { stars: '2 ★', pct: 2 },
-                  { stars: '1 ★', pct: 2 },
-                ].map((row) => (
-                  <div key={row.stars} className="flex items-center gap-2">
-                    <span className="w-12">{row.stars}</span>
-                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-accent rounded-full" style={{ width: `${row.pct}%` }} />
-                    </div>
-                    <span className="w-8 text-right">{row.pct}%</span>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>
@@ -743,27 +726,6 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
           reviewCount={product.reviewCount}
         />
       </div>
-
-      {/* AI Similar Products */}
-      {relatedProducts.length > 0 && (
-        <section id="ai-recommendations" className="py-12 px-4 bg-gradient-to-r from-accent/5 to-accent/10">
-          <div className="max-w-[1500px] mx-auto">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl">🤖</span>
-              <h2 className="text-2xl font-bold">Recomendações Inteligentes</h2>
-              <span className="px-2 py-1 bg-accent text-accent-foreground text-xs font-bold rounded">IA</span>
-            </div>
-            <p className="text-sm text-muted-foreground mb-6">
-              Nossa IA analisou este produto e encontrou itens semelhantes que você pode gostar
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {relatedProducts.slice(0, 4).map((p) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Related Products */}
       {relatedProducts.length > 0 && (
