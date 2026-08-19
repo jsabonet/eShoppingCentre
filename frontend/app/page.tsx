@@ -1,16 +1,10 @@
 ﻿import BannerSlider from '@/src/components/BannerSlider';
 import HomepageShop from '@/src/components/HomepageShop';
+import FeaturedStores from '@/src/components/FeaturedStores';
 import Link from 'next/link';
-import { Truck, Shield, CreditCard, Headphones, Star, Store as StoreIcon } from 'lucide-react';
+import { Truck, Shield, CreditCard, Headphones } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || process.env.NEXT_PUBLIC_MEDIA_HOST || 'http://localhost:8000';
-
-function mediaUrl(path: string | null): string | null {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
-}
 
 async function fetchJSON(url: string, revalidate = 60) {
   try {
@@ -53,22 +47,18 @@ function apiProductToCard(p: APIProduct) {
 
 export default async function Home() {
   let categories: APICategory[] = [];
-  let stores: any[] = [];
+  let featuredStores: any[] = [];
   let homeSections: any = { deals: [], bestsellers: [], new_arrivals: [], featured: [] };
 
   const [catsData, storesData, sectionsData] = await Promise.all([
     fetchJSON(`${API_URL}/categories/?root=true&with_image=true`),
-    fetchJSON(`${API_URL}/stores/?page_size=12`, 300),
+    fetchJSON(`${API_URL}/stores/featured/`),
     fetchJSON(`${API_URL}/products/home-sections/`),
   ]);
 
   categories = Array.isArray(catsData) ? catsData : (catsData?.results || []);
-  stores = (storesData?.results || []).filter((s: any) => s.slug);
+  featuredStores = Array.isArray(storesData) ? storesData : [];
   homeSections = sectionsData || { deals: [], bestsellers: [], new_arrivals: [], featured: [] };
-
-  const featuredStores = [...stores]
-    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-    .slice(0, 8);
 
   const deals = (homeSections.deals || []).map(apiProductToCard);
   const bestsellers = (homeSections.bestsellers || []).map(apiProductToCard);
@@ -150,43 +140,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {featuredStores.length > 0 && (
-        <section id="lojas" className="py-12 px-4 max-w-[1500px] mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <span className="text-accent">🏪</span> Lojas em Destaque
-            </h2>
-            <Link href="/stores" className="text-sm text-accent hover:underline font-medium">
-              Ver todas →
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {featuredStores.map((store: any) => {
-              const logoUrl = mediaUrl(store.logo);
-              return (
-                <Link key={store.slug} href={`/store/${store.slug}`}
-                  className="group bg-card border border-border rounded-lg p-4 flex flex-col items-center text-center hover:shadow-md transition-all">
-                  <div className="w-16 h-16 mb-3 rounded-full bg-muted overflow-hidden flex items-center justify-center">
-                    {logoUrl ? (
-                      <img src={logoUrl} alt={store.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <StoreIcon size={28} className="text-muted-foreground" />
-                    )}
-                  </div>
-                  <h3 className="font-semibold text-sm line-clamp-1">{store.name}</h3>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Star size={14} className="fill-accent text-accent" />
-                    <span className="text-xs text-muted-foreground">
-                      {store.rating ? Number(store.rating).toFixed(1) : '—'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">{store.total_products || 0} produtos</p>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      <FeaturedStores stores={featuredStores} />
 
       <HomepageShop sections={shopSections} />
     </main>

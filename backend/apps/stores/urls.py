@@ -9,6 +9,7 @@ from apps.reviews.views import (
 
 urlpatterns = [
     path('', views.StoreListView.as_view(), name='store_list'),
+    path('featured/', views.StoreFeaturedView.as_view(), name='store_featured'),
     path('register/', views.StoreRegisterView.as_view(), name='store_register'),
     path('me/', views.MyStoreView.as_view(), name='my_store'),
     path('me/stats/', StoreStatsView.as_view(), name='store_stats'),

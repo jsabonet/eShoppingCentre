@@ -2,10 +2,12 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.db import IntegrityError
 from django.http import Http404
 from .models import Store
 from .serializers import StoreSerializer, StoreDetailSerializer
+from .featured import get_featured_stores
 from apps.users.permissions import IsVerified
 
 
@@ -14,6 +16,14 @@ class StoreListView(generics.ListAPIView):
     queryset = Store.objects.filter(status='active').order_by('-created_at')
     serializer_class = StoreSerializer
     permission_classes = [permissions.AllowAny]
+
+
+class StoreFeaturedView(APIView):
+    """Lojas em destaque para a home — curadoria com score + cache."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        return Response(get_featured_stores())
 
 
 class StoreDetailView(generics.RetrieveAPIView):
