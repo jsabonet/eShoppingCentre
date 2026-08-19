@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { ChevronRight } from 'lucide-react';
-import CategoryShopClient from '@/src/components/CategoryShopClient';
+import CategoryProducts from '@/src/components/CategoryProducts';
+import { mapProduct } from '@/src/lib/productMapping';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -24,27 +25,29 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
 
   let category: any = null;
-  let products: any[] = [];
+  let productsData: any = { results: [], next: null };
+  let parentName: string | null = null;
 
   try {
     const [catRes, prodRes] = await Promise.all([
       fetch(`${API_URL}/categories/${slug}/`, { next: { revalidate: 60 } }),
-      fetch(`${API_URL}/products/?category=${slug}&page_size=50`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/products/?category=${slug}&page=1&page_size=20`, { next: { revalidate: 60 } }),
     ]);
     if (!catRes.ok) notFound();
     category = await catRes.json();
-    products = prodRes.ok ? (await prodRes.json()).results : [];
+    productsData = prodRes.ok ? await prodRes.json() : { results: [], next: null };
+
+    if (category.parent_slug) {
+      const parentRes = await fetch(`${API_URL}/categories/${category.parent_slug}/`, { next: { revalidate: 300 } });
+      if (parentRes.ok) {
+        const parent = await parentRes.json();
+        parentName = parent.name;
+      }
+    }
   } catch { notFound(); }
 
-  const mappedProducts = products.map((p: any) => ({
-    id: p.id, slug: p.slug, name: p.name, description: '',
-    price: parseFloat(p.price), image: p.primary_image || '',
-    category: slug, rating: parseFloat(p.rating), reviewCount: p.review_count,
-    badge: p.is_on_sale ? 'sale' as const : undefined,
-    inStock: p.stock > 0,
-    originalPrice: p.compare_price ? parseFloat(p.compare_price) : undefined,
-    discount: p.discount_percentage ?? undefined,
-  }));
+  const mappedProducts = (productsData.results || []).map(mapProduct);
+  const hasMore = !!productsData.next;
 
   return (
     <>
@@ -53,6 +56,12 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <nav className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             <Link href="/" className="hover:text-foreground transition-colors">Início</Link>
             <ChevronRight size={14} />
+            {parentName ? (
+              <>
+                <Link href={`/category/${category.parent_slug}`} className="hover:text-foreground transition-colors">{parentName}</Link>
+                <ChevronRight size={14} />
+              </>
+            ) : null}
             <span className="text-foreground font-medium">{category.name}</span>
           </nav>
         </div>
@@ -64,7 +73,25 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <p className="text-sm text-muted-foreground mt-1"><span className="font-semibold text-foreground">{category.product_count}</span> produtos disponíveis</p>
         </div>
       </div>
-      <CategoryShopClient products={mappedProducts} categoryName={category.name} />
+
+      {category.children && category.children.length > 0 && (
+        <div className="max-w-[1500px] mx-auto px-4 pt-6">
+          <h2 className="text-sm font-semibold mb-3 text-muted-foreground">Subcategorias</h2>
+          <div className="flex flex-wrap gap-2">
+            {category.children.map((c: any) => (
+              <Link
+                key={c.slug}
+                href={`/category/${c.slug}`}
+                className="px-3 py-1.5 bg-card border border-border rounded-full text-sm hover:bg-accent/10 hover:border-accent transition-colors"
+              >
+                {c.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <CategoryProducts categorySlug={slug} initialProducts={mappedProducts} initialHasMore={hasMore} />
     </>
   );
 }

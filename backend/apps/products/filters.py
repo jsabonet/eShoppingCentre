@@ -12,8 +12,14 @@ class ProductFilter(django_filters.FilterSet):
     min_rating = django_filters.NumberFilter(field_name='rating', lookup_expr='gte')
     status = django_filters.CharFilter(field_name='status', lookup_expr='exact')
     affiliate_enabled = django_filters.BooleanFilter()
+    has_stock = django_filters.BooleanFilter(method='filter_has_stock')
 
     class Meta:
         model = Product
         fields = ['product_type', 'category', 'store', 'min_price', 'max_price',
-                  'is_on_sale', 'is_featured', 'min_rating', 'status', 'affiliate_enabled']
+                  'is_on_sale', 'is_featured', 'min_rating', 'status', 'affiliate_enabled', 'has_stock']
+
+    def filter_has_stock(self, queryset, name, value):
+        if value:
+            return queryset.filter(stock__gt=0)
+        return queryset

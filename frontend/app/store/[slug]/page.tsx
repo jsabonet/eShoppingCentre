@@ -1,18 +1,13 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { ChevronRight, Phone, Mail, Shield, Clock, Package, Download, Truck, Monitor, FileText } from 'lucide-react';
+import { ChevronRight, Phone, Mail, Shield, Clock, Download, Truck, Monitor, FileText } from 'lucide-react';
 import StoreOwnerEditable from '@/src/components/StoreOwnerEditable';
 import StoreReviews from '@/src/components/StoreReviews';
+import StoreProducts from '@/src/components/StoreProducts';
+import { mapProduct } from '@/src/lib/productMapping';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
-
-function mediaUrl(path: string | null): string {
-  if (!path) return '';
-  if (path.startsWith('http')) return path;
-  return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
-}
 
 interface StorePageProps {
   params: Promise<{ slug: string }>;
@@ -32,30 +27,21 @@ export default async function StorePage({ params }: StorePageProps) {
   const { slug } = await params;
 
   let store: any = null;
-  let storeProducts: any[] = [];
+  let productsData: any = { results: [], next: null };
 
   try {
     const [storeRes, prodRes] = await Promise.all([
       fetch(`${API_URL}/stores/${slug}/`, { next: { revalidate: 60 } }),
-      fetch(`${API_URL}/products/?store=${slug}&page_size=12`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/products/?store=${slug}&page=1&page_size=12`, { next: { revalidate: 60 } }),
     ]);
 
     if (!storeRes.ok) notFound();
     store = await storeRes.json();
-    storeProducts = prodRes.ok ? (await prodRes.json()).results || [] : [];
+    productsData = prodRes.ok ? await prodRes.json() : { results: [], next: null };
   } catch { notFound(); }
 
-  const mappedProducts = storeProducts.map((p: any) => ({
-    id: p.id, slug: p.slug, name: p.name, description: p.description || '',
-    price: parseFloat(p.price), image: p.primary_image || '',
-    category: p.category || '', rating: parseFloat(p.rating), reviewCount: p.review_count || 0,
-    badge: p.is_on_sale ? 'sale' as const : undefined,
-    inStock: p.stock > 0,
-    originalPrice: p.compare_price ? parseFloat(p.compare_price) : undefined,
-    discount: p.discount_percentage ?? undefined,
-    digitalFormat: p.digital_format || '',
-    digitalLicense: p.digital_license || '',
-  }));
+  const mappedProducts = (productsData.results || []).map(mapProduct);
+  const hasMore = !!productsData.next;
 
   return (
     <>
@@ -90,40 +76,10 @@ export default async function StorePage({ params }: StorePageProps) {
       {/* Products — Full Width */}
       <div className="max-w-[1500px] mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">Produtos ({mappedProducts.length})</h2>
+          <h2 className="text-xl font-bold">Produtos ({store.total_products || mappedProducts.length})</h2>
         </div>
 
-        {mappedProducts.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {mappedProducts.map((product: any) => (
-              <Link key={product.id} href={`/product/${product.slug}`}
-                className="bg-card border border-border rounded-xl overflow-hidden group hover:shadow-md transition-all">
-                <div className="aspect-square bg-muted overflow-hidden">
-                  <img src={mediaUrl(product.image) || 'https://cdn.b12.io/client_media/iKv1biKD/5aa3154d-7e6e-11f1-82d2-0242ac110002-9e8FSvH-aRUq9K6kB6vgg.jpg'}
-                    alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                </div>
-                <div className="p-3">
-                  <h3 className="font-medium text-sm truncate">{product.name}</h3>
-                  <p className="font-bold text-accent mt-1">{product.price.toLocaleString('pt-MZ')} MZN</p>
-                  {product.originalPrice && (
-                    <p className="text-xs text-muted-foreground line-through">{product.originalPrice.toLocaleString('pt-MZ')} MZN</p>
-                  )}
-                  {product.digitalFormat && (
-                    <span className="inline-block mt-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
-                      {product.digitalFormat}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16 text-muted-foreground bg-card border border-border rounded-xl">
-            <Package size={48} className="mx-auto mb-3 opacity-20" />
-            <p className="text-lg font-medium">Nenhum produto ainda</p>
-            <p className="text-sm mt-1">Esta loja ainda nao publicou produtos.</p>
-          </div>
-        )}
+        <StoreProducts storeSlug={store.slug} initialProducts={mappedProducts} initialHasMore={hasMore} />
       </div>
 
       {/* About & Info Section — Cards below products */}
