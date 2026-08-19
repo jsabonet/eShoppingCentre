@@ -92,30 +92,55 @@ export async function completeRedirectSignIn(): Promise<{
   console.log('[Firebase] completeRedirectSignIn: a chamar getRedirectResult()...');
   try {
     const result = await getRedirectResult(auth);
-    if (!result) {
-      console.log('[Firebase] getRedirectResult: SEM resultado pendente (null) — nenhum redirect em curso.');
-      return null;
+    if (result) {
+      console.log('[Firebase] getRedirectResult: utilizador obtido | uid=', result.user.uid, '| email=', result.user.email);
+      const idToken = await result.user.getIdToken();
+      console.log('[Firebase] getIdToken OK | idToken len=', idToken.length);
+      return {
+        idToken,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        photoURL: result.user.photoURL,
+        firebaseUid: result.user.uid,
+      };
     }
-
-    console.log('[Firebase] getRedirectResult: utilizador obtido | uid=', result.user.uid, '| email=', result.user.email);
-    const idToken = await result.user.getIdToken();
-    console.log('[Firebase] getIdToken OK | idToken len=', idToken.length);
-    return {
-      idToken,
-      email: result.user.email,
-      displayName: result.user.displayName,
-      photoURL: result.user.photoURL,
-      firebaseUid: result.user.uid,
-    };
+    console.log('[Firebase] getRedirectResult: SEM resultado pendente (null).');
   } catch (error: any) {
-    // Ignore errors from getRedirectResult (e.g., no pending redirect)
     if (error?.code === 'auth/no-current-user') {
       console.log('[Firebase] getRedirectResult: auth/no-current-user (sem sessão pendente).');
-      return null;
+    } else {
+      console.error('[Firebase] Erro no redirect sign-in:', error?.code, error?.message);
+      throw error;
     }
-    console.error('[Firebase] Erro no redirect sign-in:', error?.code, error?.message);
-    throw error;
   }
+
+  // Fallback: alguns browsers perdem o resultado do redirect (handoff cross-origin),
+  // mas a sessão fica persistida. Verificamos o utilizador atual.
+  try {
+    await auth.authStateReady();
+    const user = auth.currentUser;
+    if (user) {
+      const isGoogle = (user.providerData || []).some((p) => p.providerId === 'google.com');
+      console.log('[Firebase] fallback authStateReady | currentUser=', user.email, '| google=', isGoogle);
+      if (isGoogle) {
+        const idToken = await user.getIdToken();
+        console.log('[Firebase] fallback: idToken obtido | len=', idToken.length);
+        return {
+          idToken,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          firebaseUid: user.uid,
+        };
+      }
+    } else {
+      console.log('[Firebase] fallback authStateReady: sem currentUser (sem sessão Google).');
+    }
+  } catch (e: any) {
+    console.error('[Firebase] fallback authStateReady falhou:', e?.code || e?.message || e);
+  }
+
+  return null;
 }
 
 /**
