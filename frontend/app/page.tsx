@@ -59,6 +59,14 @@ function apiProductToCard(p: APIProduct) {
   };
 }
 
+// Placeholder visual para categorias sem imagem (evita cards "vazios")
+function categoryCardImage(cat: APICategory): string {
+  if (cat.image) return cat.image;
+  const initial = (cat.name || '?').charAt(0).toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><rect width="200" height="200" fill="url(#g)"/><text x="50%" y="50%" font-size="90" text-anchor="middle" dominant-baseline="central" fill="#ffffff" font-family="Arial, sans-serif">${initial}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 export default async function Home() {
   let categories: APICategory[] = [];
   let featuredStores: any[] = [];
@@ -173,11 +181,7 @@ export default async function Home() {
             <Link key={cat.slug} href={'/category/' + cat.slug}
               className="category-card shrink-0 w-[120px] md:w-auto group bg-card border border-border rounded-lg p-4 text-center hover:shadow-md transition-all">
               <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted overflow-hidden flex items-center justify-center">
-                {cat.image ? (
-                  <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-2xl">{cat.name.charAt(0)}</span>
-                )}
+                <img src={categoryCardImage(cat)} alt={cat.name} className="w-full h-full object-cover" />
               </div>
               <h3 className="font-semibold text-sm">{cat.name}</h3>
             </Link>
