@@ -21,11 +21,42 @@ interface HomepageShopProps {
 
 export default function HomepageShop({ sections }: HomepageShopProps) {
   const scrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const drag = useRef<{ startX: number; startLeft: number; moved: boolean } | null>(null);
+  const suppressClickUntil = useRef(0);
 
   const scroll = (id: string, dir: -1 | 1) => {
     const el = scrollRefs.current[id];
     if (el) {
       el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' });
+    }
+  };
+
+  // Arrastar com o cursor (rato ou touchpad) para percorrer o carrossel
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    drag.current = { startX: e.clientX, startLeft: e.currentTarget.scrollLeft, moved: false };
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const st = drag.current;
+    if (!st) return;
+    const dx = e.clientX - st.startX;
+    if (!st.moved && Math.abs(dx) > 6) st.moved = true;
+    if (st.moved) {
+      e.currentTarget.scrollLeft = st.startLeft - dx;
+    }
+  };
+
+  const endDrag = () => {
+    if (drag.current?.moved) suppressClickUntil.current = Date.now() + 300;
+    drag.current = null;
+  };
+
+  // Evita que o clique dispare (link/botão) logo após um arrasto
+  const onCaptureClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (Date.now() < suppressClickUntil.current) {
+      suppressClickUntil.current = 0;
+      e.preventDefault();
+      e.stopPropagation();
     }
   };
 
@@ -56,7 +87,13 @@ export default function HomepageShop({ sections }: HomepageShopProps) {
             <div className="relative">
               <div
                 ref={(el) => { scrollRefs.current[section.id] = el; }}
-                className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x pb-2"
+                onClickCapture={onCaptureClick}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={endDrag}
+                onPointerLeave={endDrag}
+                onDragStart={(e) => e.preventDefault()}
+                className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x pb-2 select-none cursor-grab active:cursor-grabbing"
               >
                 {section.products.map((product) => (
                   <div
