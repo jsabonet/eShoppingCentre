@@ -72,21 +72,13 @@ class CategoryListView(generics.ListAPIView):
         else:
             with_img = qs
 
-        # Garantia de um número mínimo de cards na home:
-        # preenche com as mais relevantes (imagem + produtos primeiro).
-        if min_count is not None and min_count.isdigit() and with_image in ('true', '1'):
-            min_count = int(min_count)
-            primary = list(qs.order_by(*order)[:min_count])
-            ids = [c.id for c in primary]
-            if not ids:
-                return Category.objects.none()
-            preserved = Case(
-                *[When(id=cid, then=pos) for pos, cid in enumerate(ids)],
-                output_field=IntegerField(),
-            )
-            return Category.objects.filter(id__in=ids).select_related('parent').order_by(preserved)
+        with_img = with_img.order_by(*order).select_related('parent')
 
-        return with_img.order_by(*order).select_related('parent')
+        # Limite de cards (ex.: home usa min=12) — NÃO preenche com categorias sem imagem
+        if min_count is not None and min_count.isdigit():
+            with_img = with_img[:int(min_count)]
+
+        return with_img
 
 
 class CategoryDetailView(generics.RetrieveAPIView):
