@@ -4,6 +4,7 @@ from .models import Wallet, WalletTransaction, PayoutRequest
 
 class WalletSerializer(serializers.ModelSerializer):
     available_payout = serializers.SerializerMethodField()
+    total_spent = serializers.SerializerMethodField()
 
     class Meta:
         model = Wallet
