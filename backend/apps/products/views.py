@@ -5,7 +5,7 @@ from rest_framework import generics, permissions, status, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count, Sum, Case, When, IntegerField
+from django.db.models import Q, Count, Sum, Case, When, Value, IntegerField
 from decimal import Decimal, InvalidOperation
 from .models import Category, Product, ProductImage, ProductVariant, Coupon, WishlistItem, StockLog, ProductView, SearchLog
 from .serializers import (
@@ -43,15 +43,26 @@ class CategoryListView(generics.ListAPIView):
         if product_type:
             qs = qs.filter(product_type=product_type)
 
+        # Prioridade: categorias com imagem E produtos aparecem primeiro.
+        qs = qs.annotate(
+            _product_count=Count('products', filter=Q(products__status='active')),
+        ).annotate(
+            _priority=Case(
+                When(
+                    Q(image__isnull=False) & ~Q(image='') & Q(_product_count__gt=0),
+                    then=Value(0),
+                ),
+                default=Value(1),
+                output_field=IntegerField(),
+            ),
+        )
+
         # Ordenação por relevância
         if sort == 'most_products':
-            qs = qs.annotate(
-                _product_count=Count('products', filter=Q(products__status='active'))
-            )
-            order = ('-_product_count', 'name')
+            order = ('_priority', '-_product_count', 'name')
         elif sort == 'top_sales':
             qs = qs.annotate(_total_sales=Sum('products__sales_count'))
-            order = ('-_total_sales', 'name')
+            order = ('_priority', '-_total_sales', 'name')
         else:
             order = ('sort_order', 'name')
 
@@ -62,15 +73,10 @@ class CategoryListView(generics.ListAPIView):
             with_img = qs
 
         # Garantia de um número mínimo de cards na home:
-        # se houver poucas com imagem, preenche com raiz activa sem imagem.
+        # preenche com as mais relevantes (imagem + produtos primeiro).
         if min_count is not None and min_count.isdigit() and with_image in ('true', '1'):
             min_count = int(min_count)
-            primary = list(with_img.order_by(*order))
-            if len(primary) < min_count:
-                without_img = qs.filter(
-                    Q(image='') | Q(image__isnull=True)
-                ).order_by(*order)[: min_count - len(primary)]
-                primary.extend(without_img)
+            primary = list(qs.order_by(*order)[:min_count])
             ids = [c.id for c in primary]
             if not ids:
                 return Category.objects.none()
