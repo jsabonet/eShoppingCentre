@@ -5,7 +5,7 @@ from rest_framework import generics, permissions, status, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, Case, When, IntegerField
 from decimal import Decimal, InvalidOperation
 from .models import Category, Product, ProductImage, ProductVariant, Coupon, WishlistItem, StockLog, ProductView, SearchLog
 from .serializers import (
@@ -28,6 +28,7 @@ class CategoryListView(generics.ListAPIView):
         product_type = self.request.query_params.get('product_type', None)
         with_image = self.request.query_params.get('with_image', None)
         sort = self.request.query_params.get('sort', None)
+        min_count = self.request.query_params.get('min', None)
 
         if parent is not None:
             # Filter children of a specific parent (by slug)
@@ -42,25 +43,44 @@ class CategoryListView(generics.ListAPIView):
         if product_type:
             qs = qs.filter(product_type=product_type)
 
-        # Apenas categorias com imagem principal.
-        # NOTA: NÃO filtramos por nº de produtos — categorias sem produtos
-        # (mas com imagem) também são exibidas na home.
-        if with_image in ('true', '1'):
-            qs = qs.exclude(Q(image='') | Q(image__isnull=True))
-
         # Ordenação por relevância
         if sort == 'most_products':
             qs = qs.annotate(
                 _product_count=Count('products', filter=Q(products__status='active'))
-            ).order_by('-_product_count', 'name')
+            )
+            order = ('-_product_count', 'name')
         elif sort == 'top_sales':
-            qs = qs.annotate(
-                _total_sales=Sum('products__sales_count')
-            ).order_by('-_total_sales', 'name')
+            qs = qs.annotate(_total_sales=Sum('products__sales_count'))
+            order = ('-_total_sales', 'name')
         else:
-            qs = qs.order_by('sort_order', 'name')
+            order = ('sort_order', 'name')
 
-        return qs.select_related('parent')
+        if with_image in ('true', '1'):
+            # Apenas categorias com imagem principal
+            with_img = qs.exclude(Q(image='') | Q(image__isnull=True))
+        else:
+            with_img = qs
+
+        # Garantia de um número mínimo de cards na home:
+        # se houver poucas com imagem, preenche com raiz activa sem imagem.
+        if min_count is not None and min_count.isdigit() and with_image in ('true', '1'):
+            min_count = int(min_count)
+            primary = list(with_img.order_by(*order))
+            if len(primary) < min_count:
+                without_img = qs.filter(
+                    Q(image='') | Q(image__isnull=True)
+                ).order_by(*order)[: min_count - len(primary)]
+                primary.extend(without_img)
+            ids = [c.id for c in primary]
+            if not ids:
+                return Category.objects.none()
+            preserved = Case(
+                *[When(id=cid, then=pos) for pos, cid in enumerate(ids)],
+                output_field=IntegerField(),
+            )
+            return Category.objects.filter(id__in=ids).select_related('parent').order_by(preserved)
+
+        return with_img.order_by(*order).select_related('parent')
 
 
 class CategoryDetailView(generics.RetrieveAPIView):
