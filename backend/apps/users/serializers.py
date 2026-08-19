@@ -53,6 +53,16 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'email', 'roles', 'is_verified', 'date_joined', 'is_staff', 'is_active')
 
 
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Serializer usado pelo painel admin: permite verificar, bloquear e alterar roles."""
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'username', 'phone', 'first_name', 'last_name',
+                  'avatar', 'roles', 'is_verified', 'is_active', 'is_staff',
+                  'auth_provider', 'date_joined', 'date_of_birth', 'bio', 'deleted_at')
+        read_only_fields = ('id', 'email', 'auth_provider', 'date_joined', 'deleted_at')
+
+
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address

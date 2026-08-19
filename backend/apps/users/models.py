@@ -33,6 +33,22 @@ class User(AbstractUser):
     def __str__(self):
         return self.email
 
+    def soft_delete(self):
+        """Eliminação suave: desativa a conta, marca `deleted_at` e, em cascata,
+        suspende a loja e inativa os produtos — sem remover nenhum dado."""
+        from django.utils import timezone
+        from apps.stores.models import Store
+
+        self.is_active = False
+        self.deleted_at = timezone.now()
+        self.save(update_fields=['is_active', 'deleted_at'])
+
+        store = Store.objects.filter(owner=self).first()
+        if store is not None:
+            store.status = 'suspended'
+            store.save(update_fields=['status'])
+            store.products.update(status='inactive')
+
 
 class UserProfile(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')

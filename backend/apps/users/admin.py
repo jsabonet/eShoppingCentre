@@ -1,6 +1,5 @@
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from django.utils import timezone
 from .models import User
 
 
@@ -18,20 +17,9 @@ def _blacklist_user_tokens(user):
 
 
 def _soft_delete_user(user):
-    """Eliminação suave (soft-delete): desativa a conta e, em cascata,
-    suspende a loja e inativa os produtos — sem remover nenhum dado."""
-    from apps.stores.models import Store
-
+    """Eliminação suave (soft-delete): revoga sessões e aplica cascata via User.soft_delete()."""
     _blacklist_user_tokens(user)
-    user.is_active = False
-    user.deleted_at = timezone.now()
-    user.save(update_fields=['is_active', 'deleted_at'])
-
-    store = Store.objects.filter(owner=user).first()
-    if store is not None:
-        store.status = 'suspended'
-        store.save(update_fields=['status'])
-        store.products.update(status='inactive')
+    user.soft_delete()
 
 
 @admin.action(description='✅ Verificar utilizadores selecionados')

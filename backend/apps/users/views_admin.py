@@ -6,12 +6,13 @@ from django.db.models import Sum
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from apps.users.models import User
 from apps.stores.models import Store
 from apps.orders.models import Order
 from apps.wallet.models import WalletTransaction, Wallet
 from apps.affiliates.models import AffiliateProfile
-from .serializers import UserProfileSerializer, AdminUserCreateSerializer
+from .serializers import UserProfileSerializer, AdminUserCreateSerializer, AdminUserSerializer
 
 UserModel = get_user_model()
 
@@ -296,19 +297,42 @@ class AdminUserListView(generics.ListCreateAPIView):
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return AdminUserCreateSerializer
-        return UserProfileSerializer
+        return AdminUserSerializer
 
 
 class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Admin: ver, editar e eliminar utilizador"""
+    """Admin: ver, editar (verificar/bloquear/roles) e eliminar utilizador (soft-delete)."""
     queryset = UserModel.objects.all()
     permission_classes = [permissions.IsAdminUser]
+    serializer_class = AdminUserSerializer
     lookup_field = 'pk'
 
-    def get_serializer_class(self):
-        if self.request.method in ('PUT', 'PATCH'):
-            return UserProfileSerializer
-        return UserProfileSerializer
+    def perform_update(self, serializer):
+        from .views import _blacklist_user_tokens  # import local evita import circular
+        user = serializer.instance
+        was_active = user.is_active
+        user = serializer.save()
+        if was_active and not user.is_active:
+            # Conta desativada/bloqueada → revoga sessões ativas
+            _blacklist_user_tokens(user)
+        elif not was_active and user.is_active:
+            # Reativação → limpa a marca de eliminação suave
+            if user.deleted_at:
+                user.deleted_at = None
+                user.save(update_fields=['deleted_at'])
+
+    def destroy(self, request, *args, **kwargs):
+        """DELETE → eliminação suave em cascata (não remove dados)."""
+        from .views import _blacklist_user_tokens  # import local evita import circular
+        user = self.get_object()
+        _blacklist_user_tokens(user)
+        user.soft_delete()
+        return Response({
+            'detail': (
+                f'Conta {user.email} eliminada em modo suave: conta, loja e produtos '
+                'desativados. Nenhum dado foi removido.'
+            )
+        })
 
 
 # ─── Admin: Store Data (Chats, Followers, Reviews) ───

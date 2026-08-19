@@ -143,7 +143,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   const [userForm, setUserForm] = useState({
     email: '', username: '', first_name: '', last_name: '', phone: '',
     password: '', password2: '',
-    roles: ['buyer'] as string[], is_verified: false, is_staff: false,
+    roles: ['buyer'] as string[], is_verified: false, is_staff: false, is_active: true,
   });
   const [userFormError, setUserFormError] = useState('');
 
@@ -441,7 +441,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   };
 
   const resetUserForm = () => {
-    setUserForm({ email: '', username: '', first_name: '', last_name: '', phone: '', password: '', password2: '', roles: ['buyer'], is_verified: false, is_staff: false });
+    setUserForm({ email: '', username: '', first_name: '', last_name: '', phone: '', password: '', password2: '', roles: ['buyer'], is_verified: false, is_staff: false, is_active: true });
     setEditingUser(null);
     setShowUserForm(false);
     setUserFormError('');
@@ -460,6 +460,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
       roles: u.roles || ['buyer'],
       is_verified: u.is_verified || false,
       is_staff: u.is_staff || false,
+      is_active: u.is_active !== false,
     });
     setUserFormError('');
     setShowUserForm(true);
@@ -477,6 +478,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
           roles: userForm.roles,
           is_verified: userForm.is_verified,
           is_staff: userForm.is_staff,
+          is_active: userForm.is_active,
         };
         await adminAPI.updateUser(editingUser.id, payload);
       } else {
@@ -504,8 +506,8 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   const handleDeleteUser = (userId: string) => {
     setConfirmModal({
       open: true,
-      title: 'Eliminar Utilizador',
-      message: 'Tens a certeza que queres eliminar este utilizador? Esta ação é irreversível.',
+      title: 'Eliminar Utilizador (soft-delete)',
+      message: 'A conta, a loja e os produtos serão desativados, mas nenhum dado será removido. Esta ação pode ser revertida reativando a conta.',
       action: 'Eliminar',
       onConfirm: async () => {
         try {
@@ -1143,7 +1145,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                         ))}
                       </div>
                     </div>
-                    <div className="flex gap-6">
+                    <div className="flex gap-6 flex-wrap">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={userForm.is_verified}
                           onChange={(e) => setUserForm({ ...userForm, is_verified: e.target.checked })}
@@ -1155,6 +1157,12 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                           onChange={(e) => setUserForm({ ...userForm, is_staff: e.target.checked })}
                           className="rounded" />
                         <span className="text-sm">Staff (acesso admin)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={userForm.is_active}
+                          onChange={(e) => setUserForm({ ...userForm, is_active: e.target.checked })}
+                          className="rounded" />
+                        <span className="text-sm">Conta ativa (desbloqueada)</span>
                       </label>
                     </div>
                     <div className="flex gap-3 pt-2">
