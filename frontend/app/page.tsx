@@ -1,9 +1,16 @@
 ﻿import BannerSlider from '@/src/components/BannerSlider';
 import HomepageShop from '@/src/components/HomepageShop';
 import Link from 'next/link';
-import { Truck, Shield, CreditCard, Headphones } from 'lucide-react';
+import { Truck, Shield, CreditCard, Headphones, Star, Store as StoreIcon } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || process.env.NEXT_PUBLIC_MEDIA_HOST || 'http://localhost:8000';
+
+function mediaUrl(path: string | null): string | null {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+}
 
 const banners = [
   { id: '1', image: 'https://cdn.b12.io/client_media/iKv1biKD/5783f32a-7e6e-11f1-a05c-0242ac110002-gL5f6HGZjVLK9tX7ZtneG.jpg', title: 'Ofertas em Eletrônicos', subtitle: 'Até 30% OFF em smartphones, laptops e acessórios', cta: 'Comprar Agora', link: '/category/eletronicos' },
@@ -23,6 +30,10 @@ function apiProductToCard(p: APIProduct) {
     inStock: p.stock > 0,
     originalPrice: p.compare_price ? parseFloat(p.compare_price) : undefined,
     discount: p.discount_percentage ?? undefined,
+    storeName: p.store_name || undefined,
+    storeSlug: p.store_slug || undefined,
+    salesCount: p.sales_count ?? undefined,
+    productType: (p.product_type as 'physical' | 'digital' | 'course') || 'physical',
   };
 }
 
@@ -30,19 +41,32 @@ export default async function Home() {
   let categories: APICategory[] = [];
   let featuredProducts: APIProduct[] = [];
   let saleProducts: APIProduct[] = [];
-  let categoryProducts: Record<string, APIProduct[]> = {};
+  let bestSellers: APIProduct[] = [];
+  let newArrivals: APIProduct[] = [];
+  let stores: any[] = [];
 
   try {
-    const [catsRes, featuredRes, saleRes] = await Promise.all([
+    const [catsRes, featuredRes, saleRes, bestRes, newRes, storesRes] = await Promise.all([
       fetch(`${API_URL}/categories/`, { next: { revalidate: 60 } }),
       fetch(`${API_URL}/products/?is_featured=true&page_size=10`, { next: { revalidate: 60 } }),
       fetch(`${API_URL}/products/?is_on_sale=true&page_size=10`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/products/?ordering=-sales_count&page_size=10`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/products/?ordering=-created_at&page_size=10`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/stores/?page_size=12`, { next: { revalidate: 300 } }),
     ]);
     const catsJson = await catsRes.json();
     categories = Array.isArray(catsJson) ? catsJson : (catsJson.results || []);
     featuredProducts = featuredRes.ok ? (await featuredRes.json()).results : [];
     saleProducts = saleRes.ok ? (await saleRes.json()).results : [];
+    bestSellers = bestRes.ok ? (await bestRes.json()).results : [];
+    newArrivals = newRes.ok ? (await newRes.json()).results : [];
+    const storesJson = storesRes.ok ? await storesRes.json() : { results: [] };
+    stores = (storesJson.results || []).filter((s: any) => s.slug);
   } catch { console.error('API offline, using empty data'); }
+
+  const featuredStores = [...stores]
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .slice(0, 8);
 
   const shopSections = [
     {
@@ -51,9 +75,19 @@ export default async function Home() {
       viewAllLink: '/#ofertas', viewAllLabel: 'Ver todas →', bgClass: 'bg-accent/5',
     },
     {
-      id: 'destaques', title: 'Produtos em Destaque',
+      id: 'mais-vendidos', title: 'Mais Vendidos', titleIcon: '🔥',
+      products: bestSellers.slice(0, 10).map(apiProductToCard),
+      bgClass: '',
+    },
+    {
+      id: 'novidades', title: 'Novidades', titleIcon: '✨',
+      products: newArrivals.slice(0, 10).map(apiProductToCard),
+      bgClass: '',
+    },
+    {
+      id: 'destaques', title: 'Produtos em Destaque', titleIcon: '⭐',
       products: (featuredProducts.length > 0 ? featuredProducts : saleProducts).slice(0, 10).map(apiProductToCard),
-      viewAllLink: '/#destaques', viewAllLabel: 'Ver mais →', bgClass: '',
+      viewAllLink: '/#destaques', viewAllLabel: 'Ver mais →', bgClass: 'bg-accent/5',
     },
   ];
 
@@ -76,11 +110,11 @@ export default async function Home() {
             </div>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-accent/10 rounded-lg"><CreditCard size={24} className="text-foreground" /></div>
-              <div><p className="font-semibold text-sm">Parcele em 12x</p><p className="text-xs text-muted-foreground">Sem juros no cartão</p></div>
+              <div><p className="font-semibold text-sm">Pagamento Seguro</p><p className="text-xs text-muted-foreground">Diversas formas de pagamento</p></div>
             </div>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-accent/10 rounded-lg"><Headphones size={24} className="text-foreground" /></div>
-              <div><p className="font-semibold text-sm">Atendimento 24h</p><p className="text-xs text-muted-foreground">Suporte dedicado</p></div>
+              <div><p className="font-semibold text-sm">Suporte Dedicado</p><p className="text-xs text-muted-foreground">Atendimento em português</p></div>
             </div>
           </div>
         </div>
@@ -108,6 +142,44 @@ export default async function Home() {
           )}
         </div>
       </section>
+
+      {featuredStores.length > 0 && (
+        <section id="lojas" className="py-12 px-4 max-w-[1500px] mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <span className="text-accent">🏪</span> Lojas em Destaque
+            </h2>
+            <Link href="/stores" className="text-sm text-accent hover:underline font-medium">
+              Ver todas →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {featuredStores.map((store: any) => {
+              const logoUrl = mediaUrl(store.logo);
+              return (
+                <Link key={store.slug} href={`/store/${store.slug}`}
+                  className="group bg-card border border-border rounded-lg p-4 flex flex-col items-center text-center hover:shadow-md transition-all">
+                  <div className="w-16 h-16 mb-3 rounded-full bg-muted overflow-hidden flex items-center justify-center">
+                    {logoUrl ? (
+                      <img src={logoUrl} alt={store.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <StoreIcon size={28} className="text-muted-foreground" />
+                    )}
+                  </div>
+                  <h3 className="font-semibold text-sm line-clamp-1">{store.name}</h3>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Star size={14} className="fill-accent text-accent" />
+                    <span className="text-xs text-muted-foreground">
+                      {store.rating ? Number(store.rating).toFixed(1) : '—'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{store.total_products || 0} produtos</p>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <HomepageShop sections={shopSections} />
     </main>
