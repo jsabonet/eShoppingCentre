@@ -79,14 +79,7 @@ export default function FeaturedStores({ stores }: { stores: FeaturedStore[] }) 
                 <p className="text-xs text-muted-foreground line-clamp-1 w-full mt-0.5">{s.tagline}</p>
               )}
               <div className="flex items-center justify-center gap-1.5 mt-1.5 flex-wrap">
-                {s.rating > 0 && (
-                  <>
-                    <Stars rating={s.rating} />
-                    <span className="text-xs text-muted-foreground">
-                      {s.rating.toFixed(1)}
-                    </span>
-                  </>
-                )}
+                {s.rating > 0 && <Stars rating={s.rating} />}
                 {s.owner_verified && <BadgeCheck size={14} className="text-emerald-500" />}
               </div>
             </Link>
