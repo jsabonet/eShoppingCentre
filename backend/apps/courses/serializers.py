@@ -131,6 +131,8 @@ class CourseListSerializer(serializers.ModelSerializer):
         return None
 
     def get_students_count(self, obj):
+        if hasattr(obj, 'students_count') and obj.students_count is not None:
+            return obj.students_count
         return obj.enrollments.count()
 
     def get_total_lessons(self, obj):

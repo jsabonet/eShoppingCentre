@@ -1,4 +1,4 @@
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -21,11 +21,24 @@ from .serializers import (
 
 
 class CourseListView(generics.ListAPIView):
-    queryset = Course.objects.filter(product__status='active').select_related('product', 'instructor').annotate(
-        _real_lesson_count=Count('modules__lessons', distinct=True)
-    )
     serializer_class = CourseListSerializer
     permission_classes = [permissions.AllowAny]
+    filter_backends = [filters.OrderingFilter]
+    # "cursos em alta" = ordering=-students_count
+    ordering_fields = ['students_count', 'created_at', 'product__rating', 'product__price', 'product__sales_count']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        qs = Course.objects.filter(product__status='active').select_related(
+            'product', 'product__store', 'instructor'
+        ).annotate(
+            _real_lesson_count=Count('modules__lessons', distinct=True),
+            students_count=Count('enrollments', distinct=True),
+        )
+        level = self.request.query_params.get('level')
+        if level:
+            qs = qs.filter(level=level)
+        return qs
 
 
 class CourseDetailView(generics.RetrieveAPIView):
