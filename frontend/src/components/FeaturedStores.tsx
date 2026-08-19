@@ -29,13 +29,6 @@ export interface FeaturedStore {
   followers_count: number;
 }
 
-const TIER_STYLES: Record<string, string> = {
-  diamond: 'bg-purple-100 text-purple-700',
-  gold: 'bg-amber-100 text-amber-700',
-  silver: 'bg-slate-200 text-slate-700',
-  bronze: 'bg-orange-100 text-orange-700',
-};
-
 function Stars({ rating }: { rating: number }) {
   return (
     <span className="flex items-center">
@@ -46,15 +39,6 @@ function Stars({ rating }: { rating: number }) {
           className={i < Math.floor(rating) ? 'fill-accent text-accent' : 'text-muted-foreground'}
         />
       ))}
-    </span>
-  );
-}
-
-function TierBadge({ tier, display }: { tier: string; display: string }) {
-  const className = TIER_STYLES[tier] || TIER_STYLES.bronze;
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${className}`}>
-      {display}
     </span>
   );
 }
@@ -103,7 +87,6 @@ export default function FeaturedStores({ stores }: { stores: FeaturedStore[] }) 
                     </span>
                   </>
                 )}
-                <TierBadge tier={s.tier} display={s.tier_display} />
                 {s.owner_verified && <BadgeCheck size={14} className="text-emerald-500" />}
               </div>
             </Link>
