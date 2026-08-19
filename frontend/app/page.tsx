@@ -47,7 +47,7 @@ export default async function Home() {
 
   try {
     const [catsRes, featuredRes, saleRes, bestRes, newRes, storesRes] = await Promise.all([
-      fetch(`${API_URL}/categories/`, { next: { revalidate: 60 } }),
+      fetch(`${API_URL}/categories/?root=true`, { next: { revalidate: 60 } }),
       fetch(`${API_URL}/products/?is_featured=true&page_size=10`, { next: { revalidate: 60 } }),
       fetch(`${API_URL}/products/?is_on_sale=true&page_size=10`, { next: { revalidate: 60 } }),
       fetch(`${API_URL}/products/?ordering=-sales_count&page_size=10`, { next: { revalidate: 60 } }),
