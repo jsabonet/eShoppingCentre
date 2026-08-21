@@ -46,11 +46,19 @@ def _fmt_money(value) -> str:
 
 
 def _admin_recipient_emails() -> list:
-    """Emails de todos os utilizadores ativos com permissões de administração."""
+    """Emails de todos os utilizadores ativos com permissões de administração.
+
+    Abrange as três formas de se tornar admin no sistema:
+      1. Superadmin criado via `manage.py createsuperuser` (is_superuser=True,
+         is_staff=True, roles vazio);
+      2. Utilizador promovido com role 'admin' (o signal `sync_admin_permissions`
+         sincroniza is_staff=True automaticamente);
+      3. Utilizador com is_staff=True definido manualmente (Django admin/API).
+    """
     from django.db.models import Q
     from apps.users.models import User
     admins = User.objects.filter(is_active=True).filter(
-        Q(is_staff=True) | Q(roles__contains=['admin'])
+        Q(is_staff=True) | Q(is_superuser=True) | Q(roles__contains=['admin'])
     )
     return sorted({email for email in admins.values_list('email', flat=True) if email})
 
