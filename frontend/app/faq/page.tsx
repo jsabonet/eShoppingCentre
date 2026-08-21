@@ -159,6 +159,17 @@ export default function FaqPage() {
             </div>
 
             <div className="bg-background p-6 rounded border border-border">
+              <h3 className="text-xl font-semibold mb-2">Frete definido pelo vendedor</h3>
+              <p className="text-muted-foreground">
+                O custo de envio é definido por cada vendedor, com base no peso e na província de destino,
+                e é apresentado no checkout antes de confirmar a compra. Se o vendedor ainda não tiver
+                configurado as suas opções de envio, a plataforma aplica uma taxa de envio padrão por
+                província para que possa finalizar a encomenda — o vendedor pode ajustar o valor consigo
+                posteriormente.
+              </p>
+            </div>
+
+            <div className="bg-background p-6 rounded border border-border">
               <p className="text-muted-foreground">
                 <strong>Nota:</strong> Todas as encomendas incluem seguro e número de rastreio. Recomendamos que forneça um contacto telefónico válido para facilitar a comunicação com o estafeta.
               </p>
