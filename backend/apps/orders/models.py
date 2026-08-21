@@ -64,13 +64,24 @@ class Order(BaseModel):
     @property
     def has_physical_items(self):
         """True se a encomenda contém produtos físicos (ou itens legados de tipo desconhecido)."""
-        return self.items.exclude(product_type__in=('digital', 'course')).exists()
+        items = list(self.items.select_related('product').all())
+        for item in items:
+            pt = item.product_type
+            if not pt and item.product_id:
+                pt = item.product.product_type if item.product else ''
+            # Tipo vazio (legado sem produto associado) → assumir físico por segurança
+            if pt in ('', 'physical'):
+                return True
+        return False
 
     @property
     def is_digital_only(self):
         """True se a encomenda só contém produtos digitais/cursos (nada físico)."""
-        items = list(self.items.all())
-        return bool(items) and all(i.product_type in ('digital', 'course') for i in items)
+        items = list(self.items.select_related('product').all())
+        return bool(items) and all(
+            (item.product_type or (item.product.product_type if item.product_id else '')) in ('digital', 'course')
+            for item in items
+        )
 
 
 class OrderStatusHistory(BaseModel):
