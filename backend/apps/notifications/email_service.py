@@ -317,6 +317,36 @@ def send_payout_rejected_email(payout_id: str) -> None:
 # ─────────────────────────────────────────────────────────────
 
 @shared_task
+def send_affiliate_welcome_email(profile_id: str) -> None:
+    """Email de boas-vindas após o registo no programa de afiliados."""
+    from apps.affiliates.models import AffiliateProfile
+    try:
+        profile = AffiliateProfile.objects.select_related('user').get(id=profile_id)
+    except AffiliateProfile.DoesNotExist:
+        return
+    user = profile.user
+    if not user.email:
+        return
+    send_templated(
+        subject=f'Bem-vindo ao Programa de Afiliados — {SITE_NAME}',
+        template_name='affiliate_welcome.html',
+        recipient=user.email,
+        text_message=(
+            f'A tua conta de afiliado foi criada com sucesso. '
+            f'Código de indicação: {profile.referral_code}. '
+            'Começa a partilhar links e a ganhar comissões.'
+        ),
+        context=base_context(
+            first_name=user.first_name,
+            referral_code=profile.referral_code,
+            dashboard_link='/affiliate/dashboard',
+            products_link='/affiliate/products',
+            terms_link='/affiliate/terms',
+        ),
+    )
+
+
+@shared_task
 def send_affiliate_sale_email(order_id: str) -> None:
     """Aviso imediato ao afiliado de que uma venda foi realizada pelo seu link."""
     from apps.orders.models import Order

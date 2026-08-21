@@ -29,6 +29,11 @@ class AffiliateRegisterView(APIView):
             roles.add('affiliate')
             request.user.roles = list(roles)
             request.user.save(update_fields=['roles'])
+
+        if created:
+            from apps.notifications import email_service
+            email_service.dispatch(email_service.send_affiliate_welcome_email, str(profile.id))
+
         return Response(AffiliateProfileSerializer(profile).data,
                        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 

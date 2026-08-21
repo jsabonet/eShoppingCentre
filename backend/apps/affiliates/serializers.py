@@ -31,7 +31,7 @@ class AffiliateLinkSerializer(serializers.ModelSerializer):
 
     def get_short_url(self, obj):
         from django.conf import settings
-        return f'{settings.BACKEND_URL}/r/{obj.code}/'
+        return f'{settings.SITE_URL}/r/{obj.code}/'
 
 
 class AffiliateCommissionSerializer(serializers.ModelSerializer):
