@@ -45,6 +45,13 @@ def _fmt_money(value) -> str:
         return str(value)
 
 
+def _fmt_date(dt) -> str:
+    try:
+        return timezone.localtime(dt).strftime('%d/%m/%Y às %H:%M')
+    except Exception:
+        return str(dt or '')
+
+
 def _admin_recipient_emails() -> list:
     """Emails de todos os utilizadores ativos com permissões de administração.
 
@@ -129,10 +136,10 @@ def send_order_confirmation_email(order_id: str) -> None:
 
 @shared_task
 def send_new_sale_email(order_id: str) -> None:
-    """Aviso de nova venda para o vendedor."""
+    """Aviso de nova venda para o vendedor, com detalhes completos."""
     from apps.orders.models import Order
     try:
-        order = Order.objects.select_related('buyer', 'store__owner').get(id=order_id)
+        order = Order.objects.select_related('buyer', 'store__owner').prefetch_related('items').get(id=order_id)
     except Order.DoesNotExist:
         return
     owner = order.store.owner if order.store else None
@@ -141,16 +148,45 @@ def send_new_sale_email(order_id: str) -> None:
     buyer_name = order.buyer.get_full_name() or order.buyer.email
     is_digital = not order.has_physical_items
     template = 'new_sale_digital.html' if is_digital else 'new_sale.html'
+
+    items = [
+        {
+            'name': item.product_name,
+            'quantity': item.quantity,
+            'unit_price': _fmt_money(item.unit_price),
+            'total_price': _fmt_money(item.total_price),
+        }
+        for item in order.items.all()
+    ]
+    platform_fee = order.platform_fee or 0
+    affiliate_commission = order.affiliate_commission or 0
+    net_value = order.total - platform_fee - affiliate_commission
+
+    text_items = '; '.join(f'{i["name"]} (x{i["quantity"]})' for i in items)
+    text_message = (
+        f'Recebeste uma nova venda ({order.order_number}) no valor de {_fmt_money(order.total)} MZN. '
+        f'Produtos: {text_items}. Valor líquido: {_fmt_money(net_value)} MZN.'
+    )
+
     send_templated(
         subject=f'Nova venda: {order.order_number} — {SITE_NAME}',
         template_name=template,
         recipient=owner.email,
-        text_message=f'Recebeste uma nova venda ({order.order_number}) no valor de {_fmt_money(order.total)} MZN.',
+        text_message=text_message,
         context=base_context(
             first_name=owner.first_name,
             order_number=order.order_number,
             buyer_name=buyer_name,
+            items=items,
+            items_count=len(items),
+            subtotal=_fmt_money(order.subtotal),
+            shipping_cost=_fmt_money(order.shipping_cost),
+            discount=_fmt_money(order.discount),
+            platform_fee=_fmt_money(platform_fee),
+            affiliate_commission=_fmt_money(affiliate_commission),
             total=_fmt_money(order.total),
+            net_value=_fmt_money(net_value),
+            sale_date=_fmt_date(order.created_at),
             order_link=f'/seller/orders',
             is_digital=is_digital,
         ),
@@ -281,26 +317,70 @@ def send_payout_rejected_email(payout_id: str) -> None:
 # ─────────────────────────────────────────────────────────────
 
 @shared_task
+def send_affiliate_sale_email(order_id: str) -> None:
+    """Aviso imediato ao afiliado de que uma venda foi realizada pelo seu link."""
+    from apps.orders.models import Order
+    try:
+        order = Order.objects.select_related('buyer', 'affiliate').prefetch_related('items').get(id=order_id)
+    except Order.DoesNotExist:
+        return
+    affiliate_user = order.affiliate
+    if not affiliate_user or not affiliate_user.email:
+        return
+    if not order.affiliate_commission or order.affiliate_commission <= 0:
+        return
+
+    products = [item.product_name for item in order.items.all()]
+    product_name = ', '.join(products) if products else 'Produto(s) referenciado(s)'
+
+    send_templated(
+        subject=f'Venda realizada — {SITE_NAME}',
+        template_name='affiliate_sale.html',
+        recipient=affiliate_user.email,
+        text_message=(
+            f'Uma venda foi realizada através do teu link: {order.order_number}. '
+            f'Produto: {product_name}. Comissão: {_fmt_money(order.affiliate_commission)} MZN.'
+        ),
+        context=base_context(
+            first_name=affiliate_user.first_name,
+            order_number=order.order_number,
+            product_name=product_name,
+            total=_fmt_money(order.total),
+            commission=_fmt_money(order.affiliate_commission),
+            sale_date=_fmt_date(order.created_at),
+            earnings_link='/affiliate/earnings',
+        ),
+    )
+
+
+@shared_task
 def send_affiliate_commission_email(commission_id: str) -> None:
     """Comissão de afiliado aprovada."""
     from apps.affiliates.models import AffiliateCommission
     try:
         commission = AffiliateCommission.objects.select_related(
-            'affiliate__user'
+            'affiliate__user', 'order', 'product'
         ).get(id=commission_id)
     except AffiliateCommission.DoesNotExist:
         return
     user = commission.affiliate.user
     if not user.email:
         return
+    product_name = commission.product.name if commission.product else ''
     send_templated(
         subject=f'Comissão aprovada — {SITE_NAME}',
         template_name='affiliate_commission.html',
         recipient=user.email,
-        text_message=f'A tua comissão de {_fmt_money(commission.amount)} MZN foi aprovada.',
+        text_message=(
+            f'A tua comissão de {_fmt_money(commission.amount)} MZN '
+            f'da venda {commission.order.order_number} foi aprovada.'
+        ),
         context=base_context(
             first_name=user.first_name,
             amount=_fmt_money(commission.amount),
+            order_number=commission.order.order_number,
+            product_name=product_name,
+            sale_date=_fmt_date(commission.order.created_at),
             earnings_link='/affiliate/earnings',
         ),
     )

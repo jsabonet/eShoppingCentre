@@ -1,0 +1,19 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}Venda realizada — comissão de {{ commission }} MZN 🎉{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Venda realizada 🎉</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Olá{% if first_name %}, {{ first_name }}{% endif %}, parabéns! Uma venda foi realizada através do teu link de indicação no e-Shopping Centre.</p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border:1px solid #eef0f3;border-radius:8px;margin:0 0 20px;">
+    <tr><td style="padding:16px 20px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">
+      <p style="margin:0 0 6px;">Pedido: <strong>{{ order_number }}</strong></p>
+      <p style="margin:0 0 6px;">Produto: {{ product_name }}</p>
+      <p style="margin:0 0 6px;">Valor da venda: <strong>{{ total }} MZN</strong></p>
+      <p style="margin:0 0 6px;">A tua comissão: <strong style="font-size:18px;color:#111827;">{{ commission }} MZN</strong></p>
+      <p style="margin:0;">Data: {{ sale_date }}</p>
+    </td></tr>
+  </table>
+
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">A comissão foi registada na tua conta de afiliado e pode ser acompanhada no teu painel. Continua a divulgar os produtos disponíveis no e-Shopping Centre e aumenta as tuas oportunidades de ganhar com as tuas indicações.</p>
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ earnings_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Ver ganhos →</a></p>
+{% endblock %}
