@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, Heart, Download, MapPin, ShoppingBag, ChevronRight, BookOpen, Wallet } from 'lucide-react';
+import { Package, Heart, Download, MapPin, ShoppingBag, ChevronRight, BookOpen, Wallet, Store, Gift } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import AccountLayout from '@/src/components/AccountLayout';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -11,7 +11,7 @@ import { ordersAPI, usersAPI, walletAPI, type Order, type User } from '@/src/lib
 
 export default function AccountPage() {
   const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, isAffiliate, isSeller, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -121,6 +121,32 @@ export default function AccountPage() {
             </p>
           )}
         </div>
+
+        {/* Acessos rápidos: vendedor / afiliado */}
+        {(isSeller || isAffiliate) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {isSeller && (
+              <Link href="/seller/dashboard" className="bg-card border border-border rounded-xl p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+                <div className="inline-flex p-3 bg-blue-100 rounded-full"><Store size={24} className="text-blue-600" /></div>
+                <div className="min-w-0">
+                  <p className="font-bold">Área de Vendedor</p>
+                  <p className="text-sm text-muted-foreground">Gerir loja, produtos e vendas.</p>
+                </div>
+                <ChevronRight size={18} className="ml-auto text-muted-foreground shrink-0" />
+              </Link>
+            )}
+            {isAffiliate && (
+              <Link href="/affiliate/dashboard" className="bg-card border border-border rounded-xl p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+                <div className="inline-flex p-3 bg-emerald-100 rounded-full"><Gift size={24} className="text-emerald-600" /></div>
+                <div className="min-w-0">
+                  <p className="font-bold">Área de Afiliado</p>
+                  <p className="text-sm text-muted-foreground">Gerir links, comissões e ganhos.</p>
+                </div>
+                <ChevronRight size={18} className="ml-auto text-muted-foreground shrink-0" />
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
