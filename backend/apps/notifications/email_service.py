@@ -45,6 +45,16 @@ def _fmt_money(value) -> str:
         return str(value)
 
 
+def _admin_recipient_emails() -> list:
+    """Emails de todos os utilizadores ativos com permissões de administração."""
+    from django.db.models import Q
+    from apps.users.models import User
+    admins = User.objects.filter(is_active=True).filter(
+        Q(is_staff=True) | Q(roles__contains=['admin'])
+    )
+    return sorted({email for email in admins.values_list('email', flat=True) if email})
+
+
 def send_templated(subject, template_name, recipient, text_message, context):
     context['subject'] = subject
     html = render_to_string(f'emails/{template_name}', context)
@@ -167,6 +177,37 @@ def send_order_shipped_email(order_id: str) -> None:
             order_link=f'/account/orders/{order.id}',
         ),
     )
+
+
+@shared_task
+def send_admin_new_sale_email(order_id: str) -> None:
+    """Notifica todos os administradores sobre cada nova venda."""
+    from apps.orders.models import Order
+    try:
+        order = Order.objects.select_related('buyer', 'store__owner').get(id=order_id)
+    except Order.DoesNotExist:
+        return
+    buyer_name = order.buyer.get_full_name() or order.buyer.email
+    seller_email = order.store.owner.email if order.store and order.store.owner else ''
+    is_digital = not order.has_physical_items
+    for email in _admin_recipient_emails():
+        if email == seller_email:
+            continue  # evita duplicado quando o vendedor também é admin
+        send_templated(
+            subject=f'Nova venda: {order.order_number} — {SITE_NAME}',
+            template_name='new_sale_admin.html',
+            recipient=email,
+            text_message=(f'Nova venda {order.order_number} na loja {order.store_name or SITE_NAME} '
+                          f'no valor de {_fmt_money(order.total)} MZN.'),
+            context=base_context(
+                order_number=order.order_number,
+                store_name=order.store_name or SITE_NAME,
+                buyer_name=buyer_name,
+                total=_fmt_money(order.total),
+                is_digital=is_digital,
+                admin_order_link=f'/django-admin/orders/order/{order.id}/change/',
+            ),
+        )
 
 
 # ─────────────────────────────────────────────────────────────

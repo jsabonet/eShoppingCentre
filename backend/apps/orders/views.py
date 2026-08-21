@@ -52,6 +52,7 @@ class CreateOrderView(APIView):
             log_status_change(order, order.status, request.user, 'Encomenda criada')
             email_service.dispatch(email_service.send_order_confirmation_email, str(order.id))
             email_service.dispatch(email_service.send_new_sale_email, str(order.id))
+            email_service.dispatch(email_service.send_admin_new_sale_email, str(order.id))
 
         # Marcar carrinho como recuperado
         AbandonedCart.objects.filter(user=request.user).update(
