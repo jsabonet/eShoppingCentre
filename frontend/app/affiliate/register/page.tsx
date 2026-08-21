@@ -8,7 +8,7 @@ import { affiliatesAPI } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
 
 const benefits = [
-  { icon: DollarSign, title: 'Comissões Atrativas', desc: 'Ganhe até 15% por venda realizada através dos seus links.' },
+  { icon: DollarSign, title: 'Comissões Atrativas', desc: 'Ganhe até 70% por venda realizada através dos seus links.' },
   { icon: LinkIcon, title: 'Links Personalizados', desc: 'Links únicos para partilhar no WhatsApp, Facebook, Instagram e sites.' },
   { icon: TrendingUp, title: 'Acompanhe seu Desempenho', desc: 'Dashboard completo com cliques, vendas e comissões em tempo real.' },
   { icon: Users, title: 'Sem Limites', desc: 'Promova quantos produtos quiser, de quantas lojas quiser.' },
@@ -121,7 +121,7 @@ export default function AffiliateRegisterPage() {
                   <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)}
                     className="mt-1 accent-accent" required />
                   <span className="text-sm text-muted-foreground">
-                    Concordo com os <Link href="/terms" className="text-accent hover:underline">Termos do Programa de Afiliados</Link>
+                    Concordo com os <Link href="/affiliate/terms" className="text-accent hover:underline">Termos do Programa de Afiliados</Link>
                   </span>
                 </label>
                 {error && (
