@@ -13,6 +13,7 @@ from .serializers import (AffiliateProfileSerializer, AffiliateLinkSerializer, A
                           AffiliateSettingsSerializer, AffiliatePayoutSerializer, AffiliateKYCSerializer)
 from apps.products.models import Product
 from apps.users.permissions import IsVerified
+from apps.notifications import email_service
 
 
 class AffiliateRegisterView(APIView):
@@ -31,7 +32,6 @@ class AffiliateRegisterView(APIView):
             request.user.save(update_fields=['roles'])
 
         if created:
-            from apps.notifications import email_service
             email_service.dispatch(email_service.send_affiliate_welcome_email, str(profile.id))
 
         return Response(AffiliateProfileSerializer(profile).data,
@@ -165,6 +165,11 @@ class AffiliatePayoutView(APIView):
                 notification_type='affiliate',
                 link='/admin?tab=affiliates',
             )
+        email_service.dispatch(
+            email_service.send_admin_alert_email,
+            'Novo pedido de saque de afiliado',
+            f'{profile.user.email} solicitou um saque de {amount} MZN.',
+        )
 
         return Response(AffiliatePayoutSerializer(payout).data, status=201)
 
@@ -192,6 +197,12 @@ class AffiliateKYCView(APIView):
             serializer.save(status='pending')
         else:
             serializer.save(affiliate=profile, status='pending')
+
+        email_service.dispatch(
+            email_service.send_admin_alert_email,
+            'Nova verificação KYC de afiliado',
+            f'{request.user.email} submeteu a verificação de identidade (KYC) para revisão.',
+        )
         return Response(serializer.data, status=201 if not kyc else 200)
 
 

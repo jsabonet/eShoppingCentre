@@ -742,13 +742,14 @@ def send_course_completion_email(email, first_name, course_title, link) -> None:
 
 @shared_task
 def send_admin_alert_email(subject: str, message: str) -> None:
-    """Alerta operacional simples para a equipa (email de texto)."""
+    """Alerta operacional para todos os administradores (email de texto)."""
+    recipients = _admin_recipient_emails() or [settings.DEFAULT_FROM_EMAIL]
     try:
         send_mail(
             subject=f'[Admin] {subject}',
             message=message,
             from_email=f'{SITE_NAME} <{settings.DEFAULT_FROM_EMAIL}>',
-            recipient_list=[settings.DEFAULT_FROM_EMAIL],
+            recipient_list=recipients,
             fail_silently=False,
         )
     except Exception:
