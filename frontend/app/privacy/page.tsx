@@ -25,7 +25,7 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc list-inside space-y-1 mb-3">
             <li>Nome: E-SHOPPING CENTRE</li>
             <li>Morada: Avenida 25 de Setembro, Cidade de Pemba, Cabo Delgado, Moçambique</li>
-            <li>Email: support@eshoppingcentre.co.mz</li>
+            <li>Email: suporte@e-shoppingcentre.com</li>
             <li>Telefone: +258 84 2040 330 / +258 86 2040 330</li>
           </ul>
         </section>
@@ -133,8 +133,8 @@ export default function PrivacyPolicyPage() {
           </ul>
           <p>
             Pedidos podem ser enviados para:{' '}
-            <a href="mailto:support@eshoppingcentre.co.mz" className="text-accent hover:underline">
-              support@eshoppingcentre.co.mz
+            <a href="mailto:suporte@e-shoppingcentre.com" className="text-accent hover:underline">
+              suporte@e-shoppingcentre.com
             </a>
           </p>
         </section>
@@ -186,8 +186,8 @@ export default function PrivacyPolicyPage() {
             <p className="mb-1">📍 Avenida 25 de Setembro, Cidade de Pemba, Cabo Delgado, Moçambique</p>
             <p className="mb-1">
               📧{' '}
-              <a href="mailto:support@eshoppingcentre.co.mz" className="text-accent hover:underline">
-                support@eshoppingcentre.co.mz
+              <a href="mailto:suporte@e-shoppingcentre.com" className="text-accent hover:underline">
+                suporte@e-shoppingcentre.com
               </a>
             </p>
             <p className="mb-1">📞 +258 84 2040 330</p>

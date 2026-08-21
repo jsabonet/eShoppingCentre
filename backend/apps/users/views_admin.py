@@ -200,7 +200,7 @@ class AdminStoreManageView(APIView):
                         subject=f'🎉 A sua loja "{store.name}" foi aprovada!',
                         message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
                                 f'A sua loja "{store.name}" foi aprovada e já está activa no e-Shopping Centre.\n\n'
-                                f'Aceda ao seu painel de vendedor: https://eshoppingcentre.co.mz/seller/dashboard\n\n'
+                                f'Aceda ao seu painel de vendedor: https://e-shoppingcentre.com/seller/dashboard\n\n'
                                 f'Obrigado por se juntar a nós!\nEquipa e-Shopping Centre',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[owner_email],
@@ -224,7 +224,7 @@ class AdminStoreManageView(APIView):
                         message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
                                 f'A sua loja "{store.name}" foi reactivada e já está novamente activa '
                                 f'no e-Shopping Centre.\n\n'
-                                f'Aceda ao seu painel: https://eshoppingcentre.co.mz/seller/dashboard\n\n'
+                                f'Aceda ao seu painel: https://e-shoppingcentre.com/seller/dashboard\n\n'
                                 f'Equipa e-Shopping Centre',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[owner_email],
@@ -238,7 +238,7 @@ class AdminStoreManageView(APIView):
                                 f'A sua loja "{store.name}" não foi aprovada desta vez.\n\n'
                                 f'Motivo: {reason_text}\n\n'
                                 f'Por favor, corrija os dados e submeta novamente.\n'
-                                f'Aceda: https://eshoppingcentre.co.mz/seller/register\n\n'
+                                f'Aceda: https://e-shoppingcentre.com/seller/register\n\n'
                                 f'Equipa e-Shopping Centre',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[owner_email],
@@ -252,7 +252,7 @@ class AdminStoreManageView(APIView):
                                 f'A sua loja "{store.name}" está em análise e precisamos de documentos adicionais.\n\n'
                                 f'Motivo: {reason_text}\n\n'
                                 f'Por favor, aceda ao seu painel e envie os documentos solicitados:\n'
-                                f'https://eshoppingcentre.co.mz/seller/settings\n\n'
+                                f'https://e-shoppingcentre.com/seller/settings\n\n'
                                 f'Equipa e-Shopping Centre',
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[owner_email],

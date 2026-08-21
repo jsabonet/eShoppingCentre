@@ -401,7 +401,7 @@ export default function AdminStoreEditPage() {
                 <div>
                   <label className={labelBase}><Mail size={12} className="inline mr-1 text-muted-foreground" /> Email</label>
                   <input type="email" value={form.email || ''} onChange={e => updateField('email', e.target.value)}
-                    placeholder="loja@exemplo.co.mz" className={inputBase} />
+                    placeholder="loja@exemplo.com" className={inputBase} />
                 </div>
                 <div>
                   <label className={labelBase}><Tag size={12} className="inline mr-1 text-muted-foreground" /> Categoria</label>
@@ -416,7 +416,7 @@ export default function AdminStoreEditPage() {
                 <div className="md:col-span-2">
                   <label className={labelBase}><Globe size={12} className="inline mr-1 text-muted-foreground" /> Website</label>
                   <input type="url" value={form.website || ''} onChange={e => updateField('website', e.target.value)}
-                    placeholder="https://minhaloja.co.mz" className={inputBase} />
+                    placeholder="https://minhaloja.com" className={inputBase} />
                 </div>
               </div>
             </div>

@@ -17,7 +17,7 @@ def check(desc, condition):
     print(f"  [{status}] {desc}")
 
 # Setup
-admin = User.objects.get(email='admin@eshopping.co.mz')
+admin = User.objects.get(email='admin@e-shoppingcentre.com')
 vendor = User.objects.get(email='vendedor@email.com')
 client = User.objects.get(email='cliente@email.com')
 

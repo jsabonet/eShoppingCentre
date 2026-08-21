@@ -1,3 +1,4 @@
+
 # Mapeamento de Funcionalidades que Necessitam de Email — e-Shopping Centre
 
 > Documento de análise. Mapeia, por sistema/fluxo, todas as actividades que usam ou
@@ -228,7 +229,7 @@ administrativos, num serviço central (`apps/notifications/email_service.py`).
 - **Templates HTML** para os emails de encomendas/pagamentos (hoje os emails de loja são texto puro; só os de auth têm HTML).
 - **Respeitar preferências de notificação** — ligar envio de email às flags já existentes (ex.: `StoreFollower.notify_new_products`).
 - **Idempotência/deduplicação** de emails transacionais (evitar duplicados em retries do Celery).
-- **Links públicos** (não hardcoded): hoje alguns emails de loja usam `eshoppingcentre.co.mz` hardcoded; o `SITE_URL` já existe para unificar.
+- **Links públicos** (não hardcoded): os emails de loja já usam `https://e-shoppingcentre.com` (corrigido); o `SITE_URL` existe para unificar futuros emails.
 
 ---
 

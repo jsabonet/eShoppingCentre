@@ -14,9 +14,9 @@ class Command(BaseCommand):
         self.stdout.write('A criar dados de teste...')
 
         # Admin
-        if not User.objects.filter(email='admin@eshopping.co.mz').exists():
+        if not User.objects.filter(email='admin@e-shoppingcentre.com').exists():
             User.objects.create_superuser(
-                email='admin@eshopping.co.mz', username='admin',
+                email='admin@e-shoppingcentre.com', username='admin',
                 password='Admin123!', roles=['admin']
             )
 

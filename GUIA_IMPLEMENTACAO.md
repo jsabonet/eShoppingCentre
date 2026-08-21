@@ -503,7 +503,7 @@ SEMANA 6+: PADRÃO INTERNACIONAL
 SECRET_KEY=...
 DJANGO_SETTINGS_MODULE=config.settings.production
 DEBUG=False
-ALLOWED_HOSTS=api.eshoppingcentre.co.mz,localhost
+ALLOWED_HOSTS=e-shoppingcentre.com,localhost
 
 # Database
 DB_NAME=eshoppingcentre
@@ -531,7 +531,7 @@ CLOUDFLARE_STREAM_SIGNING_SECRET=...
 
 # Email (Resend)
 RESEND_API_KEY=...
-EMAIL_FROM=noreply@eshoppingcentre.co.mz
+EMAIL_FROM=noreply@e-shoppingcentre.com
 
 # Firebase Auth
 FIREBASE_SERVICE_ACCOUNT_KEY=/app/credentials/firebase-adminsdk.json

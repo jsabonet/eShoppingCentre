@@ -189,7 +189,7 @@ export default function FaqPage() {
             <div>
               <h3 className="text-2xl font-semibold mb-4">Como Devolver</h3>
               <ol className="list-decimal list-inside text-muted-foreground space-y-2">
-                <li>Contacte-nos em support@eshoppingcentre.co.mz com o número da encomenda</li>
+                <li>Contacte-nos em suporte@e-shoppingcentre.com com o número da encomenda</li>
                 <li>Enviaremos uma etiqueta de devolução pré-paga</li>
                 <li>Embale o produto com todos os materiais originais</li>
                 <li>Entregue num ponto de recolha autorizado</li>
@@ -227,8 +227,8 @@ export default function FaqPage() {
           <div className="mb-8">
             <div>
               <p className="text-sm font-semibold mb-2 text-primary-foreground/70">Email</p>
-              <a href="mailto:support@eshoppingcentre.co.mz" className="text-lg hover:text-accent transition-colors">
-                support@eshoppingcentre.co.mz
+              <a href="mailto:suporte@e-shoppingcentre.com" className="text-lg hover:text-accent transition-colors">
+                suporte@e-shoppingcentre.com
               </a>
               <p className="text-sm font-semibold mb-2 mt-6 text-primary-foreground/70">Horário</p>
               <p className="text-lg">Segunda – Sexta, 08:00 – 17:00 (CAT)</p>
@@ -240,7 +240,7 @@ export default function FaqPage() {
           </p>
 
           <a
-            href="mailto:support@eshoppingcentre.co.mz"
+            href="mailto:suporte@e-shoppingcentre.com"
             className="inline-block px-8 py-4 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors"
           >
             Enviar Email

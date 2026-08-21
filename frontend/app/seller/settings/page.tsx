@@ -421,7 +421,7 @@ export default function SellerSettingsPage() {
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Email</label>
                   <input type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)}
-                    placeholder="contacto@sualoja.co.mz"
+                    placeholder="contacto@sualoja.com"
                     className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
                 </div>
               </div>

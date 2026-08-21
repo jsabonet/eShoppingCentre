@@ -193,11 +193,11 @@ O utilizador é redirecionado para a página de pagamento e-Mola com:
 |-------|-------|
 | **Nome da Empresa** | eShoppingCentre |
 | **Website** | https://e-shoppingcentre.com |
-| **Email de Contacto** | [admin@eshopping.co.mz](mailto:admin@eshopping.co.mz) |
+| **Email de Contacto** | [admin@e-shoppingcentre.com](mailto:admin@e-shoppingcentre.com) |
 | **Telefone** | [+258 84 742 3900](tel:+258847423900) |
 | **Endereço Físico** | [Endereço da sede em Moçambique] |
 | **Responsável Técnico** | Joel Sabonet |
-| **Email Técnico** | [dev@eshopping.co.mz](mailto:dev@eshopping.co.mz) |
+| **Email Técnico** | [dev@e-shoppingcentre.com](mailto:dev@e-shoppingcentre.com) |
 
 ---
 

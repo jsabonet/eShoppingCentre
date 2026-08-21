@@ -142,7 +142,7 @@ Recomendação: **Opção B**, uma tabela dedicada de códigos de uso único, po
 
 1. Criar a conta Brevo (ou usar uma existente).
 2. Gerar a chave de API (secção API Keys) — esta chave fica nas variáveis de ambiente, nunca no código.
-3. Adicionar e verificar o domínio de envio (ex.: `eshopping.co.mz`).
+3. Adicionar e verificar o domínio de envio (ex.: `e-shoppingcentre.com`).
 4. Configurar os registos DNS do domínio:
    - SPF (autorizar os servidores da Brevo).
    - DKIM (assinatura dos emails).
@@ -150,7 +150,7 @@ Recomendação: **Opção B**, uma tabela dedicada de códigos de uso único, po
 5. Criar dois templates transacionais:
    - "Verificação de email" com o placeholder do código de 6 dígitos.
    - "Recuperação de password" com o placeholder do código de 6 dígitos.
-6. Definir o remetente oficial (ex.: `noreply@eshopping.co.mz`).
+6. Definir o remetente oficial (ex.: `noreply@e-shoppingcentre.com`).
 7. Testar o envio no painel e, em desenvolvimento, usar um backend de teste para não gastar quota.
 
 ---

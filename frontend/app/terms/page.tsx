@@ -31,7 +31,7 @@ export default function TermsPage() {
             <li>Nome da Plataforma: E-SHOPPING CENTRE</li>
             <li>Slogan: Centro de Compras Online</li>
             <li>Morada: Avenida 25 de Setembro, Cidade de Pemba, Cabo Delgado, Moçambique</li>
-            <li>Email: support@eshoppingcentre.co.mz</li>
+            <li>Email: suporte@e-shoppingcentre.com</li>
             <li>Telefone: +258 84 2040 330</li>
             <li>Telefone Alternativo: +258 86 2040 330</li>
           </ul>
@@ -266,16 +266,16 @@ export default function TermsPage() {
             <p className="mb-1">📍 Avenida 25 de Setembro, Cidade de Pemba, Cabo Delgado, Moçambique</p>
             <p className="mb-1">
               📧{' '}
-              <a href="mailto:support@eshoppingcentre.co.mz" className="text-accent hover:underline">
-                support@eshoppingcentre.co.mz
+              <a href="mailto:suporte@e-shoppingcentre.com" className="text-accent hover:underline">
+                suporte@e-shoppingcentre.com
               </a>
             </p>
             <p className="mb-1">📞 +258 84 2040 330</p>
             <p className="mb-1">📞 +258 86 2040 330</p>
             <p>
               🌐{' '}
-              <a href="https://www.eshoppingcentre.co.mz" className="text-accent hover:underline">
-                www.eshoppingcentre.co.mz
+              <a href="https://e-shoppingcentre.com" className="text-accent hover:underline">
+                www.e-shoppingcentre.com
               </a>
             </p>
           </div>

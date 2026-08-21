@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { UserPlus, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 
 // Emails autorizados para registo admin (mock)
-const AUTHORIZED_EMAILS = ['admin@eshoppingcentre.co.mz', 'suporte@e-shoppingcentre.com'];
+const AUTHORIZED_EMAILS = ['admin@e-shoppingcentre.com', 'suporte@e-shoppingcentre.com'];
 
 export default function AdminSignup() {
   const [email, setEmail] = useState('');

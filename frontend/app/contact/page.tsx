@@ -33,8 +33,8 @@ export default function ContactPage() {
               <p className="text-muted-foreground mb-2">
                 Para dúvidas gerais e suporte ao cliente
               </p>
-              <a href="mailto:support@eshoppingcentre.co.mz" className="text-accent font-semibold hover:underline">
-                support@eshoppingcentre.co.mz
+              <a href="mailto:suporte@e-shoppingcentre.com" className="text-accent font-semibold hover:underline">
+                suporte@e-shoppingcentre.com
               </a>
             </div>
 
@@ -144,7 +144,7 @@ export default function ContactPage() {
 
           <div id="b12-form-error-cb957bd8-55a4-4884-a139-66f48925fc5d" className="hidden mt-6 p-4 bg-red-50 border border-red-200 rounded text-red-800">
             <p className="font-semibold">Algo correu mal</p>
-            <p className="text-sm">Por favor tente novamente ou contacte-nos diretamente em support@eshoppingcentre.co.mz</p>
+            <p className="text-sm">Por favor tente novamente ou contacte-nos diretamente em suporte@e-shoppingcentre.com</p>
           </div>
         </div>
       </section>
