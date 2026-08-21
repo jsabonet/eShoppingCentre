@@ -132,10 +132,8 @@ class ShippingEstimateView(APIView):
                     id=item['product_id'], status='active', store__status='active'
                 )
             except Product.DoesNotExist:
-                return Response(
-                    {'detail': f'Produto {item["product_id"]} não encontrado.'},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+                # Produto removido/inativo — ignora para não bloquear o carrinho inteiro
+                continue
 
             # Ignorar produtos não-físicos (sem frete)
             if product.product_type != 'physical':
@@ -167,14 +165,14 @@ class ShippingEstimateView(APIView):
             )
 
             if not zones.exists():
-                # Loja não entrega nesta província
+                # Loja não configurou (ou não cobre) esta região
                 result_stores.append({
                     'store_id': store_id,
                     'store_name': store.name,
                     'total_weight_kg': round(data['total_weight'], 2),
                     'subtotal': round(data['subtotal'], 2),
                     'available_methods': [],
-                    'error': f'{store.name} não entrega nesta região.',
+                    'error': f'{store.name} ainda não definiu opções de envio para esta região.',
                 })
                 continue
 
@@ -203,6 +201,17 @@ class ShippingEstimateView(APIView):
 
             # Ordenar por preço (mais barato primeiro)
             available.sort(key=lambda x: x['price'])
+
+            if not available:
+                result_stores.append({
+                    'store_id': store_id,
+                    'store_name': store.name,
+                    'total_weight_kg': round(data['total_weight'], 2),
+                    'subtotal': round(data['subtotal'], 2),
+                    'available_methods': [],
+                    'error': f'{store.name} não tem tarifas de envio activas para esta região.',
+                })
+                continue
 
             result_stores.append({
                 'store_id': store_id,

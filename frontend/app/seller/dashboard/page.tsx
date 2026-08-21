@@ -119,6 +119,18 @@ export default function SellerDashboardPage() {
   return (
     <SellerLayout>
       <div className="p-6">
+        {productType === 'physical' && data.shipping_configured === false && (
+          <div className="mb-6 flex items-start gap-3 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+            <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">A sua loja ainda não tem opções de envio configuradas.</p>
+              <p className="text-amber-700">Sem frete configurado, os compradores não conseguem finalizar a compra dos seus produtos físicos.</p>
+            </div>
+            <Link href="/seller/shipping" className="px-3 py-2 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 whitespace-nowrap">
+              Configurar envio
+            </Link>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Dashboard</h1>

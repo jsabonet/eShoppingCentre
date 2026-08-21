@@ -82,12 +82,25 @@ class StoreStatsView(APIView):
                 completed=False,
             ).count()
 
+        # Saúde do frete (lojas físicas)
+        shipping_configured = True
+        if store.product_type == 'physical':
+            from apps.shipping.models import ShippingZone, ShippingMethod, ShippingRate
+            shipping_configured = (
+                ShippingZone.objects.filter(store=store, is_active=True).exists()
+                and ShippingMethod.objects.filter(store=store, is_active=True).exists()
+                and ShippingRate.objects.filter(
+                    zone__store=store, is_active=True, method__is_active=True
+                ).exists()
+            )
+
         return Response({
             # Store identity
             'store_name': store.name,
             'tagline': store.tagline or '',
             # Stats cards — common
             'product_type': store.product_type,
+            'shipping_configured': shipping_configured,
             'today_sales': today_orders.count(),
             'today_revenue': today_revenue,
             'total_revenue': total_revenue,

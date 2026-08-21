@@ -270,6 +270,20 @@ export default function CheckoutContent() {
       return;
     }
 
+    if (hasPhysicalItems) {
+      const stores = shippingEstimates?.stores || [];
+      const missing = stores.filter((s: any) => s.available_methods?.length > 0 && !shippingSelections[s.store_id]);
+      const unavailable = stores.filter((s: any) => !s.available_methods?.length);
+      if (missing.length > 0) {
+        alert('Selecione o método de envio para todas as lojas.');
+        return;
+      }
+      if (unavailable.length > 0) {
+        alert('Algumas lojas não têm opções de envio disponíveis. Remova os itens ou contacte o vendedor.');
+        return;
+      }
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -523,86 +537,93 @@ export default function CheckoutContent() {
           </div>
 
           {/* Shipping Method */}
-          {shippingEstimates && shippingEstimates.stores?.some((s: any) => s.available_methods?.length > 0) && (
+          {hasPhysicalItems && (
             <div className="bg-card border border-border rounded-lg p-6">
               <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
                 <Truck className="text-foreground" size={24} />
                 Método de Envio
               </h2>
-              {shippingEstimates.stores.length > 1 && (
-                <p className="text-xs text-muted-foreground mb-4">Produtos de {shippingEstimates.stores.length} lojas diferentes — cada loja tem o seu frete</p>
-              )}
-              {shippingEstimates.stores.map((store: any) => (
-                <div key={store.store_id} className="mb-4 last:mb-0">
-                  <p className="text-sm font-semibold mb-2">
-                    {store.store_name}
-                    <span className="text-muted-foreground font-normal ml-2">
-                      ({(store.total_weight_kg || 0).toFixed(1)} kg · {store.subtotal.toLocaleString('pt-MZ')} MZN)
-                    </span>
-                  </p>
-                  {store.error ? (
-                    <p className="text-red-500 text-sm">{store.error}</p>
-                  ) : store.available_methods?.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">Nenhum método de envio disponível para esta região.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {store.available_methods.map((method: any) => (
-                        <label
-                          key={method.rate_id}
-                          className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                            shippingSelections[store.store_id] === method.rate_id
-                              ? 'border-accent bg-accent/5'
-                              : 'border-border hover:border-accent/50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name={`shipping_${store.store_id}`}
-                            value={method.rate_id}
-                            checked={shippingSelections[store.store_id] === method.rate_id}
-                            onChange={() =>
-                              setShippingSelections((prev) => ({ ...prev, [store.store_id]: method.rate_id }))
-                            }
-                            className="w-4 h-4 text-accent"
-                          />
-                          <div className="ml-3 flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium text-sm">
-                                {method.method_type === 'pickup' ? '🏪 ' : ''}
-                                {method.method_name}
-                                {method.is_free && (
-                                  <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-bold">
-                                    GRÁTIS
-                                  </span>
-                                )}
-                              </span>
-                              <span className={`font-bold text-sm ${method.is_free ? 'text-green-600' : ''}`}>
-                                {method.is_free || method.method_type === 'pickup' ? '0 MZN' : `${method.price.toLocaleString('pt-MZ')} MZN`}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {method.method_type === 'pickup' ? (
-                                <>📍 {method.pickup_address || 'Levantamento em loja'}</>
-                              ) : (
-                                <>
-                                  {method.estimated_days}
-                                  {method.free_shipping_min && !method.is_free && (
-                                    <> · Grátis acima de {method.free_shipping_min.toLocaleString('pt-MZ')} MZN</>
-                                  )}
-                                </>
-                              )}
-                            </p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {estimatingShipping && (
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
+              {!form.province ? (
+                <p className="text-sm text-muted-foreground mt-2">Selecione a província para calcular o frete.</p>
+              ) : estimatingShipping ? (
+                <p className="text-sm text-muted-foreground flex items-center gap-2 mt-2">
                   <Loader2 size={14} className="animate-spin" /> A calcular frete...
                 </p>
+              ) : !shippingEstimates?.stores?.length ? (
+                <p className="text-sm text-amber-600 mt-2">Não foi possível calcular o frete. Tente novamente.</p>
+              ) : (
+                <>
+                  {shippingEstimates.stores.length > 1 && (
+                    <p className="text-xs text-muted-foreground mb-4">Produtos de {shippingEstimates.stores.length} lojas diferentes — cada loja tem o seu frete</p>
+                  )}
+                  {shippingEstimates.stores.map((store: any) => (
+                    <div key={store.store_id} className="mb-4 last:mb-0">
+                      <p className="text-sm font-semibold mb-2">
+                        {store.store_name}
+                        <span className="text-muted-foreground font-normal ml-2">
+                          ({(store.total_weight_kg || 0).toFixed(1)} kg · {store.subtotal.toLocaleString('pt-MZ')} MZN)
+                        </span>
+                      </p>
+                      {store.error ? (
+                        <p className="text-amber-600 text-sm">⚠ {store.error}</p>
+                      ) : store.available_methods?.length === 0 ? (
+                        <p className="text-amber-600 text-sm">⚠ Nenhum método de envio disponível para esta região.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {store.available_methods.map((method: any) => (
+                            <label
+                              key={method.rate_id}
+                              className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                                shippingSelections[store.store_id] === method.rate_id
+                                  ? 'border-accent bg-accent/5'
+                                  : 'border-border hover:border-accent/50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`shipping_${store.store_id}`}
+                                value={method.rate_id}
+                                checked={shippingSelections[store.store_id] === method.rate_id}
+                                onChange={() =>
+                                  setShippingSelections((prev) => ({ ...prev, [store.store_id]: method.rate_id }))
+                                }
+                                className="w-4 h-4 text-accent"
+                              />
+                              <div className="ml-3 flex-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-sm">
+                                    {method.method_type === 'pickup' ? '🏪 ' : ''}
+                                    {method.method_name}
+                                    {method.is_free && (
+                                      <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-bold">
+                                        GRÁTIS
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className={`font-bold text-sm ${method.is_free ? 'text-green-600' : ''}`}>
+                                    {method.is_free || method.method_type === 'pickup' ? '0 MZN' : `${method.price.toLocaleString('pt-MZ')} MZN`}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {method.method_type === 'pickup' ? (
+                                    <>📍 {method.pickup_address || 'Levantamento em loja'}</>
+                                  ) : (
+                                    <>
+                                      {method.estimated_days}
+                                      {method.free_shipping_min && !method.is_free && (
+                                        <> · Grátis acima de {method.free_shipping_min.toLocaleString('pt-MZ')} MZN</>
+                                      )}
+                                    </>
+                                  )}
+                                </p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           )}

@@ -550,6 +550,7 @@ export interface SellerDashboard {
   store_name: string;
   tagline: string;
   product_type: 'physical' | 'digital' | 'course';
+  shipping_configured?: boolean;
   today_sales: number;
   today_revenue: number;
   total_revenue: number;
