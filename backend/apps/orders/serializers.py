@@ -464,7 +464,7 @@ class CreateOrderSerializer(serializers.Serializer):
             if not product:
                 continue
 
-            if product.product_type == 'digital' and order.status in ('confirmed', 'processing'):
+            if product.product_type == 'digital':
                 from apps.products.models import DigitalDownload
                 DigitalDownload.objects.get_or_create(
                     user=order.buyer,
@@ -489,7 +489,7 @@ class CreateOrderSerializer(serializers.Serializer):
                 )
 
         # Pedidos 100% digitais/cursos são concluídos de imediato (não há envio)
-        if not order.has_physical_items and order.status != 'delivered':
+        if order.is_digital_only and order.status != 'delivered':
             from django.utils import timezone
             now = timezone.now()
             order.status = 'delivered'

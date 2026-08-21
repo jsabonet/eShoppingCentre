@@ -8,7 +8,9 @@ def deliver_digital_products(sender, instance, **kwargs):
     """Quando pagamento é confirmado, liberta downloads digitais"""
     if instance.payment_status != 'completed':
         return
-    for item in instance.items.filter(product__product_type='digital'):
+    for item in instance.items.filter(product_type='digital'):
+        if item.product_id is None:
+            continue
         from apps.products.models import DigitalDownload
         DigitalDownload.objects.get_or_create(
             user=instance.buyer,
@@ -22,22 +24,23 @@ def enroll_in_courses(sender, instance, **kwargs):
     """Quando pagamento é confirmado, matricula em cursos"""
     if instance.payment_status != 'completed':
         return
-    for item in instance.items.filter(product__product_type='course'):
-        if hasattr(item.product, 'course'):
-            from apps.courses.models import Enrollment
-            Enrollment.objects.get_or_create(
-                user=instance.buyer,
-                course=item.product.course,
-                order=instance,
-            )
+    for item in instance.items.filter(product_type='course'):
+        if item.product_id is None or not hasattr(item.product, 'course'):
+            continue
+        from apps.courses.models import Enrollment
+        Enrollment.objects.get_or_create(
+            user=instance.buyer,
+            course=item.product.course,
+            order=instance,
+        )
 
 
 @receiver(post_save, sender=Order)
 def auto_complete_digital_orders(sender, instance, **kwargs):
-    """Pedidos sem produtos físicos são concluídos automaticamente após pagamento confirmado."""
+    """Pedidos 100% digitais/cursos (com itens) são concluídos automaticamente após pagamento."""
     if instance.payment_status != 'completed' or instance.status == 'delivered':
         return
-    if not instance.has_physical_items:
+    if instance.is_digital_only:
         from django.utils import timezone
         now = timezone.now()
         instance.status = 'delivered'
