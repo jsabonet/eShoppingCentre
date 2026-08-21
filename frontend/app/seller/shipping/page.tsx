@@ -224,6 +224,22 @@ export default function SellerShippingPage() {
           </div>
         </div>
 
+        {/* Aviso sobre frete de fallback da plataforma */}
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-sm">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600" />
+            <div>
+              <p className="font-semibold">Se não configurar as suas tarifas, a plataforma aplica um frete padrão.</p>
+              <p className="text-amber-700 mt-1">
+                Para zonas ou províncias sem frete definido, é aplicada uma taxa fixa da plataforma
+                (por defeito 350 MZN, ajustável por província) para que o comprador possa finalizar a compra.
+                Pode acertar o valor depois com o comprador. Configure zonas, métodos e tarifas para ter
+                controlo total dos seus preços de envio.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Tab Navigation */}
         <div className="flex gap-1 bg-muted/50 p-1 rounded-xl mb-6 w-fit">
           {tabs.map(tab => (
