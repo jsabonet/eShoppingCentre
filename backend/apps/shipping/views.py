@@ -2,6 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+import logging
 from apps.products.models import Product
 from .models import ShippingZone, ShippingMethod, ShippingRate, ShippingSettings
 from .serializers import (
@@ -10,6 +11,8 @@ from .serializers import (
     ShippingRateSerializer, ShippingRateWriteSerializer,
     EstimateRequestSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Helpers ───
@@ -154,7 +157,6 @@ class ShippingEstimateView(APIView):
             store_items[store_id]['subtotal'] += float(product.price) * qty
 
         # Calcular opções de envio para cada loja
-        shipping_settings = ShippingSettings.get_settings()
         result_stores = []
         for store_id, data in store_items.items():
             store = data['store']
@@ -203,29 +205,37 @@ class ShippingEstimateView(APIView):
                 continue
 
             # ─── Frete de fallback da plataforma (loja sem envio configurado) ───
-            if shipping_settings.fallback_enabled:
-                fallback_rate = shipping_settings.get_rate(province)
-                if fallback_rate > 0:
-                    result_stores.append({
-                        'store_id': store_id,
-                        'store_name': store.name,
-                        'total_weight_kg': round(data['total_weight'], 2),
-                        'subtotal': round(data['subtotal'], 2),
-                        'available_methods': [{
+            fallback_method = None
+            try:
+                ss = ShippingSettings.get_settings()
+                if ss.fallback_enabled:
+                    fallback_rate = ss.get_rate(province)
+                    if fallback_rate > 0:
+                        fallback_method = {
                             'rate_id': f'platform:{province}',
-                            'method_name': shipping_settings.fallback_label,
+                            'method_name': ss.fallback_label,
                             'method_type': 'delivery',
                             'pickup_address': '',
                             'zone_name': 'Nacional (Plataforma)',
                             'price': round(fallback_rate, 2),
                             'is_free': False,
                             'free_shipping_min': None,
-                            'estimated_days': shipping_settings.estimated_days_display,
+                            'estimated_days': ss.estimated_days_display,
                             'is_fallback': True,
-                        }],
-                        'is_fallback': True,
-                    })
-                    continue
+                        }
+            except Exception:
+                logger.exception('Falha ao carregar as configurações de frete da plataforma.')
+
+            if fallback_method:
+                result_stores.append({
+                    'store_id': store_id,
+                    'store_name': store.name,
+                    'total_weight_kg': round(data['total_weight'], 2),
+                    'subtotal': round(data['subtotal'], 2),
+                    'available_methods': [fallback_method],
+                    'is_fallback': True,
+                })
+                continue
 
             # Sem opções de envio nem fallback
             result_stores.append({

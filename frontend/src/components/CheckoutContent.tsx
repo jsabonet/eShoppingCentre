@@ -143,6 +143,7 @@ export default function CheckoutContent() {
   const [shippingEstimates, setShippingEstimates] = useState<any>(null);
   const [shippingSelections, setShippingSelections] = useState<Record<string, string>>({});
   const [estimatingShipping, setEstimatingShipping] = useState(false);
+  const [shippingError, setShippingError] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponInfo, setCouponInfo] = useState<any>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
@@ -223,7 +224,11 @@ export default function CheckoutContent() {
 
   // Fetch shipping estimates when province or items change
   useEffect(() => {
-    if (!form.province || items.length === 0) return;
+    setShippingError(false);
+    if (!form.province || items.length === 0) {
+      setShippingEstimates(null);
+      return;
+    }
 
     const hasPhysical = items.some(it => it.product.productType === 'physical');
     if (!hasPhysical) {
@@ -240,7 +245,14 @@ export default function CheckoutContent() {
         province: form.province,
       }),
     })
-      .then(res => res.ok ? res.json() : null)
+      .then(res => {
+        if (!res.ok) {
+          setShippingError(true);
+          return null;
+        }
+        setShippingError(false);
+        return res.json();
+      })
       .then(data => {
         setShippingEstimates(data);
         // Auto-select cheapest option for each store
@@ -254,7 +266,10 @@ export default function CheckoutContent() {
           setShippingSelections(selections);
         }
       })
-      .catch(() => setShippingEstimates(null))
+      .catch(() => {
+        setShippingError(true);
+        setShippingEstimates(null);
+      })
       .finally(() => setEstimatingShipping(false));
   }, [form.province, items]);
 
@@ -741,6 +756,12 @@ export default function CheckoutContent() {
                 <span className="text-muted-foreground">Frete:</span>
                 {!hasPhysicalItems ? (
                   <span className="text-muted-foreground">Não se aplica</span>
+                ) : !form.province ? (
+                  <span className="text-amber-600 font-medium">Selecione a província</span>
+                ) : estimatingShipping ? (
+                  <span className="text-muted-foreground">A calcular...</span>
+                ) : shippingError ? (
+                  <span className="text-red-500 font-medium">Indisponível</span>
                 ) : shippingTotal === 0 && shippingEstimates ? (
                   <span className="text-green-600 font-medium">Grátis</span>
                 ) : shippingTotal > 0 ? (
