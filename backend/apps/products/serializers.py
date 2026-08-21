@@ -156,6 +156,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     )
     category_name = serializers.CharField(source='category.name', read_only=True)
     category_slug = serializers.CharField(source='category.slug', read_only=True)
+    is_purchased = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -205,6 +206,20 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             }
         except Exception:
             return None
+
+    def get_is_purchased(self, obj):
+        """True se o utilizador autenticado já comprou este produto digital/curso."""
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+        if obj.product_type == 'course':
+            from apps.courses.models import Enrollment
+            return Enrollment.objects.filter(user=user, course__product=obj).exists()
+        if obj.product_type == 'digital':
+            from .models_digital import DigitalDownload
+            return DigitalDownload.objects.filter(user=user, product=obj).exists()
+        return False
 
     def validate_affiliate_commission(self, value):
         from apps.affiliates.models import AffiliateSettings

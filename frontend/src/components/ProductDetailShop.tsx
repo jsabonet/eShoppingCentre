@@ -91,6 +91,7 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
   const isDigital = product.productType === 'digital';
   const isCourse = product.productType === 'course';
   const isPhysical = !product.productType || product.productType === 'physical';
+  const isPurchased = product.isPurchased === true;
   const courseData = product.course;
   const variants = product.variants || [];
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
@@ -123,7 +124,7 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
     });
   };
 
-  const buyNowDisabled = (variants.length > 0 && !selectedVariant) || (!isDigital && !isCourse && displayStock <= 0);
+  const buyNowDisabled = (variants.length > 0 && !selectedVariant) || (!isDigital && !isCourse && displayStock <= 0) || isPurchased;
 
   const handleBuyNow = () => {
     addToCart({
@@ -416,9 +417,10 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                     </p>
                     <button
                       onClick={() => addToCart({ ...product, price: displayPrice, inStock: isDigital || isCourse || displayStock > 0, image: cartImage })}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors mb-2"
+                      disabled={isPurchased}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <ShoppingCart size={18} /> Adicionar ao Carrinho
+                      <ShoppingCart size={18} /> {isPurchased ? (isCourse ? 'Já inscrito' : 'Já comprado') : 'Adicionar ao Carrinho'}
                     </button>
                   </>
                 )}
@@ -428,8 +430,17 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                   disabled={buyNowDisabled}
                   className="block w-full text-center px-4 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isCourse ? 'Inscrever-me' : isDigital ? 'Comprar e Baixar' : 'Comprar Agora'}
+                  {isPurchased ? (isCourse ? 'Já inscrito' : 'Já comprado') : isCourse ? 'Inscrever-me' : isDigital ? 'Comprar e Baixar' : 'Comprar Agora'}
                 </button>
+
+                {isPurchased && (isCourse || isDigital) && (
+                  <a
+                    href={isCourse ? '/my-courses' : '/account/downloads'}
+                    className="mt-3 flex items-center justify-center gap-1.5 text-xs text-accent hover:underline"
+                  >
+                    {isCourse ? 'Ir para Meus Cursos' : 'Ver os meus downloads'}
+                  </a>
+                )}
 
                 {/* Store link */}
                 {product.storeName && product.storeSlug && (

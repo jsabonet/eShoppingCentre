@@ -55,6 +55,7 @@ export interface Product {
   storeId?: string;
   // Digital product fields
   productType?: 'physical' | 'digital' | 'course';
+  isPurchased?: boolean;
   digitalFormat?: string;
   digitalVersion?: string;
   digitalLicense?: string;

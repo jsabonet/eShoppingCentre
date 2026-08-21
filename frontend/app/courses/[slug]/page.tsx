@@ -60,6 +60,7 @@ interface CourseDetail {
   modules: ModuleData[];
   product: string;
   access_duration_days: number | null;
+  is_enrolled?: boolean;
 }
 
 export default function CourseDetailPage() {
@@ -90,6 +91,10 @@ export default function CourseDetailPage() {
         if (res.ok) {
           const data = await res.json();
           setCourse(data);
+          // Estado de inscrição fornecido pela API (mais fiável)
+          if (typeof data.is_enrolled === 'boolean') {
+            setIsEnrolled(data.is_enrolled);
+          }
           // Check if user is enrolled
           const token = localStorage.getItem('access_token');
           if (token && data.id) {

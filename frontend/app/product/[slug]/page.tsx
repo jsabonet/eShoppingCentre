@@ -100,6 +100,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     storeSlug: product.store?.slug || '',
     storeId: product.store?.id || '',
     productType: product.product_type || 'physical',
+    isPurchased: product.is_purchased === true,
     digitalFormat: product.digital_format || '',
     digitalVersion: product.digital_version || '',
     digitalLicense: product.digital_license || '',

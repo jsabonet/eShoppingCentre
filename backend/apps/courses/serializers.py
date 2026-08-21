@@ -155,6 +155,7 @@ class CourseDetailSerializer(serializers.ModelSerializer):
     instructor_name = serializers.CharField(source='instructor.first_name', read_only=True)
     modules = CourseModuleSerializer(many=True, read_only=True)
     image = serializers.SerializerMethodField()
+    is_enrolled = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -169,6 +170,14 @@ class CourseDetailSerializer(serializers.ModelSerializer):
 
     def get_students_count(self, obj):
         return obj.enrollments.count()
+
+    def get_is_enrolled(self, obj):
+        """True se o utilizador autenticado já está inscrito neste curso."""
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+        return Enrollment.objects.filter(user=user, course=obj).exists()
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):
