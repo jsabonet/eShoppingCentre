@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from rest_framework import serializers
 from django.db import transaction
 from .models import Order, OrderItem, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket, SupportTicketImage
@@ -267,7 +268,7 @@ class CreateOrderSerializer(serializers.Serializer):
                         shipping_settings = ShippingSettings.get_settings()
                         if shipping_settings.fallback_enabled:
                             store_shipping[store_data['store'].id] = {
-                                'cost': shipping_settings.get_rate(province_slug),
+                                'cost': Decimal(str(shipping_settings.get_rate(province_slug))),
                                 'method_name': shipping_settings.fallback_label,
                                 'is_pickup': False,
                             }
@@ -293,7 +294,7 @@ class CreateOrderSerializer(serializers.Serializer):
                         calc = rate.calculate(weight, store_data['store_total'])
                         if calc:
                             store_shipping[store_data['store'].id] = {
-                                'cost': calc['price'],
+                                'cost': Decimal(str(calc['price'])),
                                 'method_name': rate.method.name,
                                 'is_pickup': rate.method.method_type == 'pickup',
                             }
