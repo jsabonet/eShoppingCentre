@@ -123,6 +123,18 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
     });
   };
 
+  const buyNowDisabled = (variants.length > 0 && !selectedVariant) || (!isDigital && !isCourse && displayStock <= 0);
+
+  const handleBuyNow = () => {
+    addToCart({
+      ...product,
+      price: displayPrice,
+      inStock: isDigital || isCourse || displayStock > 0,
+      image: cartImage,
+    });
+    window.location.href = '/checkout';
+  };
+
   return (
     <>
       {/* Product Detail */}
@@ -411,12 +423,13 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                   </>
                 )}
 
-                <a
-                  href="/cart"
-                  className="block w-full text-center px-4 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-md transition-colors"
+                <button
+                  onClick={handleBuyNow}
+                  disabled={buyNowDisabled}
+                  className="block w-full text-center px-4 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isCourse ? 'Inscrever-me' : isDigital ? 'Comprar e Baixar' : 'Comprar Agora'}
-                </a>
+                </button>
 
                 {/* Store link */}
                 {product.storeName && product.storeSlug && (
