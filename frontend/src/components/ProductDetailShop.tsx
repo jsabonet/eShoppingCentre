@@ -54,7 +54,7 @@ function StarRatingLg({ rating }: { rating: number }) {
 
 function ProductDetailContent({ product, categoryName, categorySlug, relatedProducts }: ProductDetailShopProps) {
   const { addToCart } = useCart();
-  const { isAuthenticated, isAffiliate, refreshUser } = useAuth();
+  const { isAuthenticated, isAffiliate } = useAuth();
   const [affiliateOpen, setAffiliateOpen] = useState(false);
   const [affiliateLoading, setAffiliateLoading] = useState(false);
   const [affiliateLink, setAffiliateLink] = useState<string | null>(null);
@@ -62,13 +62,13 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
   const [copied, setCopied] = useState(false);
 
   const promoteProduct = async () => {
+    if (!isAffiliate) {
+      window.location.href = '/affiliate/register';
+      return;
+    }
     setAffiliateLoading(true);
     setAffiliateError('');
     try {
-      if (!isAffiliate) {
-        await affiliatesAPI.register();
-        await refreshUser();
-      }
       const { data } = await affiliatesAPI.createLink(product.id);
       setAffiliateLink(data.short_url);
     } catch (err: any) {
@@ -806,6 +806,10 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
               {!isAuthenticated ? (
                 <a href={`/login?redirect=/product/${product.slug}`} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors">
                   Entrar para Promover
+                </a>
+              ) : !isAffiliate ? (
+                <a href="/affiliate/register" className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors">
+                  <Link2 size={16} /> Tornar-me Afiliado
                 </a>
               ) : affiliateLink ? (
                 <div className="space-y-2">

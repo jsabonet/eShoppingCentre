@@ -43,14 +43,14 @@ class MyAffiliateProfileView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
-        return self.request.user.affiliate_profile
+        return get_object_or_404(AffiliateProfile, user=self.request.user)
 
 
 class MyAffiliateStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        profile = request.user.affiliate_profile
+        profile = get_object_or_404(AffiliateProfile, user=request.user)
         pending = profile.commissions.filter(status='pending').aggregate(
             total=models.Sum('amount')
         )['total'] or 0
@@ -66,7 +66,12 @@ class CreateAffiliateLinkView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        profile = request.user.affiliate_profile
+        profile = AffiliateProfile.objects.filter(user=request.user).first()
+        if not profile or not profile.is_active:
+            return Response(
+                {'detail': 'Precisa de uma conta de afiliado activa para promover produtos.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         product_id = request.data.get('product_id')
 
         product = Product.objects.filter(id=product_id, status='active').first()
@@ -93,7 +98,8 @@ class MyAffiliateLinksView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return self.request.user.affiliate_profile.links.all()
+        profile = get_object_or_404(AffiliateProfile, user=self.request.user)
+        return profile.links.all()
 
 
 class MyCommissionsView(generics.ListAPIView):
@@ -101,18 +107,20 @@ class MyCommissionsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return self.request.user.affiliate_profile.commissions.all().order_by('-created_at')
+        profile = get_object_or_404(AffiliateProfile, user=self.request.user)
+        return profile.commissions.all().order_by('-created_at')
 
 
 class AffiliatePayoutView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsVerified]
 
     def get(self, request):
-        payouts = request.user.affiliate_profile.payouts.all()
+        profile = get_object_or_404(AffiliateProfile, user=request.user)
+        payouts = profile.payouts.all()
         return Response(AffiliatePayoutSerializer(payouts, many=True).data)
 
     def post(self, request):
-        profile = request.user.affiliate_profile
+        profile = get_object_or_404(AffiliateProfile, user=request.user)
         settings_obj = AffiliateSettings.get_settings()
 
         # Gate: verificação KYC obrigatória antes do 1º saque
@@ -166,14 +174,14 @@ class AffiliateKYCView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        profile = request.user.affiliate_profile
+        profile = get_object_or_404(AffiliateProfile, user=request.user)
         kyc = AffiliateKYC.objects.filter(affiliate=profile).first()
         if kyc:
             return Response(AffiliateKYCSerializer(kyc).data)
         return Response({'status': 'none', 'is_verified': False})
 
     def post(self, request):
-        profile = request.user.affiliate_profile
+        profile = get_object_or_404(AffiliateProfile, user=request.user)
         kyc = AffiliateKYC.objects.filter(affiliate=profile).first()
         if kyc and kyc.status == 'approved':
             return Response({'detail': 'A sua conta já está verificada.'}, status=400)
