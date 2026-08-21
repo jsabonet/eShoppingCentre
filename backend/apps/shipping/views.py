@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from apps.products.models import Product
-from .models import ShippingZone, ShippingMethod, ShippingRate
+from .models import ShippingZone, ShippingMethod, ShippingRate, ShippingSettings
 from .serializers import (
     ShippingZoneSerializer, ShippingZoneWriteSerializer,
     ShippingMethodSerializer, ShippingMethodWriteSerializer,
@@ -154,6 +154,7 @@ class ShippingEstimateView(APIView):
             store_items[store_id]['subtotal'] += float(product.price) * qty
 
         # Calcular opções de envio para cada loja
+        shipping_settings = ShippingSettings.get_settings()
         result_stores = []
         for store_id, data in store_items.items():
             store = data['store']
@@ -163,18 +164,6 @@ class ShippingEstimateView(APIView):
                 store=store, is_active=True,
                 provinces__contains=[province],
             )
-
-            if not zones.exists():
-                # Loja não configurou (ou não cobre) esta região
-                result_stores.append({
-                    'store_id': store_id,
-                    'store_name': store.name,
-                    'total_weight_kg': round(data['total_weight'], 2),
-                    'subtotal': round(data['subtotal'], 2),
-                    'available_methods': [],
-                    'error': f'{store.name} ainda não definiu opções de envio para esta região.',
-                })
-                continue
 
             # Para cada zona, encontrar tarifas activas
             available = []
@@ -197,28 +186,55 @@ class ShippingEstimateView(APIView):
                             'is_free': calc['is_free'],
                             'free_shipping_min': calc.get('free_shipping_min'),
                             'estimated_days': calc['estimated_days'],
+                            'is_fallback': False,
                         })
 
             # Ordenar por preço (mais barato primeiro)
             available.sort(key=lambda x: x['price'])
 
-            if not available:
+            if available:
                 result_stores.append({
                     'store_id': store_id,
                     'store_name': store.name,
                     'total_weight_kg': round(data['total_weight'], 2),
                     'subtotal': round(data['subtotal'], 2),
-                    'available_methods': [],
-                    'error': f'{store.name} não tem tarifas de envio activas para esta região.',
+                    'available_methods': available,
                 })
                 continue
 
+            # ─── Frete de fallback da plataforma (loja sem envio configurado) ───
+            if shipping_settings.fallback_enabled:
+                fallback_rate = shipping_settings.get_rate(province)
+                if fallback_rate > 0:
+                    result_stores.append({
+                        'store_id': store_id,
+                        'store_name': store.name,
+                        'total_weight_kg': round(data['total_weight'], 2),
+                        'subtotal': round(data['subtotal'], 2),
+                        'available_methods': [{
+                            'rate_id': f'platform:{province}',
+                            'method_name': shipping_settings.fallback_label,
+                            'method_type': 'delivery',
+                            'pickup_address': '',
+                            'zone_name': 'Nacional (Plataforma)',
+                            'price': round(fallback_rate, 2),
+                            'is_free': False,
+                            'free_shipping_min': None,
+                            'estimated_days': shipping_settings.estimated_days_display,
+                            'is_fallback': True,
+                        }],
+                        'is_fallback': True,
+                    })
+                    continue
+
+            # Sem opções de envio nem fallback
             result_stores.append({
                 'store_id': store_id,
                 'store_name': store.name,
                 'total_weight_kg': round(data['total_weight'], 2),
                 'subtotal': round(data['subtotal'], 2),
-                'available_methods': available,
+                'available_methods': [],
+                'error': f'{store.name} ainda não definiu opções de envio para esta região.',
             })
 
         # Totais agregados

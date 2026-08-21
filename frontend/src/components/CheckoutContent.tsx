@@ -616,6 +616,9 @@ export default function CheckoutContent() {
                                     </>
                                   )}
                                 </p>
+                                {method.is_fallback && (
+                                  <p className="text-[11px] text-amber-600 mt-1">Estimativa da plataforma — o vendedor pode ajustar o valor depois.</p>
+                                )}
                               </div>
                             </label>
                           ))}

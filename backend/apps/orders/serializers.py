@@ -250,8 +250,27 @@ class CreateOrderSerializer(serializers.Serializer):
         # Frete por loja
         store_shipping = {}  # store_id -> {'cost', 'method_name', 'is_pickup'}
         if shipping_selections:
-            from apps.shipping.models import ShippingRate
+            from apps.shipping.models import ShippingRate, ShippingSettings
+            shipping_settings = ShippingSettings.get_settings()
             for store_id, rate_id in shipping_selections.items():
+                rate_id = str(rate_id)
+
+                # ─── Frete de fallback da plataforma (loja sem envio configurado) ───
+                if rate_id.startswith('platform:'):
+                    province_slug = rate_id[len('platform:'):]
+                    if shipping_settings.fallback_enabled:
+                        try:
+                            store_data = store_orders.get(uuid.UUID(store_id))
+                        except ValueError:
+                            continue
+                        if store_data:
+                            store_shipping[store_data['store'].id] = {
+                                'cost': shipping_settings.get_rate(province_slug),
+                                'method_name': shipping_settings.fallback_label,
+                                'is_pickup': False,
+                            }
+                    continue
+
                 try:
                     rate = ShippingRate.objects.select_related('method', 'zone').get(
                         id=rate_id,

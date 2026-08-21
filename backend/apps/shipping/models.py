@@ -142,3 +142,62 @@ class ShippingRate(BaseModel):
             'is_free': price == 0,
             'estimated_days': self.method.estimated_days_display,
         }
+
+
+class ShippingSettings(BaseModel):
+    """
+    Configurações globais de frete da plataforma (singleton, gerido pelo admin).
+
+    O frete de fallback é aplicado quando uma loja física não configurou opções
+    de envio (sem zonas/tarifas activas). Permite ao comprador finalizar a compra
+    com uma taxa fixa por província; o vendedor ajusta depois.
+    """
+    fallback_enabled = models.BooleanField(
+        default=True,
+        help_text='Aplicar frete de fallback quando a loja não configurou envio',
+    )
+    fallback_label = models.CharField(
+        max_length=100, default='Envio Padrão (Plataforma)',
+        help_text='Nome do método de envio exibido ao comprador',
+    )
+    fallback_days_min = models.PositiveIntegerField(default=3, help_text='Prazo mínimo estimado (dias)')
+    fallback_days_max = models.PositiveIntegerField(default=10, help_text='Prazo máximo estimado (dias)')
+    default_rate = models.DecimalField(
+        max_digits=10, decimal_places=2, default=350.00,
+        help_text='Taxa fixa (MZN) usada quando a província não está em province_rates',
+    )
+    province_rates = models.JSONField(
+        default=dict,
+        help_text='Taxa fixa por província (MZN). Ex: {"maputo_cidade": 300, "maputo_provincia": 350, "nampula": 600}',
+    )
+
+    class Meta:
+        verbose_name = 'Configuração de Frete'
+        verbose_name_plural = 'Configurações de Frete'
+
+    def __str__(self):
+        return 'Configurações de Frete (Plataforma)'
+
+    @classmethod
+    def get_settings(cls):
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create()
+        return obj
+
+    def get_rate(self, province_slug: str) -> float:
+        """Devolve a taxa fixa (MZN) para uma província, com fallback para a taxa padrão."""
+        rates = self.province_rates or {}
+        value = rates.get(province_slug)
+        if value is None:
+            return float(self.default_rate or 0)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float(self.default_rate or 0)
+
+    @property
+    def estimated_days_display(self):
+        if self.fallback_days_min == self.fallback_days_max:
+            return f'{self.fallback_days_min} dia(s)'
+        return f'{self.fallback_days_min}-{self.fallback_days_max} dias'
