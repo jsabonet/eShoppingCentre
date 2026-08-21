@@ -181,7 +181,7 @@ class ConfirmDeliveryView(APIView):
                 title='Encomenda entregue',
                 message=f'O comprador confirmou a receção da encomenda {order.order_number}.',
                 notification_type='order_update',
-                link=f'/seller/orders/{order.id}',
+                link=f'/seller/orders',
             )
 
         return Response(OrderSerializer(order).data)
@@ -362,7 +362,7 @@ class ShipReturnView(APIView):
             title='Devolução enviada pelo cliente',
             message=f'O cliente enviou a devolução #{return_req.rma_number}.',
             notification_type='return_update',
-            link=f'/seller/orders/{return_req.order_id}',
+            link=f'/seller/orders',
         )
         email_service.dispatch(email_service.send_return_status_email, str(return_req.id), 'seller')
 

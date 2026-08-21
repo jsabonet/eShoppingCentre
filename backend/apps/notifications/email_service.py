@@ -127,7 +127,7 @@ def send_new_sale_email(order_id: str) -> None:
             order_number=order.order_number,
             buyer_name=buyer_name,
             total=_fmt_money(order.total),
-            order_link=f'/seller/orders/{order.id}',
+            order_link=f'/seller/orders',
         ),
     )
 
@@ -337,7 +337,7 @@ def send_return_status_email(return_id: str, recipient: str = 'buyer') -> None:
         subject = f'Devolução #{rr.rma_number} enviada pelo cliente — {SITE_NAME}'
         message = f'O cliente enviou a devolução #{rr.rma_number} (encomenda {rr.order.order_number}).'
         status_label = rr.get_status_display()
-        action_link = f'/seller/orders/{rr.order_id}'
+        action_link = f'/seller/orders'
         action_label = 'Ver encomenda'
     else:
         user = rr.buyer

@@ -85,7 +85,7 @@
 
 - **Permissão**: browsers bloqueiam pedido automático — pedir sempre após interação do utilizador.
 - **iOS Safari**: push web só funciona como app instalado na tela inicial (Home Screen) e a partir do iOS 16.4+.
-- **Deep links**: o `notificationclick` deve abrir a página certa (`/account/orders/{id}`, `/chat`, `/seller/orders/{id}`, etc.).
+- **Deep links**: o `notificationclick` deve abrir a página certa (`/account/orders/{id}`, `/chat`, `/seller/orders`, etc.).
 - **Deduplicação**: evitar push + email redundantes para o mesmo evento; respeitar preferências.
 - **Ambiente dev**: Web Push exige HTTPS (localhost é exceção); FCM funciona localmente.
 - **Falhas/expiração**: remover subscrições inválidas (`410 Gone` / `404`) automaticamente no envio em lote.
