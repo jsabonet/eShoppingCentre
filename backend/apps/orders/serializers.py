@@ -397,15 +397,34 @@ class CreateOrderSerializer(serializers.Serializer):
                     product_type=item['product'].product_type,
                 )
 
-                # Deduzir stock e registar no histórico
+                # Deduzir stock e registar no histórico (à prova de concorrência)
                 if item['product'].product_type == 'physical':
-                    old_stock = item['product'].stock
-                    item['product'].stock -= item['quantity']
-                    item['product'].save(update_fields=['stock'])
+                    from django.db.models import Case, F, When
+                    product = item['product']
+                    old_stock = product.stock
+
+                    if product.allow_backorder:
+                        # Venda permitida sem stock: nunca descer abaixo de zero
+                        Product.objects.filter(pk=product.pk).update(
+                            stock=Case(
+                                When(stock__gte=item['quantity'], then=F('stock') - item['quantity']),
+                                default=0,
+                            )
+                        )
+                    else:
+                        updated = Product.objects.filter(
+                            pk=product.pk, stock__gte=item['quantity']
+                        ).update(stock=F('stock') - item['quantity'])
+                        if not updated:
+                            raise serializers.ValidationError(
+                                f'Stock insuficiente para {product.name}. Disponível: {product.stock}'
+                            )
+
+                    product.refresh_from_db(fields=['stock'])
                     StockLog.objects.create(
-                        product=item['product'], change_type='sale',
+                        product=product, change_type='sale',
                         quantity=-item['quantity'],
-                        stock_before=old_stock, stock_after=item['product'].stock,
+                        stock_before=old_stock, stock_after=product.stock,
                         reference=order.order_number,
                         changed_by=user,
                         notes=f'Venda de {item["quantity"]} unidade(s)',
