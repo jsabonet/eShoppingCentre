@@ -261,8 +261,12 @@ export default function CheckoutContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.fullName || !form.phone || !form.email || !form.address || !form.city || !form.province) {
-      alert('Por favor, preencha todos os campos obrigatórios.');
+    if (!form.fullName || !form.phone || !form.email) {
+      alert('Por favor, preencha os campos obrigatórios.');
+      return;
+    }
+    if (hasPhysicalItems && (!form.address || !form.city || !form.province)) {
+      alert('Por favor, preencha a morada de entrega.');
       return;
     }
 
@@ -277,16 +281,22 @@ export default function CheckoutContent() {
           product_id: it.product.id,
           quantity: it.quantity,
         })),
-        shipping_address: {
-          full_name: form.fullName,
-          phone: form.phone,
-          email: form.email,
-          address: form.address,
-          city: form.city,
-          province: form.province,
-          province_label: PROVINCES.find(p => p.value === form.province)?.label || form.province,
-          notes: form.notes,
-        },
+        shipping_address: hasPhysicalItems
+          ? {
+              full_name: form.fullName,
+              phone: form.phone,
+              email: form.email,
+              address: form.address,
+              city: form.city,
+              province: form.province,
+              province_label: PROVINCES.find(p => p.value === form.province)?.label || form.province,
+              notes: form.notes,
+            }
+          : {
+              full_name: form.fullName,
+              phone: form.phone,
+              email: form.email,
+            },
         payment_method: paymentMethod,
         shipping_selections: shippingSelections,
         buyer_notes: form.notes,
@@ -407,7 +417,7 @@ export default function CheckoutContent() {
           <div className="bg-card border border-border rounded-lg p-6">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <MapPin className="text-foreground" size={24} />
-              Informações de Entrega
+              {hasPhysicalItems ? 'Informações de Entrega' : 'Dados de Contacto'}
             </h2>
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -448,58 +458,67 @@ export default function CheckoutContent() {
                   placeholder="seu.email@exemplo.com"
                 />
               </div>
-              <div>
-                <label htmlFor="address" className="block text-sm font-medium mb-2">Endereço Completo *</label>
-                <input
-                  type="text"
-                  id="address"
-                  required
-                  value={form.address}
-                  onChange={(e) => updateField('address', e.target.value)}
-                  className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
-                  placeholder="Rua, número, bairro"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="city" className="block text-sm font-medium mb-2">Cidade *</label>
-                  <input
-                    type="text"
-                    id="city"
-                    required
-                    value={form.city}
-                    onChange={(e) => updateField('city', e.target.value)}
-                    className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
-                    placeholder="Sua cidade"
-                  />
+              {hasPhysicalItems ? (
+                <>
+                  <div>
+                    <label htmlFor="address" className="block text-sm font-medium mb-2">Endereço Completo *</label>
+                    <input
+                      type="text"
+                      id="address"
+                      required
+                      value={form.address}
+                      onChange={(e) => updateField('address', e.target.value)}
+                      className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
+                      placeholder="Rua, número, bairro"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="city" className="block text-sm font-medium mb-2">Cidade *</label>
+                      <input
+                        type="text"
+                        id="city"
+                        required
+                        value={form.city}
+                        onChange={(e) => updateField('city', e.target.value)}
+                        className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
+                        placeholder="Sua cidade"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="province" className="block text-sm font-medium mb-2">Província *</label>
+                      <select
+                        id="province"
+                        required
+                        value={form.province}
+                        onChange={(e) => updateField('province', e.target.value)}
+                        className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
+                      >
+                        <option value="">Selecione</option>
+                        {PROVINCES.map((prov) => (
+                          <option key={prov.value} value={prov.value}>{prov.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="notes" className="block text-sm font-medium mb-2">Observações de Entrega</label>
+                    <textarea
+                      id="notes"
+                      rows={3}
+                      value={form.notes}
+                      onChange={(e) => updateField('notes', e.target.value)}
+                      className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
+                      placeholder="Instruções especiais para entrega (opcional)"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-start gap-3 p-4 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
+                  <CheckCircle size={18} className="mt-0.5 flex-shrink-0" />
+                  <p>Produtos digitais e cursos não requerem envio — ficam disponíveis imediatamente após o pagamento.</p>
                 </div>
-                <div>
-                  <label htmlFor="province" className="block text-sm font-medium mb-2">Província *</label>
-                  <select
-                    id="province"
-                    required
-                    value={form.province}
-                    onChange={(e) => updateField('province', e.target.value)}
-                    className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
-                  >
-                    <option value="">Selecione</option>
-                    {PROVINCES.map((prov) => (
-                      <option key={prov.value} value={prov.value}>{prov.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="notes" className="block text-sm font-medium mb-2">Observações de Entrega</label>
-                <textarea
-                  id="notes"
-                  rows={3}
-                  value={form.notes}
-                  onChange={(e) => updateField('notes', e.target.value)}
-                  className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
-                  placeholder="Instruções especiais para entrega (opcional)"
-                />
-              </div>
+              )}
             </div>
           </div>
 

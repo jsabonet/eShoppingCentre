@@ -99,7 +99,7 @@ def settle_payment(order):
     if not seller:
         return None
 
-    has_physical = order.items.filter(product__product_type='physical').exists()
+    has_physical = order.has_physical_items
     if has_physical:
         escrow, _created = EscrowHolding.objects.get_or_create(
             order=order,

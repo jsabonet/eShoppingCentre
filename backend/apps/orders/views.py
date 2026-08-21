@@ -105,6 +105,13 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
 
         # Validações
         if not is_admin:
+            # Encomendas sem produtos físicos não passam por processamento/envio
+            if new_status in ('shipped', 'ready_for_pickup', 'processing') and not order.has_physical_items:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'status': 'Esta encomenda não contém produtos físicos — não requer processamento nem envio.'
+                })
+
             if new_status not in ('shipped', 'processing', 'confirmed', 'ready_for_pickup'):
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({
@@ -161,6 +168,11 @@ class ConfirmDeliveryView(APIView):
 
     def post(self, request, pk):
         order = get_object_or_404(Order, pk=pk, buyer=request.user)
+        if not order.has_physical_items:
+            return Response(
+                {'detail': 'Encomendas digitais não requerem confirmação de entrega.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if order.status not in ('shipped', 'ready_for_pickup'):
             return Response(
                 {'detail': 'Só pode confirmar receção de encomendas enviadas ou prontas para levantamento.'},

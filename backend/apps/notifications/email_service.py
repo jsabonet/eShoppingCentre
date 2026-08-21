@@ -90,9 +90,11 @@ def send_order_confirmation_email(order_id: str) -> None:
         return
     if not order.buyer.email:
         return
+    is_digital = not order.has_physical_items
+    template = 'order_confirmation_digital.html' if is_digital else 'order_confirmation.html'
     send_templated(
         subject=f'Encomenda {order.order_number} recebida — {SITE_NAME}',
-        template_name='order_confirmation.html',
+        template_name=template,
         recipient=order.buyer.email,
         text_message=f'Recebemos a tua encomenda {order.order_number} no valor de {_fmt_money(order.total)} MZN.',
         context=base_context(
@@ -101,6 +103,8 @@ def send_order_confirmation_email(order_id: str) -> None:
             store_name=order.store_name or SITE_NAME,
             total=_fmt_money(order.total),
             order_link=f'/account/orders/{order.id}',
+            downloads_link='/account/downloads',
+            is_digital=is_digital,
         ),
     )
 
@@ -117,9 +121,11 @@ def send_new_sale_email(order_id: str) -> None:
     if not owner or not owner.email:
         return
     buyer_name = order.buyer.get_full_name() or order.buyer.email
+    is_digital = not order.has_physical_items
+    template = 'new_sale_digital.html' if is_digital else 'new_sale.html'
     send_templated(
         subject=f'Nova venda: {order.order_number} — {SITE_NAME}',
-        template_name='new_sale.html',
+        template_name=template,
         recipient=owner.email,
         text_message=f'Recebeste uma nova venda ({order.order_number}) no valor de {_fmt_money(order.total)} MZN.',
         context=base_context(
@@ -128,6 +134,7 @@ def send_new_sale_email(order_id: str) -> None:
             buyer_name=buyer_name,
             total=_fmt_money(order.total),
             order_link=f'/seller/orders',
+            is_digital=is_digital,
         ),
     )
 
@@ -142,6 +149,8 @@ def send_order_shipped_email(order_id: str) -> None:
         return
     if not order.buyer.email:
         return
+    if not order.has_physical_items:
+        return  # encomendas digitais não são enviadas — nunca notificar envio
     send_templated(
         subject=f'A tua encomenda {order.order_number} foi enviada — {SITE_NAME}',
         template_name='order_shipped.html',

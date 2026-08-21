@@ -1,0 +1,14 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}Nova venda digital {{ order_number }} 🎉{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Nova venda digital 🎉</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Recebeste uma nova venda digital. O produto foi disponibilizado automaticamente ao comprador — não há nada para processar nem enviar.</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border:1px solid #eef0f3;border-radius:8px;margin:0 0 20px;">
+    <tr><td style="padding:16px 20px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">
+      <p style="margin:0 0 6px;">Encomenda: <strong>{{ order_number }}</strong></p>
+      <p style="margin:0 0 6px;">Comprador: {{ buyer_name }}</p>
+      <p style="margin:0;">Total: <strong style="font-size:18px;color:#111827;">{{ total }} MZN</strong></p>
+    </td></tr>
+  </table>
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ order_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Ver encomenda →</a></p>
+{% endblock %}

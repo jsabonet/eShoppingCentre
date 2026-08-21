@@ -61,6 +61,17 @@ class Order(BaseModel):
     def __str__(self):
         return self.order_number
 
+    @property
+    def has_physical_items(self):
+        """True se a encomenda contém produtos físicos (ou itens legados de tipo desconhecido)."""
+        return self.items.exclude(product_type__in=('digital', 'course')).exists()
+
+    @property
+    def is_digital_only(self):
+        """True se a encomenda só contém produtos digitais/cursos (nada físico)."""
+        items = list(self.items.all())
+        return bool(items) and all(i.product_type in ('digital', 'course') for i in items)
+
 
 class OrderStatusHistory(BaseModel):
     """Regista cada mudança de status de uma encomenda (auditoria)."""
@@ -90,6 +101,10 @@ class OrderItem(BaseModel):
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
     total_price = models.DecimalField(max_digits=12, decimal_places=2)
     variation_data = models.JSONField(default=dict)
+    product_type = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text='Tipo do produto no momento do pedido (physical/digital/course)'
+    )
 
     def __str__(self):
         return f'{self.product_name} x{self.quantity}'

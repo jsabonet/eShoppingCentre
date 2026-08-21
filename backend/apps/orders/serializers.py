@@ -8,8 +8,8 @@ from apps.products.models import Product
 class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
-        fields = ('id', 'product_name', 'product_image', 'quantity', 'unit_price', 'total_price')
-        read_only_fields = ('product_name', 'product_image', 'unit_price', 'total_price')
+        fields = ('id', 'product_name', 'product_image', 'quantity', 'unit_price', 'total_price', 'product_type')
+        read_only_fields = ('product_name', 'product_image', 'unit_price', 'total_price', 'product_type')
 
 
 class ReturnImageSerializer(serializers.ModelSerializer):
@@ -112,6 +112,8 @@ class OrderSerializer(serializers.ModelSerializer):
     store_name = serializers.CharField(source='store.name', read_only=True)
     store_phone = serializers.SerializerMethodField()
     status_history = OrderStatusHistorySerializer(many=True, read_only=True)
+    has_physical_items = serializers.SerializerMethodField()
+    is_digital_only = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -131,6 +133,12 @@ class OrderSerializer(serializers.ModelSerializer):
             return obj.store.phone
         return ''
 
+    def get_has_physical_items(self, obj):
+        return obj.has_physical_items
+
+    def get_is_digital_only(self, obj):
+        return obj.is_digital_only
+
 
 class CreateOrderItemSerializer(serializers.Serializer):
     product_id = serializers.UUIDField()
@@ -140,7 +148,7 @@ class CreateOrderItemSerializer(serializers.Serializer):
 
 class CreateOrderSerializer(serializers.Serializer):
     items = CreateOrderItemSerializer(many=True, min_length=1)
-    shipping_address = serializers.DictField()
+    shipping_address = serializers.DictField(required=False, default=dict)
     payment_method = serializers.CharField()
     shipping_selections = serializers.DictField(
         required=False, default=dict,
@@ -361,6 +369,7 @@ class CreateOrderSerializer(serializers.Serializer):
                     quantity=item['quantity'],
                     unit_price=item['unit_price'],
                     total_price=item['total_price'],
+                    product_type=item['product'].product_type,
                 )
 
                 # Deduzir stock e registar no histórico
@@ -454,6 +463,15 @@ class CreateOrderSerializer(serializers.Serializer):
                     course=course,
                     defaults=defaults,
                 )
+
+        # Pedidos 100% digitais/cursos são concluídos de imediato (não há envio)
+        if not order.has_physical_items and order.status != 'delivered':
+            from django.utils import timezone
+            now = timezone.now()
+            order.status = 'delivered'
+            order.confirmed_at = order.confirmed_at or now
+            order.delivered_at = order.delivered_at or now
+            order.save(update_fields=['status', 'confirmed_at', 'delivered_at'])
 
     def _get_product_image(self, product):
         img = product.images.filter(is_primary=True).first()

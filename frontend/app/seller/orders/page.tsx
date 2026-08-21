@@ -47,6 +47,8 @@ interface OrderItem {
   items?: any[]; shipping_notes?: string; tracking_code?: string;
   shipping_evidence?: string;
   is_pickup?: boolean;
+  has_physical_items?: boolean;
+  is_digital_only?: boolean;
   status_history?: { id: string; previous_status: string; new_status: string; changed_by_name: string; notes: string; created_at: string }[];
 }
 
@@ -209,7 +211,8 @@ export default function SellerOrdersPage() {
                     const s = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
                     const Icon = s.icon;
                     const isExpanded = expanded.has(order.id);
-                    const allowed = ALLOWED_OPTIONS[order.status] || [];
+                    const isDigital = order.is_digital_only === true;
+                    const allowed = isDigital ? [] : (ALLOWED_OPTIONS[order.status] || []);
                     const hasHistory = order.status_history?.length > 0;
 
                     return (
@@ -247,18 +250,27 @@ export default function SellerOrdersPage() {
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${s.color}`}>
                               <Icon size={11} /> {s.label}
                             </span>
+                            {isDigital && (
+                              <span className="inline-flex items-center gap-1 ml-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">
+                                Digital
+                              </span>
+                            )}
                           </td>
                           <td className="py-2.5 px-2 sm:px-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {allowed.length > 0 && (
-                                <select value="" onChange={e => handleStatusChange(order.id, e.target.value)}
-                                  disabled={updating === order.id}
-                                  className="text-[11px] px-2 py-1 border border-border rounded bg-background disabled:opacity-50 max-w-[120px]">
-                                  <option value="">Alterar...</option>
-                                  {allowed.filter(s => order.is_pickup ? s !== 'shipped' : s !== 'ready_for_pickup').map(s => (
-                                    <option key={s} value={s}>{s === 'shipped' ? 'Enviar' : s === 'processing' ? 'Processar' : s === 'confirmed' ? 'Confirmar' : s === 'cancelled' ? 'Cancelar' : s === 'ready_for_pickup' ? 'Pronto p/ Levantar' : STATUS_CONFIG[s]?.label}</option>
-                                  ))}
-                                </select>
+                              {isDigital ? (
+                                <span className="text-[11px] text-muted-foreground">Nada a processar</span>
+                              ) : (
+                                allowed.length > 0 && (
+                                  <select value="" onChange={e => handleStatusChange(order.id, e.target.value)}
+                                    disabled={updating === order.id}
+                                    className="text-[11px] px-2 py-1 border border-border rounded bg-background disabled:opacity-50 max-w-[120px]">
+                                    <option value="">Alterar...</option>
+                                    {allowed.filter(s => order.is_pickup ? s !== 'shipped' : s !== 'ready_for_pickup').map(s => (
+                                      <option key={s} value={s}>{s === 'shipped' ? 'Enviar' : s === 'processing' ? 'Processar' : s === 'confirmed' ? 'Confirmar' : s === 'cancelled' ? 'Cancelar' : s === 'ready_for_pickup' ? 'Pronto p/ Levantar' : STATUS_CONFIG[s]?.label}</option>
+                                    ))}
+                                  </select>
+                                )
                               )}
                               <button onClick={() => setDetail(order)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground" title="Ver detalhes">
                                 <Eye size={14} />
