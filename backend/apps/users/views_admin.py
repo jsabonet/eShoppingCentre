@@ -4,9 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from django.db.models import Sum
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
-from django.conf import settings
 from django.shortcuts import get_object_or_404
+from apps.notifications import email_service
 from apps.users.models import User
 from apps.stores.models import Store
 from apps.orders.models import Order
@@ -117,6 +116,7 @@ class AdminStoreManageView(APIView):
 
         store_name = store.name
         owner_email = store.owner.email
+        owner_first_name = store.owner.first_name
         self._log_moderation(store, 'closed', 'Eliminada permanentemente por administrador', store.status)
 
         # Preservar nome da loja nos pedidos antes do CASCADE
@@ -127,16 +127,9 @@ class AdminStoreManageView(APIView):
 
         # Notify owner
         if owner_email:
-            send_mail(
-                subject=f'A sua loja "{store_name}" foi removida',
-                message=f'Olá,\n\n'
-                        f'A sua loja "{store_name}" foi removida permanentemente do e-Shopping Centre '
-                        f'por um administrador.\n\n'
-                        f'Para mais informações, contacte o suporte.\n\n'
-                        f'Equipa e-Shopping Centre',
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[owner_email],
-                fail_silently=True,
+            email_service.dispatch(
+                email_service.send_store_removed_email,
+                owner_email, owner_first_name, store_name,
             )
 
         return Response({'detail': f'Loja "{store_name}" eliminada permanentemente.'}, status=200)
@@ -195,68 +188,33 @@ class AdminStoreManageView(APIView):
             # Send email notification to store owner
             owner_email = store.owner.email
             if owner_email:
+                owner_first_name = store.owner.first_name
                 if action == 'approve':
-                    send_mail(
-                        subject=f'🎉 A sua loja "{store.name}" foi aprovada!',
-                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
-                                f'A sua loja "{store.name}" foi aprovada e já está activa no e-Shopping Centre.\n\n'
-                                f'Aceda ao seu painel de vendedor: https://e-shoppingcentre.com/seller/dashboard\n\n'
-                                f'Obrigado por se juntar a nós!\nEquipa e-Shopping Centre',
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[owner_email],
-                        fail_silently=True,
+                    email_service.dispatch(
+                        email_service.send_store_approved_email,
+                        owner_email, owner_first_name, store.name,
                     )
                 elif action == 'suspend':
-                    send_mail(
-                        subject=f'A sua loja "{store.name}" foi suspensa',
-                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
-                                f'A sua loja "{store.name}" foi suspensa por um administrador.\n\n'
-                                f'Os seus produtos foram removidos do marketplace. '
-                                f'Contacte o suporte para mais informações.\n\n'
-                                f'Equipa e-Shopping Centre',
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[owner_email],
-                        fail_silently=True,
+                    email_service.dispatch(
+                        email_service.send_store_suspended_email,
+                        owner_email, owner_first_name, store.name,
                     )
                 elif action == 'reactivate':
-                    send_mail(
-                        subject=f'A sua loja "{store.name}" foi reactivada!',
-                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
-                                f'A sua loja "{store.name}" foi reactivada e já está novamente activa '
-                                f'no e-Shopping Centre.\n\n'
-                                f'Aceda ao seu painel: https://e-shoppingcentre.com/seller/dashboard\n\n'
-                                f'Equipa e-Shopping Centre',
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[owner_email],
-                        fail_silently=True,
+                    email_service.dispatch(
+                        email_service.send_store_reactivated_email,
+                        owner_email, owner_first_name, store.name,
                     )
                 elif action == 'reject':
                     reason_text = reason or 'Não especificado'
-                    send_mail(
-                        subject=f'A sua loja "{store.name}" precisa de ajustes',
-                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
-                                f'A sua loja "{store.name}" não foi aprovada desta vez.\n\n'
-                                f'Motivo: {reason_text}\n\n'
-                                f'Por favor, corrija os dados e submeta novamente.\n'
-                                f'Aceda: https://e-shoppingcentre.com/seller/register\n\n'
-                                f'Equipa e-Shopping Centre',
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[owner_email],
-                        fail_silently=True,
+                    email_service.dispatch(
+                        email_service.send_store_rejected_email,
+                        owner_email, owner_first_name, store.name, reason_text,
                     )
                 elif action == 'request_docs':
                     reason_text = reason or 'Documentos adicionais necessários'
-                    send_mail(
-                        subject=f'📎 Documentos necessários para a loja "{store.name}"',
-                        message=f'Olá {store.owner.get_full_name() or store.owner.email},\n\n'
-                                f'A sua loja "{store.name}" está em análise e precisamos de documentos adicionais.\n\n'
-                                f'Motivo: {reason_text}\n\n'
-                                f'Por favor, aceda ao seu painel e envie os documentos solicitados:\n'
-                                f'https://e-shoppingcentre.com/seller/settings\n\n'
-                                f'Equipa e-Shopping Centre',
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[owner_email],
-                        fail_silently=True,
+                    email_service.dispatch(
+                        email_service.send_store_documents_email,
+                        owner_email, owner_first_name, store.name, reason_text,
                     )
 
             from apps.stores.serializers import StoreDetailSerializer

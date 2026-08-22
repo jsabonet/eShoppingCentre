@@ -126,8 +126,6 @@ def recover_abandoned_carts():
     """
     from apps.orders.models import AbandonedCart
     from apps.notifications.models import Notification
-    from django.core.mail import send_mail
-    from django.conf import settings
 
     cutoff = timezone.now() - timedelta(hours=ABANDONED_CART_HOURS)
     carts = AbandonedCart.objects.filter(
@@ -145,31 +143,12 @@ def recover_abandoned_carts():
         if not user.email:
             continue
 
-        # Resumo simples dos itens
-        item_names = ', '.join(
-            (it.get('name') or 'Produto') for it in items[:3]
+        # Email de recuperação (template HTML)
+        from apps.notifications import email_service
+        email_service.dispatch(
+            email_service.send_abandoned_cart_email,
+            user.email, user.first_name, items, '/cart',
         )
-        if len(items) > 3:
-            item_names += f' e mais {len(items) - 3}'
-
-        message = (
-            f'Olá {user.get_full_name() or user.email},\n\n'
-            f'Ainda tem {len(items)} item(ns) no seu carrinho: {item_names}.\n'
-            f'Volte ao e-Shopping Centre para concluir a sua compra!\n\n'
-            f'https://e-shoppingcentre.com/cart'
-        )
-
-        try:
-            send_mail(
-                subject='O seu carrinho está à sua espera 🛒',
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                html_message=f'<p>{message.replace(chr(10), "<br>")}</p>',
-                fail_silently=True,
-            )
-        except Exception:
-            pass
 
         Notification.objects.create(
             user=user,

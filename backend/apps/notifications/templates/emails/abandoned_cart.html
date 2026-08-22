@@ -1,0 +1,25 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}O seu carrinho está à sua espera 🛒{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">O seu carrinho está à sua espera 🛒</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Olá{% if first_name %}, {{ first_name }}{% endif %}, ainda tens <strong>{{ items_count }} item(ns)</strong> no teu carrinho.</p>
+
+  {% if items %}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eef0f3;border-radius:8px;overflow:hidden;margin:0 0 20px;">
+    {% for item in items|slice:":5" %}
+    <tr style="background-color:{% if forloop.counter|divisibleby:2 %}#f9fafb{% else %}#ffffff{% endif %};">
+      <td style="padding:12px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">{{ item.name|default:"Produto" }}</td>
+      <td align="right" style="padding:12px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#111827;font-weight:600;">
+        {% if item.price %}{{ item.price }}{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% if items_count > 5 %}
+    <tr><td colspan="2" style="padding:12px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;color:#6b7280;">… e mais {{ items_count|add:"-5" }} item(ns)</td></tr>
+    {% endif %}
+  </table>
+  {% endif %}
+
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Volta ao e-Shopping Centre para concluir a tua compra antes que os produtos esgotem.</p>
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ cart_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Concluir a compra →</a></p>
+{% endblock %}

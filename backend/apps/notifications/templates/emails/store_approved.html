@@ -1,0 +1,8 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}A sua loja "{{ store_name }}" foi aprovada!{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Loja aprovada 🎉</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Olá{% if first_name %}, {{ first_name }}{% endif %}, a sua loja <strong>{{ store_name }}</strong> foi aprovada e já está activa no e-Shopping Centre.</p>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Pode começar a adicionar produtos e a receber encomendas.</p>
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ dashboard_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Ir para o painel do vendedor →</a></p>
+{% endblock %}

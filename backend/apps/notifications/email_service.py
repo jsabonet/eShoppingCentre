@@ -488,6 +488,105 @@ def send_store_submitted_email(store_id: str) -> None:
     )
 
 
+@shared_task
+def send_store_approved_email(email, first_name, store_name) -> None:
+    """Loja aprovada pelo admin."""
+    send_templated(
+        subject=f'A sua loja "{store_name}" foi aprovada — {SITE_NAME}',
+        template_name='store_approved.html',
+        recipient=email,
+        text_message=f'A sua loja "{store_name}" foi aprovada e já está activa no e-Shopping Centre.',
+        context=base_context(first_name=first_name, store_name=store_name, dashboard_link='/seller/dashboard'),
+    )
+
+
+@shared_task
+def send_store_rejected_email(email, first_name, store_name, reason) -> None:
+    """Loja rejeitada / precisa de ajustes."""
+    send_templated(
+        subject=f'A sua loja "{store_name}" precisa de ajustes — {SITE_NAME}',
+        template_name='store_rejected.html',
+        recipient=email,
+        text_message=f'A sua loja "{store_name}" não foi aprovada. Motivo: {reason}',
+        context=base_context(
+            first_name=first_name, store_name=store_name,
+            reason=reason, register_link='/seller/register',
+        ),
+    )
+
+
+@shared_task
+def send_store_suspended_email(email, first_name, store_name) -> None:
+    """Loja suspensa pelo admin."""
+    send_templated(
+        subject=f'A sua loja "{store_name}" foi suspensa — {SITE_NAME}',
+        template_name='store_suspended.html',
+        recipient=email,
+        text_message=f'A sua loja "{store_name}" foi suspensa por um administrador.',
+        context=base_context(first_name=first_name, store_name=store_name),
+    )
+
+
+@shared_task
+def send_store_reactivated_email(email, first_name, store_name) -> None:
+    """Loja reactivada pelo admin."""
+    send_templated(
+        subject=f'A sua loja "{store_name}" foi reactivada — {SITE_NAME}',
+        template_name='store_reactivated.html',
+        recipient=email,
+        text_message=f'A sua loja "{store_name}" foi reactivada e já está novamente activa.',
+        context=base_context(first_name=first_name, store_name=store_name, dashboard_link='/seller/dashboard'),
+    )
+
+
+@shared_task
+def send_store_documents_email(email, first_name, store_name, reason) -> None:
+    """Pedido de documentos adicionais para a loja."""
+    send_templated(
+        subject=f'Documentos necessários para a loja "{store_name}" — {SITE_NAME}',
+        template_name='store_documents.html',
+        recipient=email,
+        text_message=f'A sua loja "{store_name}" precisa de documentos adicionais. Motivo: {reason}',
+        context=base_context(
+            first_name=first_name, store_name=store_name,
+            reason=reason, settings_link='/seller/settings',
+        ),
+    )
+
+
+@shared_task
+def send_store_removed_email(email, first_name, store_name) -> None:
+    """Loja removida permanentemente pelo admin."""
+    send_templated(
+        subject=f'A sua loja "{store_name}" foi removida — {SITE_NAME}',
+        template_name='store_removed.html',
+        recipient=email,
+        text_message=f'A sua loja "{store_name}" foi removida permanentemente do e-Shopping Centre.',
+        context=base_context(first_name=first_name, store_name=store_name),
+    )
+
+
+@shared_task
+def send_abandoned_cart_email(email, first_name, items, cart_link) -> None:
+    """Email de recuperação de carrinho abandonado."""
+    safe_items = items or []
+    send_templated(
+        subject=f'O seu carrinho está à sua espera 🛒 — {SITE_NAME}',
+        template_name='abandoned_cart.html',
+        recipient=email,
+        text_message=(
+            f'Ainda tens {len(safe_items)} item(ns) no teu carrinho. '
+            'Volta ao e-Shopping Centre para concluir a compra!'
+        ),
+        context=base_context(
+            first_name=first_name,
+            items=safe_items,
+            items_count=len(safe_items),
+            cart_link=cart_link,
+        ),
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # Inventário / Seguidores
 # ─────────────────────────────────────────────────────────────
