@@ -115,6 +115,7 @@ class OrderSerializer(serializers.ModelSerializer):
     status_history = OrderStatusHistorySerializer(many=True, read_only=True)
     has_physical_items = serializers.SerializerMethodField()
     is_digital_only = serializers.SerializerMethodField()
+    has_consumed_digital = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -139,6 +140,17 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def get_is_digital_only(self, obj):
         return obj.is_digital_only
+
+    def get_has_consumed_digital(self, obj):
+        """True se a encomenda contém conteúdo digital/cursos já consumidos."""
+        from apps.products.models_digital import DigitalDownload
+        from apps.courses.models import Enrollment
+        from django.db.models import Q
+        if DigitalDownload.objects.filter(order=obj, download_count__gt=0).exists():
+            return True
+        if Enrollment.objects.filter(order=obj).filter(Q(progress__gt=0) | Q(completed=True)).exists():
+            return True
+        return False
 
 
 class CreateOrderItemSerializer(serializers.Serializer):

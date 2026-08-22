@@ -268,20 +268,43 @@ class CreateReturnView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         order = serializer.validated_data['order']
+        from rest_framework.exceptions import ValidationError
+        from django.db.models import Q
+        from apps.products.models_digital import DigitalDownload
+        from apps.courses.models import Enrollment
+
+        items = list(order.items.all())
+        has_physical = order.has_physical_items
+        has_digital = any((i.product_type or '') == 'digital' for i in items)
+        has_course = any((i.product_type or '') == 'course' for i in items)
+
         # Anti-fraude: produtos digitais já descarregados não podem ser devolvidos
-        if not order.has_physical_items:
-            from apps.products.models_digital import DigitalDownload
-            if DigitalDownload.objects.filter(order=order, download_count__gt=0).exists():
-                from rest_framework.exceptions import ValidationError
+        # (aplica-se também a encomendas mistas, para proteger o vendedor)
+        if has_digital and DigitalDownload.objects.filter(order=order, download_count__gt=0).exists():
+            raise ValidationError({
+                'order': 'Não é possível devolver produtos digitais que já foram descarregados.'
+            })
+
+        # Anti-fraude: cursos já iniciados ou concluídos não podem ser devolvidos
+        if has_course and Enrollment.objects.filter(order=order).filter(
+            Q(progress__gt=0) | Q(completed=True)
+        ).exists():
+            raise ValidationError({
+                'order': 'Não é possível devolver um curso que já foi iniciado ou concluído.'
+            })
+
+        # Janela de devolução: 14 dias para encomendas exclusivamente digitais/cursos não consumidos
+        if (has_digital or has_course) and not has_physical:
+            if timezone.now() - order.created_at > timezone.timedelta(days=14):
                 raise ValidationError({
-                    'order': 'Não é possível devolver produtos digitais que já foram descarregados.'
+                    'order': 'O prazo de devolução (14 dias) para produtos digitais/cursos já expirou.'
                 })
-        # Janela de devolução: 7 dias após confirmação de entrega
+
+        # Janela de devolução: 7 dias após confirmação de entrega (produtos físicos)
         if order.status == 'delivered':
             return_window = timezone.timedelta(days=7)
             delivered_date = order.confirmed_at or order.delivered_at
             if delivered_date and (timezone.now() - delivered_date) > return_window:
-                from rest_framework.exceptions import ValidationError
                 raise ValidationError({
                     'order': 'O prazo de devolução (7 dias) já expirou para esta encomenda.'
                 })
@@ -496,9 +519,11 @@ class RefundReturnView(APIView):
         from apps.affiliates.services import reject_commissions_for_order
         reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada')
 
-        # Revogar acesso a downloads digitais após reembolso
+        # Revogar acesso a downloads digitais e matrículas em cursos após reembolso
         from apps.products.models_digital import DigitalDownload
+        from apps.courses.models import Enrollment
         DigitalDownload.objects.filter(order=return_req.order).delete()
+        Enrollment.objects.filter(order=return_req.order).delete()
 
         from apps.notifications.models import Notification
         Notification.objects.create(
@@ -618,9 +643,11 @@ class AdminOverrideView(APIView):
             from apps.affiliates.services import reject_commissions_for_order
             reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada pelo admin')
 
-            # Revogar acesso a downloads digitais após reembolso
+            # Revogar acesso a downloads digitais e matrículas em cursos após reembolso
             from apps.products.models_digital import DigitalDownload
+            from apps.courses.models import Enrollment
             DigitalDownload.objects.filter(order=return_req.order).delete()
+            Enrollment.objects.filter(order=return_req.order).delete()
 
         from apps.notifications.models import Notification
         Notification.objects.create(

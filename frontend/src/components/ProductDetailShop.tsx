@@ -412,6 +412,13 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                 {!selectedVariant && variants.length > 0 && (
                   <p className="text-xs text-amber-600 mb-4">Seleccione as opções acima</p>
                 )}
+                {(isDigital || isCourse) && (
+                  <p className="text-xs text-amber-600 mb-4">
+                    {isCourse
+                      ? 'Não reembolsável após iniciar as aulas.'
+                      : 'Não reembolsável após download.'}
+                  </p>
+                )}
                 {isOwn ? (
                   <div className="w-full p-4 bg-muted/50 border border-border rounded-lg text-center mb-2">
                     <p className="text-sm font-medium text-muted-foreground">Este é um produto da sua própria loja.</p>

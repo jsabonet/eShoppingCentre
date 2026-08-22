@@ -227,7 +227,9 @@ export default function OrderDetailPage() {
     const daysSince = (Date.now() - new Date(delivered).getTime()) / (1000 * 60 * 60 * 24);
     return daysSince <= 7;
   })();
-  const canRequestReturnFinal = canRequestReturn && returnWindowOpen;
+  const isDigitalOnly = !!order.is_digital_only;
+  const hasConsumedDigital = !!order.has_consumed_digital;
+  const canRequestReturnFinal = canRequestReturn && returnWindowOpen && !(isDigitalOnly && hasConsumedDigital);
 
   const timeline = buildTimeline(order);
 
@@ -569,6 +571,15 @@ export default function OrderDetailPage() {
           <button onClick={() => setShowReturnModal(true)} className="w-full sm:w-auto px-6 py-3 border-2 border-orange-300 text-orange-700 bg-orange-50 rounded-xl font-semibold hover:bg-orange-100 transition-colors flex items-center justify-center gap-2">
             <RotateCcw size={18} /> Solicitar Devolução
           </button>
+        )}
+
+        {isDigitalOnly && (
+          <div className="bg-card border border-border rounded-2xl p-4 text-sm text-muted-foreground">
+            <AlertCircle size={16} className="inline mr-2 text-amber-500" />
+            {hasConsumedDigital
+              ? 'Produtos digitais e cursos já descarregados ou iniciados não são reembolsáveis.'
+              : 'Produtos digitais e cursos só podem ser devolvidos se ainda não tiverem sido descarregados ou iniciados (até 14 dias).'}
+          </div>
         )}
 
         {canRequestReturn && !returnWindowOpen && (
