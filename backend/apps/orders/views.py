@@ -268,6 +268,14 @@ class CreateReturnView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         order = serializer.validated_data['order']
+        # Anti-fraude: produtos digitais já descarregados não podem ser devolvidos
+        if not order.has_physical_items:
+            from apps.products.models_digital import DigitalDownload
+            if DigitalDownload.objects.filter(order=order, download_count__gt=0).exists():
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'order': 'Não é possível devolver produtos digitais que já foram descarregados.'
+                })
         # Janela de devolução: 7 dias após confirmação de entrega
         if order.status == 'delivered':
             return_window = timezone.timedelta(days=7)
@@ -488,6 +496,10 @@ class RefundReturnView(APIView):
         from apps.affiliates.services import reject_commissions_for_order
         reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada')
 
+        # Revogar acesso a downloads digitais após reembolso
+        from apps.products.models_digital import DigitalDownload
+        DigitalDownload.objects.filter(order=return_req.order).delete()
+
         from apps.notifications.models import Notification
         Notification.objects.create(
             user=return_req.buyer,
@@ -605,6 +617,10 @@ class AdminOverrideView(APIView):
         if action == 'refund':
             from apps.affiliates.services import reject_commissions_for_order
             reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada pelo admin')
+
+            # Revogar acesso a downloads digitais após reembolso
+            from apps.products.models_digital import DigitalDownload
+            DigitalDownload.objects.filter(order=return_req.order).delete()
 
         from apps.notifications.models import Notification
         Notification.objects.create(
