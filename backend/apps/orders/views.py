@@ -56,6 +56,13 @@ class CreateOrderView(APIView):
             if order.affiliate_id and order.affiliate_commission and order.affiliate_commission > 0:
                 email_service.dispatch(email_service.send_affiliate_sale_email, str(order.id))
 
+        # Email-resumo único quando o checkout é dividido por várias lojas
+        if len(orders) > 1:
+            email_service.dispatch(
+                email_service.send_checkout_summary_email,
+                [str(order.id) for order in orders],
+            )
+
         # Marcar carrinho como recuperado
         AbandonedCart.objects.filter(user=request.user).update(
             recovered=True, recovered_at=timezone.now(), items=[]

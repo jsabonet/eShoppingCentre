@@ -163,6 +163,61 @@ def send_order_confirmation_email(order_id: str) -> None:
 
 
 @shared_task
+def send_checkout_summary_email(order_ids) -> None:
+    """Email-resumo único quando o checkout gera múltiplas ordens (uma por loja)."""
+    from apps.orders.models import Order
+    order_ids = list(order_ids or [])
+    if len(order_ids) < 2:
+        return
+    orders = list(
+        Order.objects.select_related('buyer')
+        .prefetch_related('items')
+        .filter(id__in=order_ids)
+        .order_by('created_at')
+    )
+    if len(orders) < 2:
+        return
+    buyer = orders[0].buyer
+    if not buyer.email:
+        return
+
+    summary = []
+    grand_total = Decimal('0')
+    for order in orders:
+        items = [
+            {'name': item.product_name, 'quantity': item.quantity, 'total_price': _fmt_money(item.total_price)}
+            for item in order.items.all()
+        ]
+        grand_total += order.total
+        summary.append({
+            'order_number': order.order_number,
+            'store_name': order.store_name or SITE_NAME,
+            'items': items,
+            'items_count': len(items),
+            'shipping_cost': _fmt_money(order.shipping_cost),
+            'total': _fmt_money(order.total),
+            'order_link': f'/account/orders/{order.id}',
+        })
+
+    send_templated(
+        subject=f'A tua compra foi dividida em {len(orders)} pedidos — {SITE_NAME}',
+        template_name='checkout_summary.html',
+        recipient=buyer.email,
+        text_message=(
+            f'A tua compra foi dividida em {len(orders)} pedidos, um por loja. '
+            f'Total: {_fmt_money(grand_total)} MZN.'
+        ),
+        context=base_context(
+            first_name=buyer.first_name,
+            orders=summary,
+            orders_count=len(summary),
+            grand_total=_fmt_money(grand_total),
+            orders_link='/account/orders',
+        ),
+    )
+
+
+@shared_task
 def send_new_sale_email(order_id: str) -> None:
     """Aviso de nova venda para o vendedor, com detalhes completos."""
     from apps.orders.models import Order
