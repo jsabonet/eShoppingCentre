@@ -842,6 +842,13 @@ def send_chat_digest_email(user_id: str) -> None:
     if unread <= 0:
         return
 
+    # Idempotência: evita envio duplicado no mesmo dia (o beat é reiniciado a
+    # cada deploy e o ficheiro de estado do agendador não persiste no container).
+    from django.core.cache import cache
+    dedup_key = f'chat_digest_sent:{timezone.localdate().isoformat()}:{user_id}'
+    if cache.get(dedup_key):
+        return
+
     send_templated(
         subject=f'Tens {unread} mensagens por ler — {SITE_NAME}',
         template_name='chat_digest.html',
@@ -853,6 +860,7 @@ def send_chat_digest_email(user_id: str) -> None:
             inbox_link='/account/messages',
         ),
     )
+    cache.set(dedup_key, 1, timeout=24 * 3600)
 
 
 @shared_task

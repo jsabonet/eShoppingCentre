@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from decouple import config
 from django.core.exceptions import ImproperlyConfigured
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -244,15 +245,15 @@ CELERY_BEAT_SCHEDULE = {
     },
     'delete-stale-unverified-users': {
         'task': 'apps.users.tasks.delete_stale_unverified_users',
-        'schedule': 86400.0,  # diariamente
+        'schedule': crontab(hour=2, minute=30),  # diariamente às 02:30
     },
     'send-verification-reminders': {
         'task': 'apps.users.tasks.send_verification_reminders',
-        'schedule': 86400.0,  # diariamente
+        'schedule': crontab(hour=10, minute=0),  # diariamente às 10:00
     },
     'send-unread-chat-digests': {
         'task': 'apps.notifications.email_service.send_unread_chat_digests',
-        'schedule': 86400.0,  # diariamente
+        'schedule': crontab(hour=8, minute=0),  # diariamente às 08:00
     },
     'refresh-home-sections': {
         'task': 'apps.products.tasks.refresh_home_sections',
