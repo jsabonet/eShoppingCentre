@@ -54,7 +54,7 @@ function StarRatingLg({ rating }: { rating: number }) {
 
 function ProductDetailContent({ product, categoryName, categorySlug, relatedProducts }: ProductDetailShopProps) {
   const { addToCart } = useCart();
-  const { isAuthenticated, isAffiliate } = useAuth();
+  const { isAuthenticated, isAffiliate, user } = useAuth();
   const [affiliateOpen, setAffiliateOpen] = useState(false);
   const [affiliateLoading, setAffiliateLoading] = useState(false);
   const [affiliateLink, setAffiliateLink] = useState<string | null>(null);
@@ -92,6 +92,7 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
   const isCourse = product.productType === 'course';
   const isPhysical = !product.productType || product.productType === 'physical';
   const isPurchased = product.isPurchased === true;
+  const isOwn = !!user?.id && product.storeOwnerId === user.id;
   const courseData = product.course;
   const variants = product.variants || [];
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
@@ -127,6 +128,7 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
   const buyNowDisabled = (variants.length > 0 && !selectedVariant) || (!isDigital && !isCourse && displayStock <= 0) || isPurchased;
 
   const handleBuyNow = () => {
+    if (isOwn) return;
     addToCart({
       ...product,
       price: displayPrice,
@@ -410,28 +412,37 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                 {!selectedVariant && variants.length > 0 && (
                   <p className="text-xs text-amber-600 mb-4">Seleccione as opções acima</p>
                 )}
-                {(!variants.length || selectedVariant) && (
+                {isOwn ? (
+                  <div className="w-full p-4 bg-muted/50 border border-border rounded-lg text-center mb-2">
+                    <p className="text-sm font-medium text-muted-foreground">Este é um produto da sua própria loja.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Não é possível comprar os seus próprios produtos.</p>
+                  </div>
+                ) : (
                   <>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {isCourse ? 'Acesso vitalicio ao conteudo do curso' : isDigital ? 'Acesso imediato apos confirmacao do pagamento' : 'Entrega em 3-5 dias uteis'}
-                    </p>
+                    {(!variants.length || selectedVariant) && (
+                      <>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          {isCourse ? 'Acesso vitalicio ao conteudo do curso' : isDigital ? 'Acesso imediato apos confirmacao do pagamento' : 'Entrega em 3-5 dias uteis'}
+                        </p>
+                        <button
+                          onClick={() => addToCart({ ...product, price: displayPrice, inStock: isDigital || isCourse || displayStock > 0, image: cartImage })}
+                          disabled={isPurchased}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <ShoppingCart size={18} /> {isPurchased ? (isCourse ? 'Já inscrito' : 'Já comprado') : 'Adicionar ao Carrinho'}
+                        </button>
+                      </>
+                    )}
+
                     <button
-                      onClick={() => addToCart({ ...product, price: displayPrice, inStock: isDigital || isCourse || displayStock > 0, image: cartImage })}
-                      disabled={isPurchased}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleBuyNow}
+                      disabled={buyNowDisabled}
+                      className="block w-full text-center px-4 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <ShoppingCart size={18} /> {isPurchased ? (isCourse ? 'Já inscrito' : 'Já comprado') : 'Adicionar ao Carrinho'}
+                      {isPurchased ? (isCourse ? 'Já inscrito' : 'Já comprado') : isCourse ? 'Inscrever-me' : isDigital ? 'Comprar e Baixar' : 'Comprar Agora'}
                     </button>
                   </>
                 )}
-
-                <button
-                  onClick={handleBuyNow}
-                  disabled={buyNowDisabled}
-                  className="block w-full text-center px-4 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isPurchased ? (isCourse ? 'Já inscrito' : 'Já comprado') : isCourse ? 'Inscrever-me' : isDigital ? 'Comprar e Baixar' : 'Comprar Agora'}
-                </button>
 
                 {isPurchased && (isCourse || isDigital) && (
                   <a

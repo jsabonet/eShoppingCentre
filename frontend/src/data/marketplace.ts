@@ -53,6 +53,7 @@ export interface Product {
   storeName?: string;
   storeSlug?: string;
   storeId?: string;
+  storeOwnerId?: string;
   // Digital product fields
   productType?: 'physical' | 'digital' | 'course';
   isPurchased?: boolean;

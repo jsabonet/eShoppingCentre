@@ -99,6 +99,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     storeName: product.store?.name || '',
     storeSlug: product.store?.slug || '',
     storeId: product.store?.id || '',
+    storeOwnerId: product.store?.owner_id || '',
     productType: product.product_type || 'physical',
     isPurchased: product.is_purchased === true,
     digitalFormat: product.digital_format || '',

@@ -41,7 +41,7 @@ const banners = [
 ];
 
 interface APICategory { id: string; name: string; slug: string; description: string; image: string | null; }
-interface APIProduct { id: string; name: string; slug: string; price: string; compare_price: string | null; discount_percentage: number | null; primary_image: string | null; product_type: string; rating: string; review_count: number; sales_count: number; is_on_sale: boolean; stock: number; store_name: string; store_slug: string; created_at: string; }
+interface APIProduct { id: string; name: string; slug: string; price: string; compare_price: string | null; discount_percentage: number | null; primary_image: string | null; product_type: string; rating: string; review_count: number; sales_count: number; is_on_sale: boolean; stock: number; store_name: string; store_slug: string; store_owner_id: string; created_at: string; }
 
 function apiProductToCard(p: APIProduct) {
   return {
@@ -54,6 +54,7 @@ function apiProductToCard(p: APIProduct) {
     discount: p.discount_percentage ?? undefined,
     storeName: p.store_name || undefined,
     storeSlug: p.store_slug || undefined,
+    storeOwnerId: p.store_owner_id || undefined,
     salesCount: p.sales_count ?? undefined,
     productType: (p.product_type as 'physical' | 'digital' | 'course') || 'physical',
   };

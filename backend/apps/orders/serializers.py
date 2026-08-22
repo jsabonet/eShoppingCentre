@@ -164,6 +164,11 @@ class CreateOrderSerializer(serializers.Serializer):
         for item in items:
             try:
                 product = Product.objects.get(id=item['product_id'], status='active')
+                # Impedir compra dos próprios produtos
+                if product.store.owner_id == user.id:
+                    raise serializers.ValidationError(
+                        f'Não pode comprar o seu próprio produto "{product.name}".'
+                    )
                 if product.product_type == 'physical' and not product.allow_backorder and item['quantity'] > product.stock:
                     raise serializers.ValidationError(
                         f'Stock insuficiente para {product.name}. Disponível: {product.stock}'

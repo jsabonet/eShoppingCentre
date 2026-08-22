@@ -14,7 +14,7 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const router = useRouter();
   const [wished, setWished] = useState(false);
   const [wishLoading, setWishLoading] = useState(false);
@@ -35,6 +35,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   const productType = product.productType || 'physical';
   const ctaLabel = productType === 'course' ? 'Ver Curso' : productType === 'digital' ? 'Comprar' : 'Adicionar';
+  const isOwn = !!user?.id && product.storeOwnerId === user.id;
 
   const toggleWishlist = async () => {
     if (!isAuthenticated) {
@@ -59,6 +60,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   const handleCta = () => {
+    if (isOwn) return;
     if (productType === 'course') {
       router.push('/product/' + product.slug);
       return;
@@ -155,14 +157,20 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* CTA */}
-        <button
-          onClick={handleCta}
-          disabled={!product.inStock}
-          className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-accent hover:bg-accent/90 text-accent-foreground text-sm font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {productType === 'course' ? <BookOpen size={16} /> : <ShoppingCart size={16} />}
-          {product.inStock ? ctaLabel : 'Esgotado'}
-        </button>
+        {isOwn ? (
+          <div className="mt-3 w-full flex items-center justify-center px-3 py-2 bg-muted text-muted-foreground text-xs font-medium rounded-md">
+            O seu produto
+          </div>
+        ) : (
+          <button
+            onClick={handleCta}
+            disabled={!product.inStock}
+            className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-accent hover:bg-accent/90 text-accent-foreground text-sm font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {productType === 'course' ? <BookOpen size={16} /> : <ShoppingCart size={16} />}
+            {product.inStock ? ctaLabel : 'Esgotado'}
+          </button>
+        )}
       </div>
     </div>
   );

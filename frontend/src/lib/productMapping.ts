@@ -24,6 +24,7 @@ export function mapProduct(p: any): Product {
     discount: p.discount_percentage ?? undefined,
     storeName: p.store_name || undefined,
     storeSlug: p.store_slug || undefined,
+    storeOwnerId: p.store_owner_id || undefined,
     salesCount: p.sales_count ?? undefined,
     productType: p.product_type || 'physical',
   };

@@ -49,6 +49,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     primary_image = serializers.SerializerMethodField()
     store_name = serializers.CharField(source='store.name', read_only=True)
     store_slug = serializers.CharField(source='store.slug', read_only=True)
+    store_owner_id = serializers.UUIDField(source='store.owner_id', read_only=True)
     discount_percentage = serializers.SerializerMethodField()
 
     class Meta:
@@ -56,7 +57,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'slug', 'price', 'compare_price',
                   'discount_percentage', 'primary_image', 'product_type',
                   'rating', 'review_count', 'sales_count', 'is_on_sale',
-                  'stock', 'store_name', 'store_slug', 'created_at',
+                  'stock', 'store_name', 'store_slug', 'store_owner_id', 'created_at',
                   'affiliate_enabled', 'affiliate_commission', 'affiliate_cookie_days')
 
     def get_primary_image(self, obj):
@@ -170,6 +171,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             logo_url = request.build_absolute_uri(obj.store.logo.url) if request else obj.store.logo.url
         return {
             'id': str(obj.store.id),
+            'owner_id': str(obj.store.owner_id),
             'name': obj.store.name,
             'slug': obj.store.slug,
             'logo': logo_url,
