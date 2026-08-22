@@ -100,7 +100,7 @@ class AdminOverrideSerializer(serializers.Serializer):
         ('refund', 'Forçar Reembolso'),
     ])
     admin_notes = serializers.CharField(required=True, help_text='Justificação obrigatória da decisão')
-    refund_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    refund_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     return_instructions = serializers.CharField(required=False, allow_blank=True, default='')
     return_address = serializers.CharField(required=False, allow_blank=True, default='')
 

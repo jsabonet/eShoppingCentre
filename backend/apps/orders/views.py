@@ -597,6 +597,7 @@ class AdminOverrideView(APIView):
             return_req.vendor_notes = f'[Decisão do Admin] {return_req.admin_notes}'
         elif action == 'refund':
             return_req.status = 'refunded'
+            return_req.refund_amount = serializer.validated_data.get('refund_amount')
 
         return_req.save()
 

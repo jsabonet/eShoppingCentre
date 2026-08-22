@@ -87,7 +87,7 @@ export default function AdminReturns() {
     try {
       const body: any = { action: overrideForm.action, admin_notes: overrideForm.admin_notes };
       if (overrideForm.action === 'approve') {
-        body.refund_amount = overrideForm.refund_amount || null;
+        if (overrideForm.refund_amount) body.refund_amount = overrideForm.refund_amount;
         body.return_instructions = overrideForm.return_instructions;
         body.return_address = overrideForm.return_address;
       }
