@@ -277,7 +277,20 @@ class CreateReturnView(generics.CreateAPIView):
                 raise ValidationError({
                     'order': 'O prazo de devolução (7 dias) já expirou para esta encomenda.'
                 })
-        serializer.save(buyer=self.request.user, store=order.store)
+        return_req = serializer.save(buyer=self.request.user, store=order.store)
+
+        # Notificar o vendedor por email + notificação in-app
+        email_service.dispatch(email_service.send_new_return_request_email, str(return_req.id))
+
+        from apps.notifications.models import Notification
+        if order.store and order.store.owner:
+            Notification.objects.create(
+                user=order.store.owner,
+                title='Nova solicitação de reembolso',
+                message=f'O comprador solicitou uma devolução #{return_req.rma_number} para a encomenda {order.order_number}.',
+                notification_type='return_update',
+                link='/seller/returns',
+            )
 
 
 class StoreReturnsView(generics.ListAPIView):

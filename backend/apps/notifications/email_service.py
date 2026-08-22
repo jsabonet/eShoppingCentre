@@ -736,6 +736,45 @@ def send_return_status_email(return_id: str, recipient: str = 'buyer') -> None:
     )
 
 
+@shared_task
+def send_new_return_request_email(return_id: str) -> None:
+    """Notifica o vendedor de uma nova solicitação de devolução/reembolso."""
+    from apps.orders.models import ReturnRequest
+    try:
+        rr = ReturnRequest.objects.select_related('order', 'buyer', 'store__owner').get(id=return_id)
+    except ReturnRequest.DoesNotExist:
+        return
+    owner = rr.store.owner if rr.store else None
+    if not owner or not owner.email:
+        return
+    buyer_name = rr.buyer.get_full_name() or rr.buyer.email
+    items = [
+        {'name': item.product_name, 'quantity': item.quantity}
+        for item in rr.order.items.all()
+    ]
+    send_templated(
+        subject=f'Nova solicitação de reembolso #{rr.rma_number} — {SITE_NAME}',
+        template_name='return_request_received.html',
+        recipient=owner.email,
+        text_message=(
+            f'Recebeste uma nova solicitação de reembolso #{rr.rma_number} '
+            f'para a encomenda {rr.order.order_number}.'
+        ),
+        context=base_context(
+            first_name=owner.first_name,
+            rma=rr.rma_number,
+            order_number=rr.order.order_number,
+            buyer_name=buyer_name,
+            reason_type=rr.get_reason_type_display(),
+            reason=rr.reason,
+            refund_amount=_fmt_money(rr.refund_amount) if rr.refund_amount else '',
+            items=items,
+            items_count=len(items),
+            returns_link='/seller/returns',
+        ),
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # Suporte
 # ─────────────────────────────────────────────────────────────
