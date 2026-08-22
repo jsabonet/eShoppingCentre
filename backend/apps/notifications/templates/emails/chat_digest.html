@@ -2,6 +2,7 @@
 {% block preheader %}Tens {{ unread_count }} mensagens por ler.{% endblock %}
 {% block content %}
   <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Tens mensagens por ler 💬</h1>
-  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Tens <strong>{{ unread_count }} mensagem(ns)</strong> por ler no e-Shopping Centre.</p>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Olá{% if first_name %}, {{ first_name }}{% endif %}, tens <strong>{{ unread_count }} mensagem(ns)</strong> por ler no e-Shopping Centre.</p>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Responde rapidamente para manteres uma boa experiência de compra e venda.</p>
   <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ inbox_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Ver mensagens →</a></p>
 {% endblock %}

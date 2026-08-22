@@ -110,13 +110,33 @@ def send_order_confirmation_email(order_id: str) -> None:
     """Confirmação de encomenda para o comprador."""
     from apps.orders.models import Order
     try:
-        order = Order.objects.select_related('buyer').get(id=order_id)
+        order = Order.objects.select_related('buyer').prefetch_related('items').get(id=order_id)
     except Order.DoesNotExist:
         return
     if not order.buyer.email:
         return
     is_digital = not order.has_physical_items
     template = 'order_confirmation_digital.html' if is_digital else 'order_confirmation.html'
+
+    items = [
+        {
+            'name': item.product_name,
+            'quantity': item.quantity,
+            'unit_price': _fmt_money(item.unit_price),
+            'total_price': _fmt_money(item.total_price),
+        }
+        for item in order.items.all()
+    ]
+    payment_labels = {
+        'mpesa': 'M-Pesa', 'emola': 'e-Mola', 'bank': 'Transferência Bancária',
+        'card': 'Cartão', 'test': 'Pagamento de teste',
+    }
+    payment_method = payment_labels.get(order.payment_method, order.payment_method or '—')
+
+    addr = order.shipping_address or {}
+    destination_parts = [addr.get('address') or addr.get('street'), addr.get('city')]
+    destination = ', '.join(p for p in destination_parts if p)
+
     send_templated(
         subject=f'Encomenda {order.order_number} recebida — {SITE_NAME}',
         template_name=template,
@@ -126,7 +146,15 @@ def send_order_confirmation_email(order_id: str) -> None:
             first_name=order.buyer.first_name,
             order_number=order.order_number,
             store_name=order.store_name or SITE_NAME,
+            items=items,
+            items_count=len(items),
+            subtotal=_fmt_money(order.subtotal),
+            shipping_cost=_fmt_money(order.shipping_cost),
+            discount=_fmt_money(order.discount),
             total=_fmt_money(order.total),
+            payment_method=payment_method,
+            destination=destination,
+            date=_fmt_date(order.created_at),
             order_link=f'/account/orders/{order.id}',
             downloads_link='/account/downloads',
             is_digital=is_digital,
@@ -205,6 +233,7 @@ def send_order_shipped_email(order_id: str) -> None:
         return
     if not order.has_physical_items:
         return  # encomendas digitais não são enviadas — nunca notificar envio
+    estimated = order.estimated_delivery.strftime('%d/%m/%Y') if order.estimated_delivery else ''
     send_templated(
         subject=f'A tua encomenda {order.order_number} foi enviada — {SITE_NAME}',
         template_name='order_shipped.html',
@@ -218,6 +247,8 @@ def send_order_shipped_email(order_id: str) -> None:
             order_number=order.order_number,
             store_name=order.store_name or SITE_NAME,
             tracking_code=order.tracking_code or '',
+            estimated_delivery=estimated,
+            shipping_notes=order.shipping_notes or '',
             order_link=f'/account/orders/{order.id}',
         ),
     )
@@ -228,12 +259,16 @@ def send_admin_new_sale_email(order_id: str) -> None:
     """Notifica todos os administradores sobre cada nova venda."""
     from apps.orders.models import Order
     try:
-        order = Order.objects.select_related('buyer', 'store__owner').get(id=order_id)
+        order = Order.objects.select_related('buyer', 'store__owner').prefetch_related('items').get(id=order_id)
     except Order.DoesNotExist:
         return
     buyer_name = order.buyer.get_full_name() or order.buyer.email
     seller_email = order.store.owner.email if order.store and order.store.owner else ''
     is_digital = not order.has_physical_items
+    items = [
+        {'name': item.product_name, 'quantity': item.quantity, 'total_price': _fmt_money(item.total_price)}
+        for item in order.items.all()
+    ]
     for email in _admin_recipient_emails():
         if email == seller_email:
             continue  # evita duplicado quando o vendedor também é admin
@@ -247,7 +282,11 @@ def send_admin_new_sale_email(order_id: str) -> None:
                 order_number=order.order_number,
                 store_name=order.store_name or SITE_NAME,
                 buyer_name=buyer_name,
+                items=items,
+                items_count=len(items),
                 total=_fmt_money(order.total),
+                platform_fee=_fmt_money(order.platform_fee or 0),
+                sale_date=_fmt_date(order.created_at),
                 is_digital=is_digital,
                 admin_order_link=f'/django-admin/orders/order/{order.id}/change/',
             ),
@@ -282,6 +321,7 @@ def send_payout_paid_email(payout_id: str) -> None:
             amount=_fmt_money(payout.amount),
             reference=reference,
             method=payout.get_method_display(),
+            date=_fmt_date(payout.paid_at or payout.created_at),
         ),
     )
 
@@ -308,6 +348,7 @@ def send_payout_rejected_email(payout_id: str) -> None:
             first_name=payout.user.first_name,
             amount=_fmt_money(payout.amount),
             reason=payout.rejection_reason or 'Não especificado',
+            date=_fmt_date(payout.created_at),
         ),
     )
 
@@ -441,6 +482,7 @@ def send_store_submitted_email(store_id: str) -> None:
         context=base_context(
             first_name=store.owner.first_name,
             store_name=store.name,
+            date=_fmt_date(store.created_at),
             dashboard_link='/seller/dashboard',
         ),
     )

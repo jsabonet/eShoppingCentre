@@ -2,6 +2,7 @@
 {% block preheader %}Concluíste {{ course_title }}!{% endblock %}
 {% block content %}
   <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Parabéns! 🎉</h1>
-  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Concluíste o curso <strong>{{ course_title }}</strong>.</p>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Olá{% if first_name %}, {{ first_name }}{% endif %}, concluíste o curso <strong>{{ course_title }}</strong>. Excelente trabalho!</p>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Continua a explorar novos cursos para desenvolveres as tuas competências.</p>
   <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ course_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Ver curso →</a></p>
 {% endblock %}

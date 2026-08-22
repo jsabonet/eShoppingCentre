@@ -3,11 +3,43 @@
 {% block content %}
   <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Olá{% if first_name %}, {{ first_name }}{% endif %} 👋</h1>
   <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Recebemos a tua encomenda <strong>{{ order_number }}</strong> e já está a ser processada.</p>
+
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border:1px solid #eef0f3;border-radius:8px;margin:0 0 20px;">
     <tr><td style="padding:16px 20px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">
       <p style="margin:0 0 6px;">Loja: <strong>{{ store_name }}</strong></p>
-      <p style="margin:0;">Total: <strong style="font-size:18px;color:#111827;">{{ total }} MZN</strong></p>
+      <p style="margin:0 0 6px;">Número do pedido: <strong>{{ order_number }}</strong></p>
+      <p style="margin:0 0 6px;">Data: {{ date }}</p>
+      <p style="margin:0 0 6px;">Método de pagamento: {{ payment_method }}</p>
+      {% if destination %}<p style="margin:0;">Entrega para: {{ destination }}</p>{% endif %}
     </td></tr>
   </table>
-  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ order_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Ver encomenda →</a></p>
+
+  <h2 style="margin:0 0 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:16px;color:#111827;">Produtos</h2>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eef0f3;border-radius:8px;overflow:hidden;margin:0 0 20px;">
+    <tr style="background-color:#1b2a4a;">
+      <td style="padding:10px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#ffffff;">Produto</td>
+      <td align="center" style="padding:10px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#ffffff;">Qtd.</td>
+      <td align="right" style="padding:10px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#ffffff;">Preço</td>
+      <td align="right" style="padding:10px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#ffffff;">Total</td>
+    </tr>
+    {% for item in items %}
+    <tr style="background-color:{% if forloop.counter|divisibleby:2 %}#f9fafb{% else %}#ffffff{% endif %};">
+      <td style="padding:12px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">{{ item.name }}</td>
+      <td align="center" style="padding:12px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">{{ item.quantity }}</td>
+      <td align="right" style="padding:12px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">{{ item.unit_price }} MZN</td>
+      <td align="right" style="padding:12px 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#111827;font-weight:600;">{{ item.total_price }} MZN</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border:1px solid #eef0f3;border-radius:8px;margin:0 0 20px;">
+    <tr><td style="padding:16px 20px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">
+      <p style="margin:0 0 6px;">Subtotal: <strong>{{ subtotal }} MZN</strong></p>
+      <p style="margin:0 0 6px;">Envio: <strong>{{ shipping_cost }} MZN</strong></p>
+      {% if discount != '0,00' %}<p style="margin:0 0 6px;">Desconto: <strong>- {{ discount }} MZN</strong></p>{% endif %}
+      <p style="margin:0;padding-top:8px;border-top:1px solid #e5e7eb;">Total: <strong style="font-size:16px;color:#111827;">{{ total }} MZN</strong></p>
+    </td></tr>
+  </table>
+
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ order_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Acompanhar encomenda →</a></p>
 {% endblock %}

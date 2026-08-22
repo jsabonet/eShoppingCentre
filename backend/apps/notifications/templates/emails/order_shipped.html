@@ -2,13 +2,15 @@
 {% block preheader %}A tua encomenda {{ order_number }} foi enviada.{% endblock %}
 {% block content %}
   <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Encomenda enviada 📦</h1>
-  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">A tua encomenda <strong>{{ order_number }}</strong> ({{ store_name }}) foi enviada.</p>
-  {% if tracking_code %}
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Olá{% if first_name %}, {{ first_name }}{% endif %}, a tua encomenda <strong>{{ order_number }}</strong> ({{ store_name }}) foi enviada.</p>
+
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border:1px solid #eef0f3;border-radius:8px;margin:0 0 20px;">
     <tr><td style="padding:16px 20px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">
-      <p style="margin:0;">Código de tracking: <strong style="font-size:16px;">{{ tracking_code }}</strong></p>
+      {% if tracking_code %}<p style="margin:0 0 6px;">Código de tracking: <strong style="font-size:16px;">{{ tracking_code }}</strong></p>{% endif %}
+      {% if estimated_delivery %}<p style="margin:0 0 6px;">Entrega estimada: <strong>{{ estimated_delivery }}</strong></p>{% endif %}
+      {% if shipping_notes %}<p style="margin:0;">Notas: {{ shipping_notes }}</p>{% endif %}
     </td></tr>
   </table>
-  {% endif %}
+
   <p style="margin:0 0 24px;"><a href="{{ frontend_url }}{{ order_link }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Acompanhar encomenda →</a></p>
 {% endblock %}
