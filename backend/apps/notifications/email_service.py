@@ -908,6 +908,18 @@ def send_account_blocked_email(email, first_name) -> None:
 
 
 @shared_task
+def send_account_reactivated_email(email, first_name) -> None:
+    """Aviso de conta reativada pelo administrador."""
+    send_templated(
+        subject=f'A tua conta foi reativada — {SITE_NAME}',
+        template_name='account_reactivated.html',
+        recipient=email,
+        text_message='A tua conta foi reativada. Já podes voltar a entrar na plataforma.',
+        context=base_context(first_name=first_name),
+    )
+
+
+@shared_task
 def send_kyc_status_email(email, first_name, approved) -> None:
     """Resultado da verificação KYC de afiliado."""
     if approved:

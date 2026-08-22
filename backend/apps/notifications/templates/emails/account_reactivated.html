@@ -1,0 +1,9 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}A tua conta foi reativada.{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Conta reativada ✅</h1>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Olá{% if first_name %}, {{ first_name }}{% endif %}, a tua conta foi reativada pela nossa equipa.</p>
+  <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;">Já podes voltar a entrar na plataforma e continuar a comprar e a vender.</p>
+  <p style="margin:0 0 24px;"><a href="{{ frontend_url }}/login" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;">Entrar na minha conta →</a></p>
+  <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#6b7280;">Se tiveres dúvidas, contacta o suporte em {{ support_email }}.</p>
+{% endblock %}

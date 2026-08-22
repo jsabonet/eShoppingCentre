@@ -294,10 +294,12 @@ class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
             from apps.notifications import email_service
             email_service.dispatch(email_service.send_account_blocked_email, user.email, user.first_name)
         elif not was_active and user.is_active:
-            # Reativação → limpa a marca de eliminação suave
+            # Reativação → limpa a marca de eliminação suave e notifica o utilizador
             if user.deleted_at:
                 user.deleted_at = None
                 user.save(update_fields=['deleted_at'])
+            from apps.notifications import email_service
+            email_service.dispatch(email_service.send_account_reactivated_email, user.email, user.first_name)
 
     def destroy(self, request, *args, **kwargs):
         """DELETE → eliminação suave em cascata (não remove dados)."""

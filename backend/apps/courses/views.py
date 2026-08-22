@@ -79,13 +79,18 @@ class CompleteLessonView(APIView):
             progress.completed = True
             progress.save()
 
-            # Atualizar progresso do curso
-            total = enrollment.course.total_lessons
+            # Atualizar progresso do curso (conta as aulas reais, não o campo
+            # total_lessons que pode estar desatualizado)
+            total = CourseLesson.objects.filter(module__course=enrollment.course).count()
             completed_count = enrollment.lesson_progress.filter(completed=True).count()
             enrollment.progress = (completed_count / total) * 100 if total > 0 else 0
             was_completed = enrollment.completed
-            if enrollment.progress == 100:
+            if total > 0 and completed_count >= total:
                 enrollment.completed = True
+                enrollment.progress = 100
+                if not was_completed:
+                    from django.utils import timezone
+                    enrollment.completed_at = timezone.now()
             enrollment.save()
 
             if enrollment.completed and not was_completed:
@@ -314,6 +319,9 @@ class LessonCreateView(generics.CreateAPIView):
         last = module.lessons.order_by('-sort_order').first()
         sort_order = (last.sort_order + 1) if last else 0
         serializer.save(module=module, sort_order=sort_order)
+        # Mantém total_lessons sincronizado com as aulas reais
+        module.course.total_lessons = CourseLesson.objects.filter(module__course=module.course).count()
+        module.course.save(update_fields=['total_lessons'])
 
 
 class LessonUpdateView(generics.UpdateAPIView):
@@ -346,7 +354,11 @@ class LessonDeleteView(generics.DestroyAPIView):
         if instance.module.course.product.store.owner != self.request.user:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('Nao autorizado.')
+        course = instance.module.course
         instance.delete()
+        # Mantém total_lessons sincronizado com as aulas reais
+        course.total_lessons = CourseLesson.objects.filter(module__course=course).count()
+        course.save(update_fields=['total_lessons'])
 
 
 class LessonReorderView(APIView):
