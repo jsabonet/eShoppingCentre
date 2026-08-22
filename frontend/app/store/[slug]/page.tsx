@@ -1,4 +1,3 @@
-import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { ChevronRight, Phone, Mail, Shield, Clock, Download, Truck, Monitor, FileText } from 'lucide-react';
@@ -17,10 +16,25 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
   const { slug } = await params;
   try {
     const res = await fetch(`${API_URL}/stores/${slug}/`, { next: { revalidate: 60 } });
-    if (!res.ok) return { title: 'Loja não encontrada | e-Shopping Centre' };
+    if (!res.ok) return { title: 'Loja indisponível | e-Shopping Centre' };
     const store = await res.json();
     return { title: `${store.name} | e-Shopping Centre`, description: store.description };
   } catch { return { title: 'Loja | e-Shopping Centre' }; }
+}
+
+function StoreUnavailable() {
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-24 text-center">
+      <div className="text-5xl mb-4">🚫</div>
+      <h1 className="text-2xl font-bold mb-2">Loja indisponível</h1>
+      <p className="text-muted-foreground mb-6">
+        Esta loja não está disponível de momento. Pode ter sido suspensa, removida ou estar temporariamente inactiva.
+      </p>
+      <Link href="/stores" className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium hover:bg-accent/90">
+        Ver outras lojas
+      </Link>
+    </div>
+  );
 }
 
 export default async function StorePage({ params }: StorePageProps) {
@@ -35,10 +49,14 @@ export default async function StorePage({ params }: StorePageProps) {
       fetch(`${API_URL}/products/?store=${slug}&page=1&page_size=12&ordering=-is_featured,-created_at`, { next: { revalidate: 60 } }),
     ]);
 
-    if (!storeRes.ok) notFound();
+    if (!storeRes.ok) {
+      return <StoreUnavailable />;
+    }
     store = await storeRes.json();
     productsData = prodRes.ok ? await prodRes.json() : { results: [], next: null };
-  } catch { notFound(); }
+  } catch {
+    return <StoreUnavailable />;
+  }
 
   const mappedProducts = (productsData.results || []).map(mapProduct);
   const hasMore = !!productsData.next;

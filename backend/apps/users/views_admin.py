@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAdminUser
 from django.db.models import Sum
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from django.core.cache import cache
 from apps.notifications import email_service
 from apps.users.models import User
 from apps.stores.models import Store
@@ -51,6 +52,9 @@ class ApproveStoreView(APIView):
             store = Store.objects.get(id=pk, status='pending')
             store.status = 'active'
             store.save()
+            from apps.products.models import Product
+            Product.objects.filter(store=store, status='inactive').update(status='active')
+            cache.delete('home_sections')
             return Response({'status': 'active'})
         except Store.DoesNotExist:
             return Response({'detail': 'Loja não encontrada.'}, status=404)
@@ -107,6 +111,15 @@ class AdminStoreManageView(APIView):
             new_status=store.status,
         )
 
+    @staticmethod
+    def _sync_products_with_status(store):
+        """Oculta produtos quando a loja não está activa; repõe quando activa."""
+        from apps.products.models import Product
+        if store.status == 'active':
+            Product.objects.filter(store=store, status='inactive').update(status='active')
+        else:
+            Product.objects.filter(store=store, status='active').update(status='inactive')
+
     def delete(self, request, pk):
         """Eliminar loja permanentemente da base de dados."""
         try:
@@ -124,6 +137,7 @@ class AdminStoreManageView(APIView):
 
         # Delete (cascades: products, coupons, returns. orders preserved via SET_NULL)
         store.delete()
+        cache.delete('home_sections')
 
         # Notify owner
         if owner_email:
@@ -184,6 +198,10 @@ class AdminStoreManageView(APIView):
 
             # Registo de moderação
             self._log_moderation(store, action, reason, previous_status)
+
+            # Sincronizar visibilidade dos produtos + invalidar cache da home
+            self._sync_products_with_status(store)
+            cache.delete('home_sections')
 
             # Send email notification to store owner
             owner_email = store.owner.email
