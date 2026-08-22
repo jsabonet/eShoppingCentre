@@ -119,6 +119,15 @@ export default function SellerDashboardPage() {
   return (
     <SellerLayout>
       <div className="p-6">
+        {data.status && data.status !== 'active' && (
+          <div className="mb-6 flex items-start gap-3 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">A sua loja está {data.status_display || data.status}.</p>
+              <p className="text-red-700">Não pode publicar nem actualizar produtos enquanto a loja não for reactivada. Contacte o suporte para mais informações.</p>
+            </div>
+          </div>
+        )}
         {productType === 'physical' && data.shipping_configured === false && (
           <div className="mb-6 flex items-start gap-3 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
             <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
@@ -140,12 +149,14 @@ export default function SellerDashboardPage() {
             <button onClick={fetchDashboard} disabled={loading} className="p-2 hover:bg-muted rounded-lg transition-colors" title="Actualizar">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
-            <Link
-              href="/seller/products/new"
-              className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors flex items-center gap-2"
-            >
-              <Plus size={16} /> Novo Produto
-            </Link>
+            {data.status === 'active' && (
+              <Link
+                href="/seller/products/new"
+                className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors flex items-center gap-2"
+              >
+                <Plus size={16} /> Novo Produto
+              </Link>
+            )}
           </div>
         </div>
 

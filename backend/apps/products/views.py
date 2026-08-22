@@ -13,7 +13,7 @@ from .serializers import (
     ProductImageSerializer, ProductVariantSerializer, SellerProductSerializer, WishlistItemSerializer,
 )
 from .filters import ProductFilter
-from apps.stores.permissions import IsStoreOwner
+from apps.stores.permissions import IsStoreOwner, CanManageProducts
 
 
 @method_decorator(cache_page(300), name='dispatch')
@@ -222,7 +222,7 @@ class HomeSectionsView(APIView):
 
 class MyProductListView(generics.ListAPIView):
     serializer_class = SellerProductSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def get_queryset(self):
         store = getattr(self.request.user, 'store', None)
@@ -238,7 +238,7 @@ class MyProductListView(generics.ListAPIView):
 
 class ProductUpdateView(generics.RetrieveUpdateAPIView):
     serializer_class = ProductDetailSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def get_queryset(self):
         return self.request.user.store.products.all()
@@ -264,7 +264,7 @@ class ProductUpdateView(generics.RetrieveUpdateAPIView):
 
 
 class ProductDeleteView(generics.DestroyAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def get_queryset(self):
         return self.request.user.store.products.all()
@@ -276,7 +276,7 @@ class ProductDeleteView(generics.DestroyAPIView):
 
 class RestockProductView(APIView):
     """POST /api/v1/products/{pk}/restock/ — Adiciona stock a um produto."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def post(self, request, pk):
         product = get_object_or_404(Product, pk=pk, store=request.user.store, product_type='physical')
@@ -301,7 +301,7 @@ class RestockProductView(APIView):
 
 class ProductImageView(generics.CreateAPIView):
     serializer_class = ProductImageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def perform_create(self, serializer):
         product = Product.objects.get(id=self.kwargs['product_id'])
@@ -310,7 +310,7 @@ class ProductImageView(generics.CreateAPIView):
 
 class ProductImageDeleteView(generics.DestroyAPIView):
     """Vendedor pode remover a imagem do seu próprio produto."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def get_queryset(self):
         store = self.request.user.store
@@ -367,7 +367,7 @@ class ProductVariantDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class BulkAffiliateUpdateView(APIView):
     """POST /api/v1/products/bulk-affiliate/ — define afiliação/comissão em vários produtos de uma vez."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def post(self, request):
         store = getattr(request.user, 'store', None)

@@ -18,6 +18,7 @@ from .serializers import (
     CourseReviewSerializer, CourseReviewCreateSerializer,
     CourseReviewUpdateSerializer, SellerReplySerializer,
 )
+from apps.stores.permissions import CanManageProducts
 
 
 class CourseListView(generics.ListAPIView):
@@ -240,7 +241,7 @@ class CourseLearnView(APIView):
 class ModuleCreateView(generics.CreateAPIView):
     """POST /api/v1/courses/{course_id}/modules/"""
     serializer_class = CourseModuleWriteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def perform_create(self, serializer):
         course = get_object_or_404(Course, id=self.kwargs['course_id'])
@@ -256,7 +257,7 @@ class ModuleUpdateView(generics.UpdateAPIView):
     """PUT /api/v1/courses/modules/{module_id}/"""
     queryset = CourseModule.objects.all()
     serializer_class = CourseModuleWriteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
     lookup_field = 'id'
     lookup_url_kwarg = 'module_id'
 
@@ -274,7 +275,7 @@ class ModuleUpdateView(generics.UpdateAPIView):
 class ModuleDeleteView(generics.DestroyAPIView):
     """DELETE /api/v1/courses/modules/{module_id}/"""
     queryset = CourseModule.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
     lookup_field = 'id'
     lookup_url_kwarg = 'module_id'
 
@@ -287,7 +288,7 @@ class ModuleDeleteView(generics.DestroyAPIView):
 
 class ModuleReorderView(APIView):
     """PATCH /api/v1/courses/{course_id}/modules/reorder/ — Recebe lista de IDs na nova ordem."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def patch(self, request, course_id):
         course = get_object_or_404(Course, id=course_id)
@@ -303,7 +304,7 @@ class ModuleReorderView(APIView):
 class LessonCreateView(generics.CreateAPIView):
     """POST /api/v1/courses/modules/{module_id}/lessons/"""
     serializer_class = CourseLessonWriteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def perform_create(self, serializer):
         module = get_object_or_404(CourseModule, id=self.kwargs['module_id'])
@@ -319,7 +320,7 @@ class LessonUpdateView(generics.UpdateAPIView):
     """PUT/PATCH /api/v1/courses/lessons/{lesson_id}/ — Suporta partial updates."""
     queryset = CourseLesson.objects.all()
     serializer_class = CourseLessonWriteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
     lookup_field = 'id'
     lookup_url_kwarg = 'lesson_id'
 
@@ -337,7 +338,7 @@ class LessonUpdateView(generics.UpdateAPIView):
 class LessonDeleteView(generics.DestroyAPIView):
     """DELETE /api/v1/courses/lessons/{lesson_id}/"""
     queryset = CourseLesson.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
     lookup_field = 'id'
     lookup_url_kwarg = 'lesson_id'
 
@@ -350,7 +351,7 @@ class LessonDeleteView(generics.DestroyAPIView):
 
 class LessonReorderView(APIView):
     """PATCH /api/v1/courses/modules/{module_id}/lessons/reorder/"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def patch(self, request, module_id):
         module = get_object_or_404(CourseModule, id=module_id)
@@ -420,7 +421,7 @@ class CourseProgressView(APIView):
 
 class CourseUpdateView(APIView):
     """PATCH /api/v1/courses/{course_id}/update/ — Editar metadados do curso."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def patch(self, request, course_id):
         course = get_object_or_404(Course, id=course_id)
@@ -466,7 +467,7 @@ class CourseUpdateView(APIView):
 
 class CourseDeleteView(APIView):
     """DELETE /api/v1/courses/{course_id}/delete/ — Eliminar curso e produto associado."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def delete(self, request, course_id):
         course = get_object_or_404(Course, id=course_id)
@@ -537,7 +538,7 @@ class LessonAttachmentListView(APIView):
 
 class LessonAttachmentUploadView(APIView):
     """POST /api/v1/courses/lessons/{lesson_id}/attachments/"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def post(self, request, lesson_id):
         lesson = get_object_or_404(CourseLesson, id=lesson_id)
@@ -571,7 +572,7 @@ class LessonAttachmentUploadView(APIView):
 
 class LessonAttachmentDeleteView(APIView):
     """DELETE /api/v1/courses/lessons/attachments/{attachment_id}/"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def delete(self, request, attachment_id):
         attachment = get_object_or_404(LessonAttachment, id=attachment_id)
@@ -610,7 +611,7 @@ class QuizDetailView(generics.RetrieveAPIView):
 class QuizCreateView(generics.CreateAPIView):
     """POST /api/v1/courses/modules/{module_id}/quizzes/ — Criar quiz num módulo."""
     serializer_class = QuizWriteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def perform_create(self, serializer):
         module = get_object_or_404(CourseModule, id=self.kwargs['module_id'])
@@ -626,7 +627,7 @@ class QuizUpdateView(generics.UpdateAPIView):
     """PUT /api/v1/courses/quizzes/{quiz_id}/ — Editar quiz."""
     queryset = Quiz.objects.all()
     serializer_class = QuizWriteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
     lookup_field = 'id'
     lookup_url_kwarg = 'quiz_id'
 
@@ -640,7 +641,7 @@ class QuizUpdateView(generics.UpdateAPIView):
 class QuizDeleteView(generics.DestroyAPIView):
     """DELETE /api/v1/courses/quizzes/{quiz_id}/ — Remover quiz."""
     queryset = Quiz.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
     lookup_field = 'id'
     lookup_url_kwarg = 'quiz_id'
 
@@ -659,7 +660,7 @@ from .serializers import QuestionWriteSerializer, QuestionSerializer
 class QuestionCreateView(generics.CreateAPIView):
     """POST /api/v1/courses/quizzes/{quiz_id}/questions/ — Adicionar questão ao quiz."""
     serializer_class = QuestionWriteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
 
     def perform_create(self, serializer):
         quiz = get_object_or_404(Quiz, id=self.kwargs['quiz_id'])
@@ -675,7 +676,7 @@ class QuestionUpdateView(generics.UpdateAPIView):
     """PUT /api/v1/courses/quizzes/questions/{question_id}/ — Editar questão (inclui opções)."""
     queryset = Question.objects.all()
     serializer_class = QuestionWriteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
     lookup_field = 'id'
     lookup_url_kwarg = 'question_id'
 
@@ -689,7 +690,7 @@ class QuestionUpdateView(generics.UpdateAPIView):
 class QuestionDeleteView(generics.DestroyAPIView):
     """DELETE /api/v1/courses/quizzes/questions/{question_id}/ — Remover questão."""
     queryset = Question.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageProducts]
     lookup_field = 'id'
     lookup_url_kwarg = 'question_id'
 

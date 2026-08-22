@@ -549,6 +549,8 @@ export interface DashboardProduct {
 export interface SellerDashboard {
   store_name: string;
   tagline: string;
+  status?: string;
+  status_display?: string;
   product_type: 'physical' | 'digital' | 'course';
   shipping_configured?: boolean;
   today_sales: number;

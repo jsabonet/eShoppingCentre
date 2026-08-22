@@ -16,6 +16,8 @@ class StoreStatsView(APIView):
             return Response({
                 'store_name': '',
                 'tagline': '',
+                'status': '',
+                'status_display': '',
                 'today_sales': 0, 'today_revenue': 0, 'total_revenue': 0,
                 'total_products': 0, 'total_orders': 0, 'pending_orders': 0,
                 'store_rating': 0, 'recent_orders': [], 'top_products': [],
@@ -98,6 +100,8 @@ class StoreStatsView(APIView):
             # Store identity
             'store_name': store.name,
             'tagline': store.tagline or '',
+            'status': store.status,
+            'status_display': store.get_status_display(),
             # Stats cards — common
             'product_type': store.product_type,
             'shipping_configured': shipping_configured,
