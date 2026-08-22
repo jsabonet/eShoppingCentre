@@ -107,7 +107,7 @@ export default function OrderDetailPage() {
 
   const handleRequestReturn = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError('');
-    if (returnImages.length === 0) { setError('Envie pelo menos uma foto do produto para comprovar o problema.'); setSubmitting(false); return; }
+    if (!isDigitalOnly && returnImages.length === 0) { setError('Envie pelo menos uma foto do produto para comprovar o problema.'); setSubmitting(false); return; }
     try {
       const res = await fetch(API_URL + '/orders/returns/', {
         method: 'POST', headers: apiHeaders(),
@@ -695,24 +695,30 @@ export default function OrderDetailPage() {
                   <label className="block text-sm font-semibold mb-2">Descrição do Problema</label>
                   <textarea rows={4} placeholder="Descreva detalhadamente o problema encontrado..." value={returnForm.reason} onChange={e => setReturnForm(p => ({ ...p, reason: e.target.value }))} className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors resize-none" required />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-2">Fotos do Produto <span className="text-red-500">*</span></label>
-                  <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent/30 transition-colors">
-                    <Camera size={18} className="text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">
-                      {returnImages.length > 0 ? `${returnImages.length} foto(s) selecionada(s)` : 'Tirar/Adicionar foto (obrigatório)'}
-                    </span>
-                    <input type="file" accept="image/*" capture="environment" multiple className="hidden"
-                      onChange={e => setReturnImages(Array.from(e.target.files || []))} />
-                  </label>
-                  {returnImages.length > 0 && (
-                    <div className="flex gap-2 mt-2">
-                      {returnImages.map((f, i) => (
-                        <img key={i} src={URL.createObjectURL(f)} alt="" className="w-14 h-14 rounded-lg object-cover border border-border" />
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {isDigitalOnly ? (
+                  <p className="text-xs text-muted-foreground -mt-1">
+                    Produtos digitais não necessitam de foto comprovativa. Apenas descreva o problema.
+                  </p>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Fotos do Produto <span className="text-red-500">*</span></label>
+                    <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent/30 transition-colors">
+                      <Camera size={18} className="text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {returnImages.length > 0 ? `${returnImages.length} foto(s) selecionada(s)` : 'Tirar/Adicionar foto (obrigatório)'}
+                      </span>
+                      <input type="file" accept="image/*" capture="environment" multiple className="hidden"
+                        onChange={e => setReturnImages(Array.from(e.target.files || []))} />
+                    </label>
+                    {returnImages.length > 0 && (
+                      <div className="flex gap-2 mt-2">
+                        {returnImages.map((f, i) => (
+                          <img key={i} src={URL.createObjectURL(f)} alt="" className="w-14 h-14 rounded-lg object-cover border border-border" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="flex gap-3 pt-2">
                   <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 bg-accent text-accent-foreground rounded-xl font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                     {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
