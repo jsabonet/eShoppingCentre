@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play, Download, Monitor, FileText, GraduationCap, BookOpen, Award, Users, ChevronDown, Store, MessageCircle, Link2, Copy, Check, Loader2, X } from 'lucide-react';
 import ChatButton from './ChatButton';
 import ProductReviews from './ProductReviews';
-import { CartProvider, useCart } from '../contexts/CartContext';
+import { useCart } from '../contexts/CartContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { affiliatesAPI } from '@/src/lib/api';
 import ProductCard from './ProductCard';
@@ -835,9 +835,5 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
 }
 
 export default function ProductDetailShop(props: ProductDetailShopProps) {
-  return (
-    <CartProvider>
-      <ProductDetailContent {...props} />
-    </CartProvider>
-  );
+  return <ProductDetailContent {...props} />;
 }

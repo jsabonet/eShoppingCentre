@@ -1,6 +1,5 @@
-import { CartProvider } from '../../components/CartContext';
-import ProductCard from '../../components/ProductCard';
-import CartDrawer from '../../components/CartDrawer';
+import ProductCard from './ProductCard';
+import CartDrawer from './CartDrawer';
 import type { Product } from '../data/marketplace';
 
 interface SearchShopProps {
@@ -10,7 +9,7 @@ interface SearchShopProps {
 
 export default function SearchShop({ products, similarProducts = [] }: SearchShopProps) {
   return (
-    <CartProvider>
+    <>
       {products.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {products.map((product) => (
@@ -21,15 +20,15 @@ export default function SearchShop({ products, similarProducts = [] }: SearchSho
       
       {similarProducts.length > 0 && (
         <>
-          <div class="mt-8 pt-8 border-t border-border">
-            <div class="flex items-center gap-2 mb-6">
-              <span class="text-xl">🤖</span>
-              <h2 class="text-xl font-bold">Produtos Semelhantes (Sugestões IA)</h2>
+          <div className="mt-8 pt-8 border-t border-border">
+            <div className="flex items-center gap-2 mb-6">
+              <span className="text-xl">🤖</span>
+              <h2 className="text-xl font-bold">Produtos Semelhantes (Sugestões IA)</h2>
             </div>
-            <p class="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Baseado na sua pesquisa, nossa IA recomenda estes produtos que podem interessar:
             </p>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {similarProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
@@ -39,6 +38,6 @@ export default function SearchShop({ products, similarProducts = [] }: SearchSho
       )}
       
       <CartDrawer />
-    </CartProvider>
+    </>
   );
 }

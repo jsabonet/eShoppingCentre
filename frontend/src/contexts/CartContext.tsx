@@ -50,6 +50,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [items]);
 
+  // Sincronizar entre abas/janelas (evita carrinhos divergentes)
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          setItems(JSON.parse(e.newValue));
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   // Sincronizar carrinho com o backend (para recuperação de carrinhos abandonados)
   useEffect(() => {
     const token = localStorage.getItem('access_token');
