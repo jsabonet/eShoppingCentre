@@ -248,7 +248,7 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 
 Alinhado com o `PLANO_CARTEIRA_INTERNA.md` (W1–W5):
 
-1. **W0 — Fechar o elo de pagamento (crítico)**: implementar a conclusão do pagamento no webhook (M-Pesa/Stripe) mapeando o payload para a encomenda (via referência/id de transação) e marcando `payment_status="completed"` de forma idempotente. Isto desbloqueia `settle_payment`, escrow e crédito do vendedor.
+1. **W0 — Fechar o elo de pagamento (crítico)** ✅ **IMPLEMENTADO via PaySuite**: o gateway único é o **PaySuite** (M-Pesa/e-Mola/Mkesh/cartões num checkout hospedado). Fluxo: `POST /api/v1/payments/initiate/` cria o pagamento e grava a `reference` na encomenda → o cliente é redirecionado para a `checkout_url` → o webhook `POST /api/v1/payments/webhook/paysuite/` (assinado por `X-Signature` HMAC-SHA256) mapeia `data.reference` para as encomendas e chama `complete_payment()`, que marca `payment_status="completed"` de forma idempotente e despoleta `settle_payment` (escrow/crédito do vendedor). Frontend: redirecionamento no checkout + página `/checkout/success` com polling do estado.
 2. **Unificar afiliados na carteira**: fazer `AffiliateCommission`/`AffiliatePayout` passarem por `wallet.services.credit/debit`, eliminando o circuito paralelo (ou documentar formalmente a separação como decisão de arquitetura).
 3. **Remover stubs**: apagar `PendingPayoutsView`/`ApprovePayoutView` de `users/views_admin.py`, as rotas duplicadas e as funções mortas em `frontend/src/lib/api.ts`.
 4. **Tornar `approve_payout` load-bearing** ou remover o passo: `pay_payout` deveria exigir aprovação prévia (ou documentar o fluxo de pagamento direto).
@@ -276,7 +276,11 @@ Alinhado com o `PLANO_CARTEIRA_INTERNA.md` (W1–W5):
 - [backend/apps/affiliates/views.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/views.py) — endpoints de afiliados/admin.
 - [backend/apps/affiliates/services.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/services.py) / [tasks.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/tasks.py) — aprovar/clawback de comissões.
 - [backend/apps/affiliates/urls.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/urls.py) — rotas de afiliados.
-- [backend/apps/payments/views.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/views.py) — webhooks M-Pesa/Stripe.
+- [backend/apps/payments/views.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/views.py) — initiate/status/webhook PaySuite (W0).
+- [backend/apps/payments/services/paysuite.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/paysuite.py) — cliente PaySuite (criar/consultar pagamento + verificação HMAC).
+- [backend/apps/payments/services/completion.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/completion.py) — `complete_payment()` idempotente.
+- [frontend/src/components/CheckoutContent.tsx](d:/Projectos/eShoppingCentre-main/frontend/src/components/CheckoutContent.tsx) — redireciona para o checkout PaySuite.
+- [frontend/app/checkout/success/page.tsx](d:/Projectos/eShoppingCentre-main/frontend/app/checkout/success/page.tsx) — confirmação/polling pós-pagamento.
 - [backend/apps/stores/views_earnings.py](d:/Projectos/eShoppingCentre-main/backend/apps/stores/views_earnings.py) — ganhos do vendedor.
 - [backend/config/settings/base.py](d:/Projectos/eShoppingCentre-main/backend/config/settings/base.py) — `CELERY_BEAT_SCHEDULE`.
 - [frontend/src/lib/api.ts](d:/Projectos/eShoppingCentre-main/frontend/src/lib/api.ts) — `walletAPI`, `affiliatesAPI`, stubs mortos.

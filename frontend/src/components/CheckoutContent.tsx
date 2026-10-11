@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Truck, Shield, CreditCard, MapPin, CheckCircle, Loader2, FlaskConical, Wallet } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
 import { useAuth } from '@/src/hooks/useAuth';
-import { walletAPI } from '@/src/lib/api';
+import { walletAPI, paymentsAPI } from '@/src/lib/api';
 
 function formatPrice(price: number): string {
   return price.toFixed(2).replace('.', ',');
@@ -31,6 +31,9 @@ const PROVINCES = [
   { value: 'cabo_delgado', label: 'Cabo Delgado' },
   { value: 'niassa', label: 'Niassa' },
 ];
+
+// Métodos de pagamento online processados via PaySuite (checkout hospedado).
+const PAYSUITE_METHODS = ['mpesa', 'emola', 'card'];
 
 const PAYMENT_METHODS = [
   {
@@ -372,7 +375,31 @@ export default function CheckoutContent() {
       }
 
       const data = await res.json();
-      setOrderData(Array.isArray(data) ? data : [data]);
+      const orders = Array.isArray(data) ? data : [data];
+      setOrderData(orders);
+
+      // Métodos online (M-Pesa/e-Mola/Cartão) → checkout hospedado PaySuite
+      if (PAYSUITE_METHODS.includes(paymentMethod)) {
+        const orderIds = orders.map((o: any) => o.id);
+        let checkoutUrl = '';
+        try {
+          const payRes = await paymentsAPI.initiate({ order_ids: orderIds, method: paymentMethod });
+          checkoutUrl = payRes.data?.checkout_url || '';
+        } catch (err: any) {
+          setError(err?.response?.data?.error || 'Erro ao iniciar pagamento.');
+          setSubmitting(false);
+          return;
+        }
+        clearCart();
+        if (checkoutUrl) {
+          window.location.href = checkoutUrl;
+          return;
+        }
+        setError('Não foi possível iniciar o pagamento. Tente novamente.');
+        setSubmitting(false);
+        return;
+      }
+
       setConfirmed(true);
       clearCart();
       window.scrollTo({ top: 0, behavior: 'smooth' });

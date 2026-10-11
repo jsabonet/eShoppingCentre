@@ -683,6 +683,15 @@ export const walletAPI = {
   adminReconciliation: () => api.get<any>('/wallet/admin/reconciliation/'),
 };
 
+export const paymentsAPI = {
+  initiate: (data: { order_ids: string[]; method?: string }) =>
+    api.post<{ checkout_url: string; payment_id: string; reference: string; order_ids: string[] }>(
+      '/payments/initiate/',
+      data,
+    ),
+  status: (reference: string) => api.get('/payments/status/', { params: { reference } }),
+};
+
 export const reviewsAPI = {
   create: (data: { product_id: string; rating: number; title?: string; comment: string }) =>
     api.post<Review>('/reviews/', data),

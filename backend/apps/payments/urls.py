@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('webhook/mpesa/', views.MPesaWebhookView.as_view(), name='mpesa_webhook'),
-    path('webhook/stripe/', views.StripeWebhookView.as_view(), name='stripe_webhook'),
+    path('initiate/', views.PaymentsInitiateView.as_view(), name='payments_initiate'),
+    path('status/', views.PaymentsStatusView.as_view(), name='payments_status'),
+    path('webhook/paysuite/', views.PaysuiteWebhookView.as_view(), name='paysuite_webhook'),
 ]
