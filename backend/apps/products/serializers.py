@@ -266,6 +266,10 @@ class CategorySerializer(serializers.ModelSerializer):
             children = obj._prefetched_children
         else:
             children = obj.children.filter(is_active=True)
+        # Respeita o filtro de tipo de produto aplicado na listagem (ex.: formulário de produto).
+        product_type = self.context.get('request').query_params.get('product_type') if self.context.get('request') else None
+        if product_type:
+            children = children.filter(product_type=product_type)
         return [{'name': c.name, 'slug': c.slug} for c in children[:20]]
 
     def create(self, validated_data):

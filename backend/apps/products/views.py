@@ -16,10 +16,17 @@ from .filters import ProductFilter
 from apps.stores.permissions import IsStoreOwner, CanManageProducts
 
 
-@method_decorator(cache_page(300), name='dispatch')
 class CategoryListView(generics.ListAPIView):
     serializer_class = CategorySerializer
     permission_classes = [permissions.AllowAny]
+
+    def dispatch(self, request, *args, **kwargs):
+        # Os formulários de produto (criação/edição) pedem dados frescos com
+        # `product_type`/`page_size`; não os cachear para refletir categorias
+        # acabadas de criar no admin.
+        if 'product_type' in request.query_params or 'page_size' in request.query_params:
+            return super().dispatch(request, *args, **kwargs)
+        return cache_page(300)(super().dispatch)(request, *args, **kwargs)
 
     def get_queryset(self):
         qs = Category.objects.filter(is_active=True)

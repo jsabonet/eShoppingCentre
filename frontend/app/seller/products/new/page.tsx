@@ -126,15 +126,15 @@ export default function NewProductPage() {
         setProductType(storeType as 'physical' | 'digital' | 'course');
       } catch {} finally { setLoadingType(false); }
 
-      // Fetch categories filtered by store type
+      // Fetch categories filtered by store type (page_size alto para carregar todas)
       try {
-        const res = await fetch(`${API_URL}/categories/?root=true&product_type=${storeType}`);
+        const res = await fetch(`${API_URL}/categories/?root=true&product_type=${storeType}&page_size=100`);
         const data = await res.json();
         if (data.results?.length) {
           setCategories(data.results);
         } else {
-          // Fallback: fetch all if none match the type
-          const fallback = await fetch(`${API_URL}/categories/?root=true`);
+          // Fallback: fetch all if none match the type (permite continuar a criar produtos)
+          const fallback = await fetch(`${API_URL}/categories/?root=true&page_size=100`);
           const fbData = await fallback.json();
           setCategories(fbData.results || []);
         }

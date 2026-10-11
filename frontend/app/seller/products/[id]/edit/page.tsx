@@ -129,9 +129,6 @@ export default function EditProductPage() {
   useEffect(() => {
     (async () => {
       try {
-        const catRes = await fetch(`${API_URL}/categories/?root=true`);
-        if (catRes.ok) { const cData = await catRes.json(); setCategories(cData.results || []); }
-
         const token = localStorage.getItem('access_token');
         const res = await fetch(`${API_URL}/products/${id}/update/`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -141,6 +138,15 @@ export default function EditProductPage() {
 
         const pType = (data.product_type || 'physical') as 'physical' | 'digital' | 'course';
         setProductType(pType);
+
+        // Categorias filtradas pelo tipo da loja/produto (consistente com o formulário de criação)
+        try {
+          const catRes = await fetch(`${API_URL}/categories/?root=true&product_type=${pType}&page_size=100`);
+          if (catRes.ok) {
+            const cData = await catRes.json();
+            setCategories(cData.results?.length ? cData.results : []);
+          }
+        } catch {}
 
         const d = data as any;
         setForm({

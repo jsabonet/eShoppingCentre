@@ -20,6 +20,12 @@ import AdminWallet from './admin/AdminWallet';
 
 const BACKEND_READY = true;
 
+const PRODUCT_TYPE_LABELS: Record<string, string> = {
+  physical: 'Físicos',
+  digital: 'Digitais',
+  course: 'Cursos',
+};
+
 type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet';
 
 interface Product {
@@ -946,13 +952,14 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                   <thead className="bg-muted/50 border-b"><tr>
                     <th className="text-left px-4 py-3">Imagem</th>
                     <th className="text-left px-4 py-3">Nome</th>
+                    <th className="text-left px-4 py-3">Tipo</th>
                     <th className="text-left px-4 py-3">Produtos</th>
                     <th className="text-left px-4 py-3">Ordem</th>
                     <th className="text-right px-4 py-3">Acções</th>
                   </tr></thead>
                   <tbody className="divide-y">
                     {categories.length === 0 ? (
-                      <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">Nenhuma categoria.</td></tr>
+                      <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma categoria.</td></tr>
                     ) : categories.map((cat: any) => (
                       <tr key={cat.id} className="hover:bg-muted/30">
                         <td className="px-4 py-3">
@@ -969,7 +976,15 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-medium">{cat.name}</td>
+                        <td className="px-4 py-3 font-medium">
+                          {cat.name}
+                          {cat.parent ? <span className="block text-xs text-muted-foreground">— subcategoria</span> : null}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">
+                            {PRODUCT_TYPE_LABELS[cat.product_type] || cat.product_type || '—'}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{cat.product_count || 0}</td>
                         <td className="px-4 py-3 text-sm">{cat.sort_order}</td>
                         <td className="px-4 py-3 text-right">
