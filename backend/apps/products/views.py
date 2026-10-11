@@ -23,8 +23,9 @@ class CategoryListView(generics.ListAPIView):
     def dispatch(self, request, *args, **kwargs):
         # Os formulários de produto (criação/edição) pedem dados frescos com
         # `product_type`/`page_size`; não os cachear para refletir categorias
-        # acabadas de criar no admin.
-        if 'product_type' in request.query_params or 'page_size' in request.query_params:
+        # acabadas de criar no admin. Aqui `request` ainda é o objecto Django
+        # cru, por isso usa-se `request.GET` (e não `request.query_params`).
+        if 'product_type' in request.GET or 'page_size' in request.GET:
             return super().dispatch(request, *args, **kwargs)
         return cache_page(300)(super().dispatch)(request, *args, **kwargs)
 
