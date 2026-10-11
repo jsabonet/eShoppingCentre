@@ -60,21 +60,6 @@ class ApproveStoreView(APIView):
             return Response({'detail': 'Loja não encontrada.'}, status=404)
 
 
-class PendingPayoutsView(APIView):
-    permission_classes = [permissions.IsAdminUser]
-
-    def get(self, request):
-        payouts = []
-        return Response(payouts)
-
-
-class ApprovePayoutView(APIView):
-    permission_classes = [permissions.IsAdminUser]
-
-    def patch(self, request, pk):
-        return Response({'status': 'approved'})
-
-
 class AdminAllStoresView(generics.ListAPIView):
     """Admin: listar TODAS as lojas (qualquer status)"""
     queryset = Store.objects.all().order_by('-created_at')

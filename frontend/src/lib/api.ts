@@ -779,8 +779,6 @@ export const adminAPI = {
     api.patch(`/admin/stores/${id}/manage/`, data, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   // All orders
   allOrders: (params?: Record<string, any>) => api.get('/admin/orders/all/', { params }),
-  pendingPayouts: () => api.get('/admin/payouts/pending/'),
-  approvePayout: (id: string) => api.patch(`/admin/payouts/${id}/approve/`),
   // Users
   listUsers: (params?: Record<string, any>) => api.get('/admin/users/', { params }),
   createUser: (data: any) => api.post('/admin/users/', data),

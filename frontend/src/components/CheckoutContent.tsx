@@ -3,9 +3,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Truck, Shield, CreditCard, MapPin, CheckCircle, Loader2, FlaskConical } from 'lucide-react';
+import { Truck, Shield, CreditCard, MapPin, CheckCircle, Loader2, FlaskConical, Wallet } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
 import { useAuth } from '@/src/hooks/useAuth';
+import { walletAPI } from '@/src/lib/api';
 
 function formatPrice(price: number): string {
   return price.toFixed(2).replace('.', ',');
@@ -45,6 +46,20 @@ const PAYMENT_METHODS = [
         'A encomenda será criada como paga automaticamente.',
         'Ideal para testar fluxos de compra, cursos e downloads.',
         'Disponível apenas em ambiente de desenvolvimento.',
+      ],
+    },
+  },
+  {
+    value: 'wallet',
+    label: '👛 Saldo da Carteira',
+    desc: 'Pague com o saldo de reembolsos disponível',
+    icon: '👛',
+    instructions: {
+      title: 'Pagamento com Saldo:',
+      steps: [
+        'O valor total será debitado do seu saldo de reembolsos.',
+        'A encomenda é paga instantaneamente.',
+        'Produtos digitais e cursos ficam disponíveis de imediato.',
       ],
     },
   },
@@ -147,6 +162,7 @@ export default function CheckoutContent() {
   const [couponCode, setCouponCode] = useState('');
   const [couponInfo, setCouponInfo] = useState<any>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   // Form state
   const [form, setForm] = useState({
@@ -165,6 +181,14 @@ export default function CheckoutContent() {
       router.push('/cart');
     }
   }, [items, confirmed, router]);
+
+  // Load buyer wallet balance for pay-with-balance
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    walletAPI.myWallet()
+      .then((res) => setWalletBalance(Number(res.data?.balance || 0)))
+      .catch(() => setWalletBalance(null));
+  }, [isAuthenticated]);
 
   const currentInstructions = useMemo(
     () => PAYMENT_METHODS.find((m) => m.value === paymentMethod)?.instructions,
@@ -369,7 +393,9 @@ export default function CheckoutContent() {
         <p className="text-lg text-muted-foreground mb-6">
           {paymentMethod === 'test'
             ? '🧪 Modo Teste — a sua encomenda foi criada com pagamento automático.'
-            : 'Obrigado pela sua compra. Receberá um email com os detalhes.'}
+            : paymentMethod === 'wallet'
+              ? '👛 Pagamento com saldo concluído — o valor foi debitado da sua carteira.'
+              : 'Obrigado pela sua compra. Receberá um email com os detalhes.'}
         </p>
         <div className="bg-card border border-border rounded-lg p-6 mb-6 space-y-4">
           {orderData.map((o: any) => (
@@ -653,30 +679,48 @@ export default function CheckoutContent() {
               Método de Pagamento
             </h2>
             <div className="space-y-3">
-              {PAYMENT_METHODS.map((method) => (
-                <label
-                  key={method.value}
-                  className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                    paymentMethod === method.value
-                      ? 'border-accent'
-                      : 'border-border hover:border-accent'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payment"
-                    value={method.value}
-                    checked={paymentMethod === method.value}
-                    onChange={() => setPaymentMethod(method.value)}
-                    className="w-5 h-5 text-accent"
-                  />
-                  <div className="ml-3 flex-1">
-                    <div className="font-semibold">{method.label}</div>
-                    <div className="text-sm text-muted-foreground">{method.desc}</div>
-                  </div>
-                  <div className="text-2xl">{method.icon}</div>
-                </label>
-              ))}
+              {PAYMENT_METHODS.map((method) => {
+                const total = Math.max(0, totalPrice + shippingTotal - discountAmount);
+                const isWallet = method.value === 'wallet';
+                const insufficientWallet = isWallet && walletBalance !== null && walletBalance < total;
+                const disabled = insufficientWallet;
+                return (
+                  <label
+                    key={method.value}
+                    className={`flex items-center p-4 border-2 rounded-lg transition-colors ${
+                      disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                    } ${
+                      paymentMethod === method.value
+                        ? 'border-accent'
+                        : 'border-border hover:border-accent'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      value={method.value}
+                      checked={paymentMethod === method.value}
+                      onChange={() => !disabled && setPaymentMethod(method.value)}
+                      disabled={disabled}
+                      className="w-5 h-5 text-accent"
+                    />
+                    <div className="ml-3 flex-1">
+                      <div className="font-semibold">
+                        {method.label}
+                        {isWallet && walletBalance !== null && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            (Saldo: {walletBalance.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {insufficientWallet ? 'Saldo insuficiente para este pedido.' : method.desc}
+                      </div>
+                    </div>
+                    <div className="text-2xl">{isWallet ? <Wallet size={24} /> : method.icon}</div>
+                  </label>
+                );
+              })}
             </div>
 
             {/* Payment Instructions */}

@@ -159,7 +159,6 @@ class WishlistDeleteView(generics.DestroyAPIView):
 
 from .views_admin import (
     AdminStatsView, PendingStoresView, ApproveStoreView,
-    PendingPayoutsView, ApprovePayoutView,
 )
 
 # ──────────────────────────────────────────────

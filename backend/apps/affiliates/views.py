@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db import models
+from django.db import models, transaction
 from django.db.models import F
 from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
@@ -14,6 +14,7 @@ from .serializers import (AffiliateProfileSerializer, AffiliateLinkSerializer, A
 from apps.products.models import Product
 from apps.users.permissions import IsVerified
 from apps.notifications import email_service
+from apps.wallet import services as wallet_services
 
 
 class AffiliateRegisterView(APIView):
@@ -147,9 +148,11 @@ class AffiliatePayoutView(APIView):
                 status=400,
             )
 
+        fee = (amount * settings_obj.payout_fee_percent / Decimal('100')).quantize(Decimal('0.01'))
         payout = AffiliatePayout.objects.create(
             affiliate=profile,
             amount=amount,
+            fee=fee,
             method=request.data.get('method', 'mpesa'),
             account_details=request.data.get('account_details', {}) or {},
         )
@@ -341,6 +344,15 @@ class AdminAffiliateCommissionActionView(APIView):
         if action == 'approve' and comm.status == 'pending':
             comm.status = 'approved'
             comm.save(update_fields=['status'])
+            # Circuito de dinheiro unificado: credita a carteira do afiliado.
+            wallet_services.credit(
+                wallet_services.get_wallet(comm.affiliate.user),
+                comm.amount, kind='payout',
+                ref_type='affiliate_commission', ref_id=comm.id,
+                description=f'Comissão de afiliado (encomenda {comm.order.order_number})',
+                txn_type='affiliate_commission',
+                idempotency_key=f'affiliate_commission:{comm.id}:credit',
+            )
             AffiliateProfile.objects.filter(pk=comm.affiliate_id).update(
                 total_commission=F('total_commission') + comm.amount
             )
@@ -350,6 +362,15 @@ class AdminAffiliateCommissionActionView(APIView):
             comm.rejection_reason = request.data.get('reason', 'Rejeitada pelo admin')
             comm.save(update_fields=['status', 'rejection_reason'])
             if was_approved:
+                # Reverte o crédito na carteira (devolve o valor ao saldo).
+                wallet_services.debit(
+                    wallet_services.get_wallet(comm.affiliate.user),
+                    comm.amount, kind='payout',
+                    ref_type='affiliate_commission', ref_id=comm.id,
+                    description=f'Reversão de comissão de afiliado rejeitada',
+                    txn_type='affiliate_commission',
+                    idempotency_key=f'affiliate_commission:{comm.id}:debit',
+                )
                 AffiliateProfile.objects.filter(pk=comm.affiliate_id).update(
                     total_commission=F('total_commission') - comm.amount
                 )
@@ -373,13 +394,32 @@ class AdminAffiliatePayoutActionView(APIView):
         payout = get_object_or_404(AffiliatePayout, pk=pk)
         action = request.data.get('action')
         if action == 'approve' and payout.status == 'pending':
-            payout.status = 'paid'
-            payout.paid_at = timezone.now()
-            payout.approved_by = request.user
-            payout.save(update_fields=['status', 'paid_at', 'approved_by'])
-            AffiliateProfile.objects.filter(pk=payout.affiliate_id).update(
-                total_withdrawn=F('total_withdrawn') + payout.amount
-            )
+            from apps.wallet.models import Wallet
+            try:
+                with transaction.atomic():
+                    # Circuito de dinheiro unificado: debita a carteira do afiliado.
+                    wallet_services.debit(
+                        wallet_services.get_wallet(payout.affiliate.user),
+                        payout.amount, kind='payout',
+                        ref_type='affiliate_payout', ref_id=payout.id,
+                        description=f'Saque de afiliado ({payout.get_method_display()})',
+                        txn_type='withdrawal',
+                        idempotency_key=f'affiliate_payout:{payout.id}:debit',
+                        counterparty='external',
+                    )
+                    Wallet.objects.filter(user=payout.affiliate.user).update(
+                        total_withdrawn=F('total_withdrawn') + payout.amount
+                    )
+                    AffiliateProfile.objects.filter(pk=payout.affiliate_id).update(
+                        total_withdrawn=F('total_withdrawn') + payout.amount
+                    )
+                    payout.status = 'paid'
+                    payout.paid_at = timezone.now()
+                    payout.approved_by = request.user
+                    payout.save(update_fields=['status', 'paid_at', 'approved_by'])
+            except wallet_services.InsufficientFunds as e:
+                return Response({'detail': str(e)}, status=400)
+
             from apps.notifications.models import Notification
             Notification.objects.create(
                 user=payout.affiliate.user,

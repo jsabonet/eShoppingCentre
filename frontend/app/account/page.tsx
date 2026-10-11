@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, Heart, Download, MapPin, ShoppingBag, ChevronRight, BookOpen, Wallet, Store, Gift } from 'lucide-react';
+import { Package, Heart, Download, MapPin, ShoppingBag, ChevronRight, BookOpen, Wallet, Store, Gift, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import AccountLayout from '@/src/components/AccountLayout';
 import { useAuth } from '@/src/hooks/useAuth';
-import { ordersAPI, usersAPI, walletAPI, type Order, type User } from '@/src/lib/api';
+import { ordersAPI, usersAPI, walletAPI, type Order, type User, type WalletTransaction } from '@/src/lib/api';
 
 export default function AccountPage() {
   const router = useRouter();
@@ -20,6 +20,7 @@ export default function AccountPage() {
   const [downloadCount, setDownloadCount] = useState(0);
   const [balance, setBalance] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -33,7 +34,7 @@ export default function AccountPage() {
 
   const loadData = async () => {
     try {
-      const [ordersRes, wishlistRes, addressesRes, coursesRes, downloadsRes, walletRes] = await Promise.allSettled([
+      const [ordersRes, wishlistRes, addressesRes, coursesRes, downloadsRes, walletRes, txRes] = await Promise.allSettled([
         ordersAPI.myOrders({ page_size: 5 }),
         usersAPI.myWishlist(),
         usersAPI.myAddresses(),
@@ -44,6 +45,7 @@ export default function AccountPage() {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
         }).then(r => r.ok ? r.json() : Promise.reject(r)),
         walletAPI.myWallet(),
+        walletAPI.myTransactions({ page_size: 10 }),
       ]);
 
       if (ordersRes.status === 'fulfilled') {
@@ -69,6 +71,10 @@ export default function AccountPage() {
       if (walletRes.status === 'fulfilled') {
         setBalance(Number(walletRes.value.data?.balance || 0));
         setTotalSpent(Number(walletRes.value.data?.total_spent || 0));
+      }
+      if (txRes.status === 'fulfilled') {
+        const data = txRes.value.data as any;
+        setTransactions(data?.results || data || []);
       }
     } catch {} finally {
       setOrdersLoading(false);
@@ -175,6 +181,54 @@ export default function AccountPage() {
             <p className="text-2xl font-bold">{addressCount}</p>
             <p className="text-sm text-muted-foreground">Endereços</p>
           </Link>
+        </div>
+
+        {/* Carteira / Movimentos */}
+        <div className="bg-card border border-border rounded-xl">
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <div>
+              <h3 className="font-bold flex items-center gap-2">
+                <Wallet size={16} className="text-emerald-600" /> Carteira
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Saldo de reembolsos: <strong>{balance.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</strong>
+              </p>
+            </div>
+          </div>
+          {transactions.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">
+              Sem movimentos na carteira ainda. O saldo de reembolsos pode ser usado no checkout.
+            </p>
+          ) : (
+            <div className="divide-y divide-border">
+              {transactions.map((tx) => {
+                const isCredit = Number(tx.amount) >= 0;
+                const labels: Record<string, string> = {
+                  sale: 'Venda', purchase: 'Compra', commission: 'Comissão',
+                  affiliate_commission: 'Comissão Afiliado', withdrawal: 'Saque',
+                  fee: 'Taxa', refund: 'Reembolso', bonus: 'Bónus',
+                };
+                return (
+                  <div key={tx.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${isCredit ? 'bg-green-100' : 'bg-red-100'}`}>
+                        {isCredit
+                          ? <ArrowDownLeft size={16} className="text-green-700" />
+                          : <ArrowUpRight size={16} className="text-red-700" />}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{tx.description || labels[tx.type] || 'Movimento'}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                    </div>
+                    <span className={`font-medium ${isCredit ? 'text-green-600' : 'text-red-600'}`}>
+                      {isCredit ? '+' : '-'}{Math.abs(Number(tx.amount)).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Recent Orders */}

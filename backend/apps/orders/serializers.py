@@ -368,9 +368,10 @@ class CreateOrderSerializer(serializers.Serializer):
                 discounts[sid] = (discount_total * e_total / eligible_total) if eligible_total else 0
             applied_coupon = coupon
 
-        is_test = validated_data['payment_method'] == 'test'
-        payment_status = 'completed' if is_test else 'pending'
-        order_status = 'confirmed' if is_test else 'pending'
+        payment_method = validated_data['payment_method']
+        is_instant = payment_method in ('test', 'wallet')
+        payment_status = 'completed' if is_instant else 'pending'
+        order_status = 'confirmed' if is_instant else 'pending'
 
         from apps.products.models import StockLog
 
@@ -446,6 +447,17 @@ class CreateOrderSerializer(serializers.Serializer):
                         changed_by=user,
                         notes=f'Venda de {item["quantity"]} unidade(s)',
                     )
+
+            # Pagamento com saldo da carteira (débito imediato do saldo comprável)
+            if payment_method == 'wallet':
+                from apps.wallet.services import debit, get_wallet, InsufficientFunds
+                try:
+                    debit(get_wallet(user), order.total, kind='buyer',
+                          ref_type='order', ref_id=order.id,
+                          description=f'Pagamento {order.order_number} com saldo', txn_type='purchase',
+                          idempotency_key=f'order:{order.id}:wallet_pay', counterparty='platform')
+                except InsufficientFunds as e:
+                    raise serializers.ValidationError({'payment_method': str(e)})
 
             # Processar entregas digitais e matrículas imediatamente
             if order.payment_status == 'completed':

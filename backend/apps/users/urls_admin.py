@@ -1,7 +1,6 @@
 from django.urls import path
 from .views_admin import (
     AdminStatsView, PendingStoresView, ApproveStoreView,
-    PendingPayoutsView, ApprovePayoutView,
     AdminUserListView, AdminUserDetailView,
     AdminAllStoresView, AdminStoreManageView, AdminAllOrdersView,
     AdminStoreConversationsView, AdminStoreFollowersView, AdminStoreReviewsView,
@@ -15,8 +14,6 @@ urlpatterns = [
     path('stores/all/', AdminAllStoresView.as_view(), name='admin_all_stores'),
     path('stores/<uuid:pk>/manage/', AdminStoreManageView.as_view(), name='admin_store_manage'),
     path('orders/all/', AdminAllOrdersView.as_view(), name='admin_all_orders'),
-    path('payouts/pending/', PendingPayoutsView.as_view(), name='admin_pending_payouts'),
-    path('payouts/<uuid:pk>/approve/', ApprovePayoutView.as_view(), name='admin_approve_payout'),
     path('users/', AdminUserListView.as_view(), name='admin_user_list'),
     path('users/<pk>/', AdminUserDetailView.as_view(), name='admin_user_detail'),
     # Store data for admin

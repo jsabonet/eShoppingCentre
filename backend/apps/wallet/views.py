@@ -83,7 +83,7 @@ class AdminPayoutPayView(APIView):
         payout = get_object_or_404(PayoutRequest, pk=pk)
         try:
             pay_payout(payout, request.user, request.data.get('reference', ''))
-        except InsufficientFunds as e:
+        except (InsufficientFunds, ValueError) as e:
             return Response({'detail': str(e)}, status=400)
         return Response(PayoutRequestSerializer(payout).data)
 

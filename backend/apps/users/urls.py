@@ -19,6 +19,4 @@ urlpatterns += [
     path('admin/stats/', views.AdminStatsView.as_view(), name='admin_stats'),
     path('admin/stores/pending/', views.PendingStoresView.as_view(), name='admin_pending_stores'),
     path('admin/stores/<uuid:pk>/approve/', views.ApproveStoreView.as_view(), name='admin_approve_store'),
-    path('admin/payouts/pending/', views.PendingPayoutsView.as_view(), name='admin_pending_payouts'),
-    path('admin/payouts/<uuid:pk>/approve/', views.ApprovePayoutView.as_view(), name='admin_approve_payout'),
 ]

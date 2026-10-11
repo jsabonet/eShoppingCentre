@@ -134,11 +134,14 @@ export default function AdminWallet() {
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       {p.status === 'pending' && (
-                        <button onClick={() => approve(p.id)} className="px-2.5 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700">Aprovar</button>
-                      )}
-                      {(p.status === 'pending' || p.status === 'approved') && (
                         <>
-                          <button onClick={() => pay(p.id)} className="ml-1.5 px-2.5 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700">Marcar Pago</button>
+                          <button onClick={() => approve(p.id)} className="px-2.5 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700">Aprovar</button>
+                          <button onClick={() => reject(p.id)} className="ml-1.5 px-2.5 py-1 text-xs bg-red-600 text-white rounded-md hover:bg-red-700">Rejeitar</button>
+                        </>
+                      )}
+                      {p.status === 'approved' && (
+                        <>
+                          <button onClick={() => pay(p.id)} className="px-2.5 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700">Marcar Pago</button>
                           <button onClick={() => reject(p.id)} className="ml-1.5 px-2.5 py-1 text-xs bg-red-600 text-white rounded-md hover:bg-red-700">Rejeitar</button>
                         </>
                       )}

@@ -56,12 +56,13 @@ class AffiliateSettingsSerializer(serializers.ModelSerializer):
 
 class AffiliatePayoutSerializer(serializers.ModelSerializer):
     affiliate_email = serializers.CharField(source='affiliate.user.email', read_only=True)
+    net_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = AffiliatePayout
-        fields = ('id', 'affiliate', 'affiliate_email', 'amount', 'method',
+        fields = ('id', 'affiliate', 'affiliate_email', 'amount', 'fee', 'net_amount', 'method',
                   'account_details', 'status', 'notes', 'created_at', 'paid_at')
-        read_only_fields = ('affiliate', 'status', 'created_at', 'paid_at')
+        read_only_fields = ('affiliate', 'fee', 'status', 'created_at', 'paid_at')
 
 
 class AffiliateKYCSerializer(serializers.ModelSerializer):

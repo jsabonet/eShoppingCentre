@@ -10,17 +10,20 @@ import type { WalletInfo, WalletTransaction } from '@/src/lib/api';
 export default function SellerEarningsPage() {
   const [wallet, setWallet] = useState<WalletInfo | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
-      const [wRes, tRes] = await Promise.all([
+      const [wRes, tRes, pRes] = await Promise.all([
         walletAPI.myWallet(),
         walletAPI.myTransactions(),
+        walletAPI.myPayouts(),
       ]);
       setWallet(wRes.data);
       setTransactions((tRes.data as any).results || tRes.data || []);
+      setPayouts(Array.isArray(pRes.data) ? pRes.data : (pRes.data as any)?.results || []);
     } catch { /* silently fail */ }
     finally { setLoading(false); }
   }, []);
@@ -138,6 +141,49 @@ export default function SellerEarningsPage() {
                 </span>
               </div>
             )})}
+          </div>
+        </div>
+
+        {/* Histórico de Saques */}
+        <div className="bg-card border border-border rounded-xl mt-6">
+          <div className="p-4 border-b border-border">
+            <h2 className="font-bold">Histórico de Saques</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Pedidos de saque submetidos e respectivo estado.</p>
+          </div>
+          <div className="divide-y divide-border">
+            {payouts.length === 0 && (
+              <p className="p-6 text-center text-sm text-muted-foreground">Nenhum pedido de saque ainda.</p>
+            )}
+            {payouts.map((p) => {
+              const statusStyles: Record<string, string> = {
+                pending: 'bg-yellow-100 text-yellow-700',
+                approved: 'bg-blue-100 text-blue-700',
+                paid: 'bg-green-100 text-green-700',
+                rejected: 'bg-red-100 text-red-700',
+              };
+              const methodLabels: Record<string, string> = {
+                mpesa: 'M-Pesa', emola: 'e-Mola', bank: 'Banco', cash: 'Dinheiro',
+              };
+              return (
+                <div key={p.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-gray-100">
+                      <TrendingDown size={16} className="text-gray-700" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">
+                        {Number(p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN
+                        <span className="text-muted-foreground font-normal"> · {methodLabels[p.method] || p.method_display || p.method}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusStyles[p.status] || 'bg-gray-100 text-gray-700'}`}>
+                    {p.status_display || p.status}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

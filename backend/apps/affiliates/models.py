@@ -105,7 +105,8 @@ class AffiliatePayout(BaseModel):
     ]
 
     affiliate = models.ForeignKey(AffiliateProfile, on_delete=models.CASCADE, related_name='payouts')
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, help_text='Valor bruto solicitado pelo afiliado')
+    fee = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text='Taxa da plataforma descontada (payout_fee_percent)')
     method = models.CharField(max_length=20, choices=METHOD_CHOICES, default='mpesa')
     account_details = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -118,6 +119,11 @@ class AffiliatePayout(BaseModel):
 
     def __str__(self):
         return f'Payout {self.affiliate.user.email} - {self.amount} MZN ({self.status})'
+
+    @property
+    def net_amount(self):
+        """Valor líquido efectivamente recebido pelo afiliado após a taxa."""
+        return self.amount - self.fee
 
 
 class AffiliateKYC(BaseModel):

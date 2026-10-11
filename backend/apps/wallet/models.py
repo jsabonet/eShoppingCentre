@@ -15,6 +15,7 @@ class Wallet(BaseModel):
 class WalletTransaction(BaseModel):
     TYPE_CHOICES = [
         ('sale', 'Venda'),
+        ('purchase', 'Compra'),
         ('commission', 'Comissão'),
         ('affiliate_commission', 'Comissão Afiliado'),
         ('withdrawal', 'Saque'),
@@ -37,10 +38,19 @@ class WalletTransaction(BaseModel):
     reference_id = models.UUIDField()
     description = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    idempotency_key = models.CharField(
+        max_length=120, unique=True, null=True, blank=True,
+        help_text='Chave de idempotência para evitar movimentos duplicados.',
+    )
 
 
 class WalletEntry(BaseModel):
-    """Linha do ledger (double-entry) — registo imutável de cada movimento de saldo."""
+    """Linha do ledger — registo imutável de cada movimento de saldo numa carteira.
+
+    Semântica: registo de entrada única (single-entry) por carteira. A contraparte
+    de cada movimento é a conta da plataforma (contra-conta implícita), indicada
+    pelo campo `counterparty`.
+    """
     DIRECTION_CHOICES = [
         ('debit', 'Débito'),
         ('credit', 'Crédito'),
@@ -50,6 +60,11 @@ class WalletEntry(BaseModel):
         ('payout', 'Saldo para saque'),
         ('platform', 'Plataforma'),
     ]
+    COUNTERPARTY_CHOICES = [
+        ('platform', 'Plataforma'),
+        ('escrow', 'Escrow'),
+        ('external', 'Externo (pagamento/saque)'),
+    ]
 
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='entries')
     transaction = models.ForeignKey(WalletTransaction, on_delete=models.SET_NULL, null=True, blank=True, related_name='entries')
@@ -58,6 +73,7 @@ class WalletEntry(BaseModel):
     balance_before = models.DecimalField(max_digits=12, decimal_places=2)
     balance_after = models.DecimalField(max_digits=12, decimal_places=2)
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, default='buyer')
+    counterparty = models.CharField(max_length=20, choices=COUNTERPARTY_CHOICES, default='platform')
 
     class Meta:
         ordering = ['-created_at']

@@ -633,8 +633,22 @@ class AdminOverrideView(APIView):
             return_req.status = 'rejected'
             return_req.vendor_notes = f'[Decisão do Admin] {return_req.admin_notes}'
         elif action == 'refund':
-            return_req.status = 'refunded'
-            return_req.refund_amount = serializer.validated_data.get('refund_amount')
+            refund_amount = serializer.validated_data.get('refund_amount') or return_req.order.total
+            return_req.refund_amount = refund_amount
+
+            # W2 Carteira: reembolso (reverte escrow se retido; senão debita vendedor; credita comprador)
+            from apps.wallet.services import process_refund, InsufficientFunds
+            seller = return_req.order.store.owner if return_req.order.store else None
+            try:
+                with transaction.atomic():
+                    process_refund(
+                        return_req.order, seller, return_req.order.buyer, refund_amount,
+                        f'Reembolso da devolução #{return_req.rma_number} (decisão do admin)',
+                    )
+                    return_req.status = 'refunded'
+                    return_req.save()
+            except InsufficientFunds as e:
+                return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return_req.save()
 

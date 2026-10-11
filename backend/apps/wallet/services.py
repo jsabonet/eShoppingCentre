@@ -15,13 +15,22 @@ def get_wallet(user):
     return wallet
 
 
-def _apply(wallet, amount, *, kind, ref_type, ref_id, description, txn_type):
+def _apply(wallet, amount, *, kind, ref_type, ref_id, description, txn_type,
+           idempotency_key=None, counterparty='platform'):
     """
     Aplica um movimento atómico de saldo.
     amount > 0 → crédito; amount < 0 → débito.
     kind: 'buyer' (balance) | 'payout' (payout_balance) | 'platform' (tratado como buyer).
+    idempotency_key: se fornecido e já existir um movimento com a mesma chave,
+    devolve o movimento existente sem alterar saldos (idempotência).
+    counterparty: contraparte do movimento no ledger (ver WalletEntry.COUNTERPARTY_CHOICES).
     """
     wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
+
+    if idempotency_key:
+        existing = WalletTransaction.objects.filter(idempotency_key=idempotency_key).first()
+        if existing:
+            return existing
 
     if kind == 'payout':
         balance_before = wallet.payout_balance
@@ -55,6 +64,7 @@ def _apply(wallet, amount, *, kind, ref_type, ref_id, description, txn_type):
         reference_id=ref_id,
         description=description,
         status='completed',
+        idempotency_key=idempotency_key,
     )
     WalletEntry.objects.create(
         wallet=wallet,
@@ -64,26 +74,31 @@ def _apply(wallet, amount, *, kind, ref_type, ref_id, description, txn_type):
         balance_before=balance_before,
         balance_after=balance_after,
         kind=kind,
+        counterparty=counterparty,
     )
     return txn
 
 
 @transaction.atomic
-def credit(wallet, amount, *, kind='buyer', ref_type='system', ref_id, description='', txn_type='sale'):
+def credit(wallet, amount, *, kind='buyer', ref_type='system', ref_id, description='',
+           txn_type='sale', idempotency_key=None, counterparty='platform'):
     amount = Decimal(str(amount))
     if amount <= 0:
         raise ValueError('credit: amount deve ser positivo')
     return _apply(wallet, amount, kind=kind, ref_type=ref_type, ref_id=ref_id,
-                  description=description, txn_type=txn_type)
+                  description=description, txn_type=txn_type,
+                  idempotency_key=idempotency_key, counterparty=counterparty)
 
 
 @transaction.atomic
-def debit(wallet, amount, *, kind='buyer', ref_type='system', ref_id, description='', txn_type='withdrawal'):
+def debit(wallet, amount, *, kind='buyer', ref_type='system', ref_id, description='',
+          txn_type='withdrawal', idempotency_key=None, counterparty='platform'):
     amount = Decimal(str(amount))
     if amount <= 0:
         raise ValueError('debit: amount deve ser positivo')
     return _apply(wallet, -amount, kind=kind, ref_type=ref_type, ref_id=ref_id,
-                  description=description, txn_type=txn_type)
+                  description=description, txn_type=txn_type,
+                  idempotency_key=idempotency_key, counterparty=counterparty)
 
 
 @transaction.atomic
@@ -109,7 +124,8 @@ def settle_payment(order):
 
     credit(get_wallet(seller), net, kind='payout',
            ref_type='order', ref_id=order.id,
-           description=f'Venda {order.order_number} (digital/curso)', txn_type='sale')
+           description=f'Venda {order.order_number} (digital/curso)', txn_type='sale',
+           idempotency_key=f'order:{order.id}:settle', counterparty='external')
     return None
 
 
@@ -124,7 +140,8 @@ def release_escrow(escrow):
     if seller:
         credit(get_wallet(seller), escrow.amount, kind='payout',
                ref_type='order', ref_id=order.id,
-               description=f'Libertação de escrow {order.order_number}', txn_type='sale')
+               description=f'Libertação de escrow {order.order_number}', txn_type='sale',
+               idempotency_key=f'escrow:{escrow.id}:release', counterparty='escrow')
     escrow.status = 'released'
     escrow.released_at = timezone.now()
     escrow.save(update_fields=['status', 'released_at'])
@@ -149,9 +166,11 @@ def process_refund(order, seller, buyer, refund_amount, description):
     """
     if not reverse_escrow(order) and seller:
         debit(get_wallet(seller), refund_amount, kind='payout',
-              ref_type='order', ref_id=order.id, description=description, txn_type='refund')
+              ref_type='order', ref_id=order.id, description=description, txn_type='refund',
+              idempotency_key=f'order:{order.id}:refund:debit')
     credit(get_wallet(buyer), refund_amount, kind='buyer',
-           ref_type='order', ref_id=order.id, description=description, txn_type='refund')
+           ref_type='order', ref_id=order.id, description=description, txn_type='refund',
+           idempotency_key=f'order:{order.id}:refund:credit')
 
 
 # ─── Payouts manuais (W3/W4) ───
@@ -206,11 +225,20 @@ def approve_payout(payout, admin):
 
 @transaction.atomic
 def pay_payout(payout, admin, reference=''):
-    """Admin confirma o pagamento manual → debita o saldo e marca como pago."""
-    if payout.status not in ('pending', 'approved'):
-        return payout
+    """Admin confirma o pagamento manual → debita o saldo e marca como pago.
+
+    Exige aprovação prévia (status == 'approved'): o pagamento manual não pode
+    saltar o passo de aprovação.
+    """
+    if payout.status != 'approved':
+        raise ValueError('O saque deve ser aprovado antes de ser marcado como pago.')
 
     wallet = Wallet.objects.select_for_update().get(pk=get_wallet(payout.user).pk)
+
+    idem_key = f'payout:{payout.id}:pay'
+    if WalletTransaction.objects.filter(idempotency_key=idem_key).exists():
+        return payout
+
     wallet.reserved_balance = max(wallet.reserved_balance - payout.amount, Decimal('0'))
     if wallet.payout_balance < payout.amount:
         raise InsufficientFunds('Saldo de saque insuficiente.')
@@ -225,10 +253,12 @@ def pay_payout(payout, admin, reference=''):
         balance_before=balance_before, balance_after=balance_after,
         reference_type='payout', reference_id=payout.id,
         description=f'Saque ({payout.get_method_display()})', status='completed',
+        idempotency_key=idem_key,
     )
     WalletEntry.objects.create(
         wallet=wallet, transaction=txn, direction='debit', amount=payout.amount,
         balance_before=balance_before, balance_after=balance_after, kind='payout',
+        counterparty='external',
     )
 
     payout.status = 'paid'
