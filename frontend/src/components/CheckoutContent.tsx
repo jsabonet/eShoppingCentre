@@ -7,6 +7,7 @@ import { Truck, Shield, CreditCard, MapPin, CheckCircle, Loader2, FlaskConical, 
 import { useCart } from '@/src/contexts/CartContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { walletAPI, paymentsAPI } from '@/src/lib/api';
+import { savePendingCheckout } from '@/src/lib/pendingCheckout';
 
 function formatPrice(price: number): string {
   return price.toFixed(2).replace('.', ',');
@@ -32,8 +33,14 @@ const PROVINCES = [
   { value: 'niassa', label: 'Niassa' },
 ];
 
-// Métodos de pagamento online processados via PaySuite (checkout hospedado).
-const PAYSUITE_METHODS = ['mpesa', 'emola', 'card'];
+// Métodos online processados pelo ZumboPay (checkout hospedado).
+// Activo apenas o M-Pesa: é a única carteira que existe na conta do gateway
+// (`GET /merchant/validate` → ready=false, missing=["wallet_emola","wallet_card"]).
+// Escolher um método sem carteira faz o gateway recusar a cobrança, por isso
+// e-Mola e cartão ficam desactivados até as carteiras serem criadas no painel.
+// O gateway também suporta mKesh, que nunca esteve no UI.
+// Ver MAPEAMENTO_ZUMBOPAY_GATEWAY.md §19.
+const GATEWAY_METHODS = ['mpesa'];
 
 const PAYMENT_METHODS = [
   {
@@ -74,14 +81,16 @@ const PAYMENT_METHODS = [
     instructions: {
       title: 'Instruções M-Pesa:',
       steps: [
-        'Após confirmar o pedido, você receberá um SMS com instruções',
-        'Abra o menu M-Pesa no seu celular',
-        'Selecione "Pagar" e insira o número fornecido',
-        'Confirme o valor e insira seu PIN',
-        'Você receberá uma confirmação por SMS',
+        'Após confirmar o pedido, será levado para a página segura de pagamento',
+        'Indique o seu número M-Pesa (Vodacom) e confirme',
+        'Receberá um pedido de pagamento no telemóvel',
+        'Introduza o seu PIN M-Pesa para autorizar',
+        'A página confirma o pagamento automaticamente — não feche o separador',
       ],
     },
   },
+  /* Desactivado: a conta do gateway ainda não tem carteira de e-Mola.
+     Reactivar quando `GET /merchant/validate` deixar de reportar `wallet_emola`.
   {
     value: 'emola',
     label: 'e-Mola',
@@ -90,14 +99,15 @@ const PAYMENT_METHODS = [
     instructions: {
       title: 'Instruções e-Mola:',
       steps: [
-        'Após confirmar o pedido, você receberá um SMS com instruções',
-        'Abra o menu e-Mola no seu celular',
-        'Selecione "Transferência" e insira o número fornecido',
-        'Confirme o valor e insira seu PIN',
-        'Você receberá uma confirmação por SMS',
+        'Após confirmar o pedido, será levado para a página segura de pagamento',
+        'Indique o seu número e-Mola (Movitel) e confirme',
+        'Receberá um pedido de pagamento no telemóvel',
+        'Introduza o seu PIN e-Mola para autorizar',
+        'A página confirma o pagamento automaticamente — não feche o separador',
       ],
     },
   },
+  */
   {
     value: 'bank',
     label: 'Transferência Bancária',
@@ -114,6 +124,8 @@ const PAYMENT_METHODS = [
       ],
     },
   },
+  /* Desactivado: a conta do gateway ainda não tem carteira de cartão.
+     Reactivar quando `GET /merchant/validate` deixar de reportar `wallet_card`.
   {
     value: 'card',
     label: 'Cartão de Crédito/Débito',
@@ -130,6 +142,7 @@ const PAYMENT_METHODS = [
       ],
     },
   },
+  */
   {
     value: 'cash',
     label: 'Pagamento na Entrega',
@@ -378,19 +391,25 @@ export default function CheckoutContent() {
       const orders = Array.isArray(data) ? data : [data];
       setOrderData(orders);
 
-      // Métodos online (M-Pesa/e-Mola/Cartão) → checkout hospedado PaySuite
-      if (PAYSUITE_METHODS.includes(paymentMethod)) {
+      // Métodos online (M-Pesa/e-Mola/Cartão) → checkout hospedado ZumboPay
+      if (GATEWAY_METHODS.includes(paymentMethod)) {
         const orderIds = orders.map((o: any) => o.id);
         let checkoutUrl = '';
+        let reference = '';
         try {
           const payRes = await paymentsAPI.initiate({ order_ids: orderIds, method: paymentMethod });
           checkoutUrl = payRes.data?.checkout_url || '';
+          reference = payRes.data?.reference || '';
         } catch (err: any) {
           setError(err?.response?.data?.error || 'Erro ao iniciar pagamento.');
           setSubmitting(false);
           return;
         }
-        clearCart();
+        // O carrinho NÃO é esvaziado aqui: um pagamento iniciado não é um
+        // pagamento feito. Se o cliente desistir no checkout do gateway ou o
+        // pagamento falhar, os artigos continuam no carrinho. Só saem quando o
+        // pagamento for confirmado (ver usePendingCheckout).
+        savePendingCheckout(reference, items.map((i) => i.product.id));
         if (checkoutUrl) {
           window.location.href = checkoutUrl;
           return;

@@ -690,6 +690,15 @@ export const paymentsAPI = {
       data,
     ),
   status: (reference: string) => api.get('/payments/status/', { params: { reference } }),
+  // Reconciliação manual (staff): consulta o gateway quando o webhook se perdeu.
+  reconcile: (data: { reference?: string; order_id?: string }) =>
+    api.post<{
+      status: string;
+      gateway_status: string;
+      completed: string[];
+      failed: string[];
+      error?: string;
+    }>('/payments/reconcile/', data),
 };
 
 export const reviewsAPI = {

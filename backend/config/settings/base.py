@@ -259,6 +259,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.products.tasks.refresh_home_sections',
         'schedule': 3600.0,  # a cada hora
     },
+    'reconcile-pending-payments': {
+        'task': 'apps.payments.tasks.reconcile_pending_payments',
+        'schedule': 300.0,  # a cada 5 minutos
+    },
 }
 
 CHANNEL_LAYERS = {
@@ -310,19 +314,42 @@ ANYMAIL = {
 # Se vazio, os emails usam um wordmark em texto.
 EMAIL_LOGO_URL = config('EMAIL_LOGO_URL', default='')
 
-# ─── Gateway de Pagamento (PaySuite) ───
+# ─── Gateway de Pagamento (ZumboPay) ───
 # Fonte única de verdade para as credenciais do gateway. O fecho do elo de
-# pagamento (W0) usa estas variáveis no cliente e no webhook PaySuite.
-# Contrato oficial: https://paysuite.tech/docs/
-PAYSUITE_BASE_URL = config('PAYSUITE_BASE_URL', default='https://paysuite.tech/api')
-PAYSUITE_API_KEY = config('PAYSUITE_API_KEY', default='')
-PAYSUITE_WEBHOOK_SECRET = config('PAYSUITE_WEBHOOK_SECRET', default='')
-PAYSUITE_TIMEOUT = config('PAYSUITE_TIMEOUT', default=20, cast=int)
-PAYSUITE_RETRY_TOTAL = config('PAYSUITE_RETRY_TOTAL', default=3, cast=int)
-PAYSUITE_RETRY_BACKOFF = config('PAYSUITE_RETRY_BACKOFF', default=0.5, cast=float)
-# URL pública absoluta para onde o PaySuite envia os webhooks. Se vazia,
-# deriva de BACKEND_URL + /api/v1/payments/webhook/paysuite/.
-PAYSUITE_WEBHOOK_URL = config('PAYSUITE_WEBHOOK_URL', default='')
+# pagamento (W0) usa estas variáveis no cliente e no webhook ZumboPay.
+# Contrato oficial: https://zumbopay.com/documentacao
+ZUMBOPAY_BASE_URL = config('ZUMBOPAY_BASE_URL', default='https://zumbopay.com/api/public/v1')
+# `MCH_…` — identifica a conta. Enviado como `X-Merchant-Id` em todos os pedidos.
+ZUMBOPAY_MERCHANT_ID = config('ZUMBOPAY_MERCHANT_ID', default='')
+# `zk_live_…` / `zk_test_…`
+ZUMBOPAY_API_KEY = config('ZUMBOPAY_API_KEY', default='')
+# `whsec_…` — valida o cabeçalho `x-zumbopay-signature` (HMAC-SHA256 do corpo bruto).
+# OBRIGATÓRIO em produção: sem ele o webhook recusa todos os pedidos (503) em vez
+# de aceitar pedidos não assinados. Em DEBUG é ignorado com um aviso. Um webhook
+# legítimo que seja recusado por isto é fechado pela reconciliação, abaixo.
+ZUMBOPAY_WEBHOOK_SECRET = config('ZUMBOPAY_WEBHOOK_SECRET', default='')
+# `wallet_id` (UUID) da carteira de cada método. OBRIGATÓRIO no pedido de
+# pagamento: sem ele o gateway responde `400 invalid_input`. Obtém-se com
+# `GET /wallets` ou `GET /merchant/validate`.
+ZUMBOPAY_WALLET_MPESA = config('ZUMBOPAY_WALLET_MPESA', default='')
+ZUMBOPAY_WALLET_EMOLA = config('ZUMBOPAY_WALLET_EMOLA', default='')
+ZUMBOPAY_WALLET_CARD = config('ZUMBOPAY_WALLET_CARD', default='')
+ZUMBOPAY_WALLET_MKESH = config('ZUMBOPAY_WALLET_MKESH', default='')
+ZUMBOPAY_TIMEOUT = config('ZUMBOPAY_TIMEOUT', default=20, cast=int)
+ZUMBOPAY_RETRY_TOTAL = config('ZUMBOPAY_RETRY_TOTAL', default=3, cast=int)
+ZUMBOPAY_RETRY_BACKOFF = config('ZUMBOPAY_RETRY_BACKOFF', default=0.5, cast=float)
+# URL pública onde o ZumboPay entrega os webhooks. NÃO vai no pedido de
+# pagamento — é registada no Painel ZumboPay → Programadores. Existe aqui para
+# documentação e para o diagnóstico do gateway. Se vazia, deriva de BACKEND_URL
+# + /api/v1/payments/webhook/zumbopay/.
+ZUMBOPAY_WEBHOOK_URL = config('ZUMBOPAY_WEBHOOK_URL', default='')
+# Reconciliação: rede de segurança para webhooks que não chegam. Uma transacção
+# pendente só é consultada no gateway depois de MIN_AGE minutos e deixa de o ser
+# ao fim de MAX_AGE horas (a encomenda fica pendente para decisão humana).
+# Sem `ZUMBOPAY_API_KEY` a reconciliação não corre — evita 401 em série.
+ZUMBOPAY_RECONCILE_MIN_AGE_MINUTES = config('ZUMBOPAY_RECONCILE_MIN_AGE_MINUTES', default=5, cast=int)
+ZUMBOPAY_RECONCILE_MAX_AGE_HOURS = config('ZUMBOPAY_RECONCILE_MAX_AGE_HOURS', default=48, cast=int)
+ZUMBOPAY_RECONCILE_BATCH = config('ZUMBOPAY_RECONCILE_BATCH', default=50, cast=int)
 
 # ─── Cloudflare Stream ───
 CLOUDFLARE_ACCOUNT_ID = config('CLOUDFLARE_ACCOUNT_ID', default='')

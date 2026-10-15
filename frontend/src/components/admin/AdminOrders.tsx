@@ -5,7 +5,7 @@ import Image from 'next/image';
 import LightboxImage from '@/src/components/LightboxImage';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
-  AlertCircle, ChevronDown, ChevronUp, History, Eye, User, Phone, Mail, Loader2,
+  AlertCircle, ChevronDown, ChevronUp, History, Eye, User, Phone, Mail, Loader2, RotateCcw,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -30,6 +30,7 @@ interface StatusEntry {
 interface OrderItem {
   id: string; order_number: string; status: string; total: number;
   payment_method: string; created_at: string;
+  payment_status?: string; payment_id?: string;
   buyer_email?: string; buyer_phone?: string; buyer_name?: string;
   store_name?: string; store_phone?: string;
   items?: any[]; shipping_notes?: string; tracking_code?: string;
@@ -46,6 +47,7 @@ export default function AdminOrders() {
   const [detail, setDetail] = useState<OrderItem | null>(null);
   const [detailModal, setDetailModal] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [reconciling, setReconciling] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const showToast = (type: 'success' | 'error', text: string) => {
@@ -93,6 +95,32 @@ export default function AdminOrders() {
     } catch (err: any) {
       showToast('error', err.message);
     } finally { setUpdating(null); }
+  };
+
+  // Rede de segurança do webhook: pergunta ao gateway se o pagamento pendente
+  // foi mesmo aceite e fecha a encomenda sem esperar pelo lote automático.
+  const handleReconcile = async (order: OrderItem) => {
+    setReconciling(order.id);
+    try {
+      const res = await fetch(`${API_URL}/payments/reconcile/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers() },
+        body: JSON.stringify({ order_id: order.order_number }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Não foi possível verificar o pagamento.');
+
+      if (data.status === 'completed') {
+        showToast('success', `Pagamento confirmado pelo gateway — ${order.order_number} marcado como pago.`);
+        fetchOrders();
+      } else if (data.status === 'failed') {
+        showToast('error', `O gateway registou falha no pagamento de ${order.order_number}.`);
+      } else {
+        showToast('success', `O gateway ainda não confirmou o pagamento de ${order.order_number}.`);
+      }
+    } catch (err: any) {
+      showToast('error', err.message);
+    } finally { setReconciling(null); }
   };
 
   const filtered = orders.filter(o => {
@@ -206,6 +234,15 @@ export default function AdminOrders() {
                           {updating === order.id && <Loader2 size={12} className="animate-spin inline ml-1" />}
                         </td>
                         <td className="py-2.5 px-2 text-right">
+                          {order.payment_status === 'pending' && (
+                            <button onClick={() => handleReconcile(order)} disabled={reconciling === order.id}
+                              title="Verificar este pagamento junto do gateway"
+                              className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground disabled:opacity-50">
+                              {reconciling === order.id
+                                ? <Loader2 size={14} className="animate-spin" />
+                                : <RotateCcw size={14} />}
+                            </button>
+                          )}
                           <button onClick={() => { setDetail(order); setDetailModal(true); }}
                             className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground"><Eye size={14} /></button>
                         </td>
