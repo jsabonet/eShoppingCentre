@@ -1,10 +1,11 @@
 ﻿"use client";
 
 import { useState } from 'react';
-import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play, Download, Monitor, FileText, GraduationCap, BookOpen, Award, Users, ChevronDown, Store, MessageCircle, Link2, Copy, Check, Loader2, X } from 'lucide-react';
+import { Star, Truck, Shield, RotateCcw, ShoppingCart, Tag, BadgeCheck, Clock, Play, Download, Monitor, FileText, GraduationCap, BookOpen, Award, Users, ChevronDown, Store, MessageCircle, Link2, Copy, Check, Loader2, X, Heart } from 'lucide-react';
 import ChatButton from './ChatButton';
 import ProductReviews from './ProductReviews';
 import { useCart } from '../contexts/CartContext';
+import { useWishlist } from '../contexts/WishlistContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { affiliatesAPI } from '@/src/lib/api';
 import ProductCard from './ProductCard';
@@ -54,7 +55,10 @@ function StarRatingLg({ rating }: { rating: number }) {
 
 function ProductDetailContent({ product, categoryName, categorySlug, relatedProducts }: ProductDetailShopProps) {
   const { addToCart } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const { isAuthenticated, isAffiliate, user } = useAuth();
+  const [wishLoading, setWishLoading] = useState(false);
+  const wished = isWishlisted(product.id);
   const [affiliateOpen, setAffiliateOpen] = useState(false);
   const [affiliateLoading, setAffiliateLoading] = useState(false);
   const [affiliateLink, setAffiliateLink] = useState<string | null>(null);
@@ -136,6 +140,22 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
       image: cartImage,
     });
     window.location.href = '/checkout';
+  };
+
+  const handleToggleWishlist = async () => {
+    if (!isAuthenticated) {
+      window.location.href = '/login?redirect=' + encodeURIComponent('/product/' + product.slug);
+      return;
+    }
+    if (wishLoading) return;
+    setWishLoading(true);
+    try {
+      await toggleWishlist(product.id);
+    } catch {
+      // falha silenciosa — o estado é revertido na próxima interação
+    } finally {
+      setWishLoading(false);
+    }
   };
 
   return (
@@ -449,6 +469,19 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                       {isPurchased ? (isCourse ? 'Já inscrito' : 'Já comprado') : isCourse ? 'Inscrever-me' : isDigital ? 'Comprar e Baixar' : 'Comprar Agora'}
                     </button>
                   </>
+                )}
+
+                {/* Favoritos */}
+                {!isOwn && (
+                  <button
+                    onClick={handleToggleWishlist}
+                    disabled={wishLoading}
+                    aria-label={wished ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                    className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-border hover:border-accent hover:text-accent text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+                  >
+                    <Heart size={16} className={wished ? 'fill-red-500 text-red-500' : ''} />
+                    {wished ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
+                  </button>
                 )}
 
                 {isPurchased && (isCourse || isDigital) && (

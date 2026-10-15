@@ -5,8 +5,8 @@ import { Star, ShoppingCart, Heart, BookOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Product } from '../data/marketplace';
 import { useCart } from '../contexts/CartContext';
+import { useWishlist } from '../contexts/WishlistContext';
 import { useAuth } from '../hooks/useAuth';
-import { usersAPI } from '../lib/api';
 
 interface ProductCardProps {
   product: Product;
@@ -14,10 +14,12 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const { isAuthenticated, user } = useAuth();
   const router = useRouter();
-  const [wished, setWished] = useState(false);
   const [wishLoading, setWishLoading] = useState(false);
+
+  const wished = isWishlisted(product.id);
 
   const formatPrice = (price: number) => {
     return price.toFixed(2).replace('.', ',');
@@ -37,7 +39,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const ctaLabel = productType === 'course' ? 'Ver Curso' : productType === 'digital' ? 'Comprar' : 'Adicionar';
   const isOwn = !!user?.id && product.storeOwnerId === user.id;
 
-  const toggleWishlist = async () => {
+  const handleToggleWishlist = async () => {
     if (!isAuthenticated) {
       router.push('/login?redirect=' + encodeURIComponent('/product/' + product.slug));
       return;
@@ -45,13 +47,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     if (wishLoading) return;
     setWishLoading(true);
     try {
-      if (wished) {
-        await usersAPI.removeFromWishlist(product.id);
-        setWished(false);
-      } else {
-        await usersAPI.addToWishlist(product.id);
-        setWished(true);
-      }
+      await toggleWishlist(product.id);
     } catch {
       // falha silenciosa — o estado é revertido na próxima interação
     } finally {
@@ -101,7 +97,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       {/* Wishlist heart */}
       <button
-        onClick={toggleWishlist}
+        onClick={handleToggleWishlist}
         aria-label="Adicionar aos favoritos"
         className="absolute top-2 right-2 p-1.5 bg-white/90 hover:bg-white rounded-full shadow-sm transition-colors z-10"
       >

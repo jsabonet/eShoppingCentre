@@ -39,7 +39,7 @@ export default function AccountMenu() {
 
   const handleWishlist = () => {
     // Navigate to wishlist page
-    window.location.href = '/wishlist';
+    window.location.href = '/account/wishlist';
     setIsOpen(false);
   };
 

@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { AuthProvider, useAuth } from "@/src/hooks/useAuth";
 import { CartProvider } from "@/src/contexts/CartContext";
 import { ChatProvider } from "@/src/contexts/ChatContext";
+import { WishlistProvider } from "@/src/contexts/WishlistContext";
 import { TooltipProvider } from "@/src/components/ui/tooltip";
 import { Toaster } from "@/src/components/ui/sonner";
 import Header from "@/src/components/Header";
@@ -55,6 +56,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <CartProvider>
+        <WishlistProvider>
         <ChatProvider>
         <TooltipProvider>
           <AuthGate>
@@ -69,6 +71,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <ChatWidget />
         </TooltipProvider>
         </ChatProvider>
+        </WishlistProvider>
       </CartProvider>
     </AuthProvider>
   );
