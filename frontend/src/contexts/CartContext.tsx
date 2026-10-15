@@ -34,6 +34,13 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 const STORAGE_KEY = 'eshoppingcentre-cart-v1';
 
+// Sem productType o checkout não reconhece o item como físico e nunca pede a
+// estimativa de frete — a secção de envio desaparece em silêncio.
+const normalizeItem = (item: CartItem): CartItem => ({
+  ...item,
+  product: { ...item.product, productType: item.product.productType || 'physical' },
+});
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -41,7 +48,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setItems(JSON.parse(stored));
+      if (stored) setItems((JSON.parse(stored) as CartItem[]).map(normalizeItem));
     } catch {}
   }, []);
 
@@ -56,7 +63,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
-          setItems(JSON.parse(e.newValue));
+          setItems((JSON.parse(e.newValue) as CartItem[]).map(normalizeItem));
         } catch {}
       }
     };
@@ -87,14 +94,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items]);
 
   const addToCart = useCallback((product: CartProduct, quantity = 1) => {
+    const normalized = normalizeItem({ product, quantity });
     setItems((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
+      const existing = prev.find((i) => i.product.id === normalized.product.id);
       if (existing) {
         return prev.map((i) =>
-          i.product.id === product.id ? { ...i, quantity: i.quantity + quantity } : i
+          i.product.id === normalized.product.id ? { ...i, quantity: i.quantity + quantity } : i
         );
       }
-      return [...prev, { product, quantity }];
+      return [...prev, normalized];
     });
     setIsCartOpen(true);
   }, []);
