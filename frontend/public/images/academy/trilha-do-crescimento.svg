@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 720" width="1680" height="720" role="img" aria-label="Mockup de um painel de vendas com gráficos de crescimento e indicadores">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1D2537"/>
+      <stop offset="1" stop-color="#0D1320"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBB03B"/>
+      <stop offset="1" stop-color="#F0801F"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="glassTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#EEF2F7" stop-opacity="0.96"/>
+    </linearGradient>
+    <pattern id="dots" width="30" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#FFFFFF" fill-opacity="0.07"/>
+    </pattern>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FBB03B" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#FBB03B" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowBlue" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#38BDF8" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#38BDF8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="leftCalm" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0D1320" stop-opacity="0.9"/>
+      <stop offset="0.3" stop-color="#0D1320" stop-opacity="0.35"/>
+      <stop offset="0.62" stop-color="#0D1320" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#05080F" flood-opacity="0.55"/>
+    </filter>
+    <filter id="soft2" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#05080F" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1680" height="720" fill="url(#bg)"/>
+  <rect width="1680" height="720" fill="url(#dots)"/>
+  <ellipse cx="760" cy="240" rx="520" ry="380" fill="url(#glowBlue)"/>
+  <ellipse cx="1220" cy="430" rx="480" ry="340" fill="url(#glow)"/>
+
+  <g stroke="#FFFFFF" stroke-opacity="0.05" fill="none">
+    <circle cx="1260" cy="350" r="250"/>
+    <circle cx="1260" cy="350" r="330"/>
+    <circle cx="1260" cy="350" r="410"/>
+  </g>
+  <g stroke="#38BDF8" stroke-opacity="0.16" stroke-width="2">
+    <line x1="1520" y1="30" x2="1200" y2="350"/>
+    <line x1="1620" y1="130" x2="1300" y2="450"/>
+    <line x1="1400" y1="700" x2="1100" y2="400"/>
+  </g>
+
+  <!-- Painel -->
+  <g filter="url(#soft)">
+    <rect x="560" y="168" width="770" height="384" rx="20" fill="url(#glassTop)"/>
+  </g>
+  <path d="M560 188 a20 20 0 0 1 20 -20 h730 a20 20 0 0 1 20 20 v24 h-770 z" fill="#E7EDF4"/>
+  <g fill="#C3CEDD">
+    <circle cx="590" cy="190" r="6"/>
+    <circle cx="612" cy="190" r="6"/>
+    <circle cx="634" cy="190" r="6"/>
+  </g>
+  <rect x="700" y="178" width="300" height="24" rx="12" fill="#DCE4EE"/>
+
+  <!-- cartões de KPI -->
+  <g>
+    <rect x="596" y="234" width="212" height="76" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <rect x="612" y="252" width="58" height="9" rx="4.5" fill="#CBD5E1"/>
+    <rect x="612" y="274" width="96" height="16" rx="6" fill="#334155"/>
+    <path d="M760 288 l14 -14 l10 10 l20 -20" stroke="#16A34A" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="612" y="300" width="40" height="7" rx="3.5" fill="#86D3A3"/>
+  </g>
+  <g>
+    <rect x="824" y="234" width="212" height="76" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <rect x="840" y="252" width="58" height="9" rx="4.5" fill="#CBD5E1"/>
+    <rect x="840" y="274" width="112" height="16" rx="6" fill="#334155"/>
+    <path d="M988 288 l14 -14 l10 10 l20 -20" stroke="#16A34A" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="840" y="300" width="52" height="7" rx="3.5" fill="#86D3A3"/>
+  </g>
+
+  <!-- gráfico de barras -->
+  <rect x="596" y="330" width="440" height="196" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <g fill="#DBE4EF">
+    <rect x="612" y="352" width="440" height="1" fill="#E7EDF4"/>
+  </g>
+  <g>
+    <rect x="628" y="440" width="34" height="62" rx="8" fill="#BFD3E8"/>
+    <rect x="682" y="418" width="34" height="84" rx="8" fill="#BFD3E8"/>
+    <rect x="736" y="428" width="34" height="74" rx="8" fill="#BFD3E8"/>
+    <rect x="790" y="392" width="34" height="110" rx="8" fill="url(#teal)"/>
+    <rect x="844" y="404" width="34" height="98" rx="8" fill="#BFD3E8"/>
+    <rect x="898" y="368" width="34" height="134" rx="8" fill="url(#accent)"/>
+    <rect x="952" y="386" width="34" height="116" rx="8" fill="#BFD3E8"/>
+  </g>
+  <rect x="612" y="504" width="424" height="2" rx="1" fill="#E2E8F0"/>
+
+  <!-- gráfico de linha -->
+  <rect x="1056" y="330" width="248" height="196" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <path d="M1076 486 L1116 452 L1156 466 L1196 414 L1236 428 L1276 372" stroke="#2563EB" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M1076 486 L1116 452 L1156 466 L1196 414 L1236 428 L1276 372 L1276 506 L1076 506 Z" fill="url(#teal)" fill-opacity="0.14"/>
+  <circle cx="1276" cy="372" r="8" fill="#FBB03B" stroke="#FFFFFF" stroke-width="3"/>
+
+  <!-- seta de crescimento -->
+  <g filter="url(#soft2)">
+    <circle cx="1348" cy="300" r="66" fill="#FFFFFF"/>
+  </g>
+  <circle cx="1348" cy="300" r="54" fill="url(#accent)"/>
+  <path d="M1322 316 l26 -30 l26 30" stroke="#FFFFFF" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M1348 286 v34" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+
+  <g filter="url(#soft2)">
+    <rect x="520" y="160" width="150" height="40" rx="20" fill="#FFFFFF"/>
+  </g>
+  <rect x="538" y="176" width="70" height="10" rx="5" fill="#94A3B8"/>
+  <circle cx="642" cy="181" r="9" fill="#16A34A"/>
+
+  <rect width="1680" height="720" fill="url(#leftCalm)"/>
+</svg>

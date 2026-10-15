@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { Menu, X, ChevronRight, Home, Store, BookOpen, ShoppingCart, User, LogIn, UserPlus, Headphones, Gift, DollarSign, Store as StoreIcon, Info, HelpCircle, FileText, Shield, LayoutDashboard, LogOut } from 'lucide-react';
+import { Menu, X, ChevronRight, Home, Store, BookOpen, ShoppingCart, User, LogIn, UserPlus, Headphones, Gift, DollarSign, Store as StoreIcon, Info, HelpCircle, FileText, Shield, LayoutDashboard, LogOut, GraduationCap } from 'lucide-react';
 import type { Category } from '../data/marketplace';
 import { useAuth } from '@/src/hooks/useAuth';
 
@@ -104,6 +104,10 @@ export default function MobileMenu({ categories }: MobileMenuProps) {
               <a href="/courses" onClick={close}
                 className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted rounded-lg transition-colors">
                 <BookOpen size={18} className="text-muted-foreground" /> Cursos Online
+              </a>
+              <a href="/academy" onClick={close}
+                className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted rounded-lg transition-colors">
+                <GraduationCap size={18} className="text-muted-foreground" /> Academy
               </a>
               <a href="/blog" onClick={close}
                 className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted rounded-lg transition-colors">

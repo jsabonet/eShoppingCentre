@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 720" width="1680" height="720" role="img" aria-label="Mockup de leitor de videoaula com botão de reprodução">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1D2537"/>
+      <stop offset="1" stop-color="#0D1320"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBB03B"/>
+      <stop offset="1" stop-color="#F0801F"/>
+    </linearGradient>
+    <pattern id="dots" width="30" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#FFFFFF" fill-opacity="0.07"/>
+    </pattern>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FBB03B" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#FBB03B" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowBlue" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#60A5FA" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#60A5FA" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="centerScrim" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#0B1220" stop-opacity="0.72"/>
+      <stop offset="0.6" stop-color="#0B1220" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#0B1220" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#05080F" flood-opacity="0.55"/>
+    </filter>
+    <filter id="soft2" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#05080F" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1680" height="720" fill="url(#bg)"/>
+  <rect width="1680" height="720" fill="url(#dots)"/>
+  <ellipse cx="840" cy="360" rx="600" ry="420" fill="url(#glow)"/>
+  <ellipse cx="1380" cy="160" rx="420" ry="300" fill="url(#glowBlue)"/>
+
+  <g stroke="#FFFFFF" stroke-opacity="0.05" fill="none">
+    <circle cx="840" cy="360" r="270"/>
+    <circle cx="840" cy="360" r="350"/>
+    <circle cx="840" cy="360" r="440"/>
+  </g>
+
+  <!-- Ecrã de leitura -->
+  <g filter="url(#soft)">
+    <rect x="560" y="176" width="800" height="400" rx="22" fill="#0B1220" stroke="#FFFFFF" stroke-opacity="0.14"/>
+  </g>
+  <rect x="582" y="198" width="756" height="300" rx="14" fill="#121C2E"/>
+  <g stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="2">
+    <line x1="582" y1="248" x2="1338" y2="248"/>
+    <line x1="582" y1="298" x2="1338" y2="298"/>
+    <line x1="582" y1="348" x2="1338" y2="348"/>
+    <line x1="582" y1="398" x2="1338" y2="398"/>
+    <line x1="582" y1="448" x2="1338" y2="448"/>
+  </g>
+  <path d="M600 470 C 720 470, 760 330, 860 340 C 960 350, 1000 250, 1120 262 C 1220 272, 1280 230, 1320 240" stroke="#FBB03B" stroke-opacity="0.35" stroke-width="3" fill="none"/>
+
+  <!-- Zona central livre (o botão de reprodução é desenhado pela interface) -->
+  <ellipse cx="840" cy="348" rx="470" ry="290" fill="url(#centerScrim)"/>
+  <circle cx="840" cy="348" r="96" fill="none" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="2"/>
+  <circle cx="840" cy="348" r="140" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2"/>
+
+  <!-- Barra do leitor -->
+  <rect x="582" y="512" width="756" height="8" rx="4" fill="#FFFFFF" fill-opacity="0.14"/>
+  <rect x="582" y="512" width="286" height="8" rx="4" fill="url(#amber)"/>
+  <circle cx="868" cy="516" r="11" fill="#FFFFFF"/>
+  <rect x="600" y="536" width="46" height="9" rx="4.5" fill="#FFFFFF" fill-opacity="0.35"/>
+  <rect x="1264" y="536" width="74" height="9" rx="4.5" fill="#FFFFFF" fill-opacity="0.35"/>
+  <rect x="912" y="534" width="96" height="13" rx="6.5" fill="#FFFFFF" fill-opacity="0.2"/>
+
+  <!-- Etiqueta "aula" -->
+  <g filter="url(#soft2)">
+    <rect x="520" y="248" width="156" height="44" rx="22" fill="#FFFFFF"/>
+  </g>
+  <circle cx="548" cy="270" r="12" fill="#FBB03B"/>
+  <rect x="570" y="264" width="88" height="11" rx="5.5" fill="#94A3B8"/>
+
+  <!-- Mini playlist -->
+  <g filter="url(#soft2)">
+    <rect x="1380" y="248" width="196" height="252" rx="18" fill="#FFFFFF" fill-opacity="0.96"/>
+  </g>
+  <rect x="1404" y="272" width="96" height="10" rx="5" fill="#334155"/>
+  <g>
+    <rect x="1404" y="300" width="148" height="40" rx="10" fill="#F1F5F9"/>
+    <rect x="1412" y="308" width="24" height="24" rx="6" fill="url(#amber)"/>
+    <rect x="1446" y="314" width="96" height="9" rx="4.5" fill="#CBD5E1"/>
+  </g>
+  <g>
+    <rect x="1404" y="350" width="148" height="40" rx="10" fill="#F1F5F9"/>
+    <rect x="1412" y="358" width="24" height="24" rx="6" fill="#CBD5E1"/>
+    <rect x="1446" y="364" width="80" height="9" rx="4.5" fill="#E2E8F0"/>
+  </g>
+  <g>
+    <rect x="1404" y="400" width="148" height="40" rx="10" fill="#F1F5F9"/>
+    <rect x="1412" y="408" width="24" height="24" rx="6" fill="#CBD5E1"/>
+    <rect x="1446" y="414" width="88" height="9" rx="4.5" fill="#E2E8F0"/>
+  </g>
+  <rect x="1404" y="456" width="148" height="28" rx="14" fill="url(#amber)"/>
+</svg>

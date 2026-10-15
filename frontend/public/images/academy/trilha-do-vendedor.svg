@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 720" width="1680" height="720" role="img" aria-label="Mockup de uma loja online: montra de produtos numa janela de navegador e um telemóvel com encomendas">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1D2537"/>
+      <stop offset="1" stop-color="#0D1320"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBB03B"/>
+      <stop offset="1" stop-color="#F0801F"/>
+    </linearGradient>
+    <linearGradient id="glassTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#EEF2F7" stop-opacity="0.96"/>
+    </linearGradient>
+    <pattern id="dots" width="30" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#FFFFFF" fill-opacity="0.07"/>
+    </pattern>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FBB03B" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#FBB03B" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowBlue" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#60A5FA" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#60A5FA" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="leftCalm" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0D1320" stop-opacity="0.9"/>
+      <stop offset="0.3" stop-color="#0D1320" stop-opacity="0.35"/>
+      <stop offset="0.62" stop-color="#0D1320" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#05080F" flood-opacity="0.55"/>
+    </filter>
+    <filter id="soft2" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#05080F" flood-opacity="0.45"/>
+    </filter>
+    <g id="tile">
+      <rect width="200" height="132" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <rect x="12" y="12" width="176" height="70" rx="8" fill="#E2E8F0"/>
+      <circle cx="34" cy="34" r="6" fill="#FFFFFF" fill-opacity="0.7"/>
+      <path d="M62 82 L98 34 L130 70 L152 46 L176 82 Z" fill="#CBD5E1" fill-opacity="0.85"/>
+      <rect x="12" y="92" width="126" height="9" rx="4.5" fill="#CBD5E1"/>
+      <rect x="12" y="108" width="78" height="9" rx="4.5" fill="#E2E8F0"/>
+    </g>
+  </defs>
+
+  <rect width="1680" height="720" fill="url(#bg)"/>
+  <rect width="1680" height="720" fill="url(#dots)"/>
+  <ellipse cx="1120" cy="330" rx="560" ry="400" fill="url(#glow)"/>
+  <ellipse cx="300" cy="120" rx="420" ry="300" fill="url(#glowBlue)"/>
+
+  <g stroke="#FFFFFF" stroke-opacity="0.05" fill="none">
+    <circle cx="1240" cy="360" r="250"/>
+    <circle cx="1240" cy="360" r="330"/>
+    <circle cx="1240" cy="360" r="410"/>
+  </g>
+
+  <g stroke="#FBB03B" stroke-opacity="0.18" stroke-width="2">
+    <line x1="1500" y1="20" x2="1180" y2="340"/>
+    <line x1="1600" y1="120" x2="1280" y2="440"/>
+    <line x1="1420" y1="700" x2="1120" y2="420"/>
+  </g>
+
+  <!-- Janela do navegador com a montra -->
+  <g filter="url(#soft)">
+    <rect x="560" y="170" width="760" height="380" rx="20" fill="url(#glassTop)"/>
+  </g>
+  <path d="M560 190 a20 20 0 0 1 20 -20 h720 a20 20 0 0 1 20 20 v24 h-760 z" fill="#E7EDF4"/>
+  <g fill="#C3CEDD">
+    <circle cx="590" cy="192" r="6"/>
+    <circle cx="612" cy="192" r="6"/>
+    <circle cx="634" cy="192" r="6"/>
+  </g>
+  <rect x="700" y="180" width="300" height="24" rx="12" fill="#DCE4EE"/>
+  <rect x="712" y="188" width="130" height="8" rx="4" fill="#B9C6D6"/>
+
+  <use href="#tile" x="596" y="240"/>
+  <use href="#tile" x="816" y="240"/>
+  <use href="#tile" x="1036" y="240"/>
+  <use href="#tile" x="596" y="392"/>
+  <use href="#tile" x="816" y="392"/>
+  <use href="#tile" x="1036" y="392"/>
+
+  <g>
+    <rect x="588" y="140" width="132" height="34" rx="17" fill="url(#amber)"/>
+    <rect x="604" y="153" width="76" height="9" rx="4.5" fill="#FFFFFF" fill-opacity="0.9"/>
+    <circle cx="700" cy="157" r="7" fill="#FFFFFF" fill-opacity="0.85"/>
+  </g>
+  <g>
+    <rect x="1150" y="132" width="150" height="38" rx="19" fill="#FFFFFF"/>
+    <circle cx="1173" cy="151" r="9" fill="#FBB03B"/>
+    <rect x="1191" y="146" width="86" height="10" rx="5" fill="#94A3B8"/>
+  </g>
+
+  <!-- Telemóvel com encomendas -->
+  <g filter="url(#soft2)">
+    <rect x="1372" y="208" width="212" height="404" rx="30" fill="#0F172A" stroke="#FFFFFF" stroke-opacity="0.22"/>
+  </g>
+  <rect x="1384" y="220" width="188" height="380" rx="22" fill="#111A2B"/>
+  <rect x="1450" y="230" width="56" height="7" rx="3.5" fill="#1E293B"/>
+  <rect x="1400" y="256" width="72" height="10" rx="5" fill="#FBB03B" fill-opacity="0.85"/>
+  <g>
+    <rect x="1400" y="286" width="156" height="64" rx="12" fill="#1B2537"/>
+    <rect x="1412" y="298" width="40" height="40" rx="8" fill="#2B3950"/>
+    <rect x="1462" y="302" width="72" height="9" rx="4.5" fill="#3D4E68"/>
+    <rect x="1462" y="320" width="48" height="9" rx="4.5" fill="#33425A"/>
+  </g>
+  <g>
+    <rect x="1400" y="362" width="156" height="64" rx="12" fill="#1B2537"/>
+    <rect x="1412" y="374" width="40" height="40" rx="8" fill="#2B3950"/>
+    <rect x="1462" y="378" width="72" height="9" rx="4.5" fill="#3D4E68"/>
+    <rect x="1462" y="396" width="48" height="9" rx="4.5" fill="#33425A"/>
+  </g>
+  <rect x="1400" y="446" width="156" height="38" rx="19" fill="url(#amber)"/>
+  <rect x="1432" y="461" width="92" height="9" rx="4.5" fill="#FFFFFF" fill-opacity="0.9"/>
+  <rect x="1420" y="512" width="116" height="9" rx="4.5" fill="#26334A"/>
+  <rect x="1440" y="534" width="76" height="9" rx="4.5" fill="#1E293B"/>
+  <rect x="1450" y="574" width="56" height="6" rx="3" fill="#33425A"/>
+
+  <!-- Selo de vendedor -->
+  <g filter="url(#soft2)">
+    <circle cx="520" cy="524" r="52" fill="#FFFFFF"/>
+  </g>
+  <circle cx="520" cy="524" r="42" fill="url(#amber)"/>
+  <path d="M502 524 l12 12 l26 -26" stroke="#FFFFFF" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect width="1680" height="720" fill="url(#leftCalm)"/>
+</svg>

@@ -51,6 +51,7 @@ export default function Header() {
                 <nav className="hidden md:flex items-center gap-1">
                   <Link href="/stores" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Lojas</Link>
                   <Link href="/courses" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Cursos</Link>
+                  <Link href="/academy" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Academy</Link>
                   <Link href="/blog" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Blog</Link>
                   {/* <Link href="/contact" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Atendimento</Link> */}
 

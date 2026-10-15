@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 720" width="1680" height="720" role="img" aria-label="Mockup de compras em segurança: telemóvel com carrinho de compras, encomenda e selo de proteção">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1D2537"/>
+      <stop offset="1" stop-color="#0D1320"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBB03B"/>
+      <stop offset="1" stop-color="#F0801F"/>
+    </linearGradient>
+    <linearGradient id="glassTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#EEF2F7" stop-opacity="0.96"/>
+    </linearGradient>
+    <pattern id="dots" width="30" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#FFFFFF" fill-opacity="0.07"/>
+    </pattern>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#60A5FA" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#60A5FA" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowAmber" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FBB03B" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#FBB03B" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="leftCalm" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0D1320" stop-opacity="0.9"/>
+      <stop offset="0.3" stop-color="#0D1320" stop-opacity="0.35"/>
+      <stop offset="0.62" stop-color="#0D1320" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#05080F" flood-opacity="0.55"/>
+    </filter>
+    <filter id="soft2" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#05080F" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1680" height="720" fill="url(#bg)"/>
+  <rect width="1680" height="720" fill="url(#dots)"/>
+  <ellipse cx="1080" cy="340" rx="560" ry="400" fill="url(#glow)"/>
+  <ellipse cx="420" cy="140" rx="420" ry="300" fill="url(#glowAmber)"/>
+
+  <g stroke="#FFFFFF" stroke-opacity="0.05" fill="none">
+    <circle cx="940" cy="360" r="260"/>
+    <circle cx="940" cy="360" r="345"/>
+    <circle cx="940" cy="360" r="430"/>
+  </g>
+  <g stroke="#60A5FA" stroke-opacity="0.16" stroke-width="2">
+    <line x1="1500" y1="40" x2="1200" y2="340"/>
+    <line x1="1620" y1="150" x2="1320" y2="450"/>
+    <line x1="1380" y1="700" x2="1100" y2="430"/>
+  </g>
+
+  <!-- Telemóvel com o carrinho -->
+  <g filter="url(#soft)">
+    <rect x="586" y="150" width="300" height="470" rx="40" fill="#FFFFFF"/>
+  </g>
+  <rect x="602" y="166" width="268" height="438" rx="30" fill="#F6F9FC"/>
+  <rect x="700" y="180" width="72" height="9" rx="4.5" fill="#DCE4EE"/>
+  <circle cx="628" cy="206" r="10" fill="#CBD5E1"/>
+  <circle cx="852" cy="206" r="10" fill="#CBD5E1"/>
+  <rect x="660" y="198" width="120" height="14" rx="7" fill="#334155"/>
+
+  <g>
+    <rect x="620" y="238" width="232" height="86" rx="14" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <rect x="634" y="252" width="58" height="58" rx="10" fill="#E7EDF4"/>
+    <rect x="706" y="258" width="104" height="11" rx="5.5" fill="#CBD5E1"/>
+    <rect x="706" y="278" width="70" height="11" rx="5.5" fill="#E2E8F0"/>
+    <rect x="706" y="300" width="52" height="14" rx="7" fill="url(#blue)"/>
+  </g>
+  <g>
+    <rect x="620" y="336" width="232" height="86" rx="14" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <rect x="634" y="350" width="58" height="58" rx="10" fill="#E7EDF4"/>
+    <rect x="706" y="356" width="104" height="11" rx="5.5" fill="#CBD5E1"/>
+    <rect x="706" y="376" width="70" height="11" rx="5.5" fill="#E2E8F0"/>
+    <rect x="706" y="398" width="52" height="14" rx="7" fill="url(#blue)"/>
+  </g>
+
+  <rect x="620" y="440" width="232" height="1" fill="#E2E8F0"/>
+  <rect x="620" y="458" width="92" height="12" rx="6" fill="#CBD5E1"/>
+  <rect x="772" y="454" width="80" height="18" rx="9" fill="#334155"/>
+  <rect x="620" y="494" width="232" height="46" rx="23" fill="url(#blue)"/>
+  <rect x="676" y="512" width="120" height="11" rx="5.5" fill="#FFFFFF" fill-opacity="0.92"/>
+
+  <!-- Caixa de encomenda -->
+  <g filter="url(#soft2)">
+    <rect x="944" y="316" width="290" height="222" rx="22" fill="url(#glassTop)"/>
+  </g>
+  <path d="M944 356 L1089 282 L1234 356 Z" fill="#DCE4EE"/>
+  <path d="M1089 282 L1234 356 L1234 538 L1089 538 Z" fill="#E7EDF4"/>
+  <path d="M944 356 L1089 282 L1089 538 L944 538 Z" fill="#EEF2F7"/>
+  <rect x="944" y="356" width="290" height="8" fill="#C3CEDD"/>
+  <rect x="1062" y="282" width="54" height="14" fill="#CBD5E1"/>
+  <rect x="1074" y="356" width="30" height="90" rx="6" fill="url(#amber)"/>
+
+  <!-- Etiqueta de entrega -->
+  <g filter="url(#soft2)">
+    <rect x="1252" y="392" width="230" height="70" rx="16" fill="#FFFFFF"/>
+  </g>
+  <circle cx="1288" cy="427" r="18" fill="#DBEAFE"/>
+  <path d="M1279 427 l6 6 l12 -13" stroke="#2563EB" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="1318" y="414" width="132" height="11" rx="5.5" fill="#CBD5E1"/>
+  <rect x="1318" y="434" width="88" height="11" rx="5.5" fill="#E2E8F0"/>
+
+  <!-- Rastreio -->
+  <g>
+    <rect x="1252" y="482" width="230" height="14" rx="7" fill="#E2E8F0"/>
+    <rect x="1252" y="482" width="150" height="14" rx="7" fill="url(#blue)"/>
+    <circle cx="1252" cy="489" r="11" fill="#2563EB"/>
+    <circle cx="1402" cy="489" r="11" fill="#FFFFFF" stroke="#2563EB" stroke-width="5"/>
+    <circle cx="1482" cy="489" r="11" fill="#E2E8F0"/>
+  </g>
+
+  <!-- Escudo de proteção -->
+  <g filter="url(#soft2)">
+    <circle cx="520" cy="470" r="62" fill="#FFFFFF"/>
+  </g>
+  <path d="M520 432 l34 12 v26 c0 22 -16 38 -34 46 c-18 -8 -34 -24 -34 -46 v-26 z" fill="url(#blue)"/>
+  <path d="M504 480 l11 11 l24 -25" stroke="#FFFFFF" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g filter="url(#soft2)">
+    <rect x="1352" y="176" width="180" height="46" rx="23" fill="#FFFFFF"/>
+  </g>
+  <circle cx="1380" cy="199" r="12" fill="#FBB03B"/>
+  <rect x="1402" y="193" width="104" height="12" rx="6" fill="#94A3B8"/>
+
+  <rect width="1680" height="720" fill="url(#leftCalm)"/>
+</svg>

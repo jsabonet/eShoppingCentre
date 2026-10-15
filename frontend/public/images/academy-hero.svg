@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-label="Ilustração de aprendizagem online">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0E1626"/>
+      <stop offset="0.55" stop-color="#16203A"/>
+      <stop offset="1" stop-color="#1C2A49"/>
+    </linearGradient>
+
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FF8A00" stop-opacity="0.42"/>
+      <stop offset="0.6" stop-color="#FF8A00" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#FF8A00" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="glow2" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#3B82F6" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#3B82F6" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.04"/>
+    </linearGradient>
+
+    <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#FFFFFF" fill-opacity="0.07"/>
+    </pattern>
+
+    <linearGradient id="fadeRight" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0E1626" stop-opacity="1"/>
+      <stop offset="1" stop-color="#0E1626" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- base -->
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#dots)"/>
+  <circle cx="1290" cy="250" r="460" fill="url(#glow)"/>
+  <circle cx="640" cy="820" r="380" fill="url(#glow2)"/>
+
+  <!-- anéis decorativos -->
+  <circle cx="1240" cy="470" r="430" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.5"/>
+  <circle cx="1240" cy="470" r="300" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.5"/>
+  <circle cx="1240" cy="470" r="170" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.5"/>
+
+  <!-- riscos de luz na diagonal -->
+  <path d="M420 -60 L900 900" stroke="#FFFFFF" stroke-opacity="0.035" stroke-width="1.5" fill="none"/>
+  <path d="M560 -60 L1040 900" stroke="#FFFFFF" stroke-opacity="0.03" stroke-width="1.5" fill="none"/>
+  <path d="M700 -60 L1180 900" stroke="#FFFFFF" stroke-opacity="0.025" stroke-width="1.5" fill="none"/>
+
+  <!-- conjunto de aulas -->
+  <g transform="rotate(-8 1240 470)">
+    <!-- cartão 1 -->
+    <rect x="1000" y="286" width="420" height="88" rx="18" fill="url(#card)" stroke="#FFFFFF" stroke-opacity="0.14"/>
+    <circle cx="1054" cy="330" r="22" fill="#FF8A00"/>
+    <path d="M1047 318 L1066 330 L1047 342 Z" fill="#131E36"/>
+    <rect x="1092" y="312" width="212" height="11" rx="5.5" fill="#FFFFFF" fill-opacity="0.30"/>
+    <rect x="1092" y="335" width="140" height="9" rx="4.5" fill="#FFFFFF" fill-opacity="0.15"/>
+
+    <!-- cartão 2 -->
+    <rect x="1000" y="392" width="420" height="88" rx="18" fill="url(#card)" stroke="#FFFFFF" stroke-opacity="0.14"/>
+    <circle cx="1054" cy="436" r="22" fill="#FF8A00" fill-opacity="0.75"/>
+    <path d="M1047 424 L1066 436 L1047 448 Z" fill="#131E36"/>
+    <rect x="1092" y="418" width="176" height="11" rx="5.5" fill="#FFFFFF" fill-opacity="0.30"/>
+    <rect x="1092" y="441" width="112" height="9" rx="4.5" fill="#FFFFFF" fill-opacity="0.15"/>
+
+    <!-- cartão 3 (com progresso) -->
+    <rect x="1000" y="498" width="420" height="88" rx="18" fill="url(#card)" stroke="#FFFFFF" stroke-opacity="0.14"/>
+    <circle cx="1054" cy="542" r="22" fill="#FF8A00"/>
+    <path d="M1047 530 L1066 542 L1047 554 Z" fill="#131E36"/>
+    <rect x="1092" y="524" width="238" height="11" rx="5.5" fill="#FFFFFF" fill-opacity="0.30"/>
+    <rect x="1092" y="549" width="272" height="9" rx="4.5" fill="#FFFFFF" fill-opacity="0.14"/>
+    <rect x="1092" y="549" width="168" height="9" rx="4.5" fill="#FF8A00"/>
+  </g>
+
+  <!-- selo / certificado -->
+  <g transform="translate(1128 168)">
+    <circle cx="0" cy="0" r="62" fill="#FFFFFF" fill-opacity="0.06" stroke="#FFFFFF" stroke-opacity="0.14"/>
+    <circle cx="0" cy="0" r="46" fill="#FF8A00" fill-opacity="0.16"/>
+    <circle cx="0" cy="0" r="33" fill="#FF8A00" fill-opacity="0.28"/>
+    <path d="M-14 -16 L0 -22 L14 -16 L14 2 L0 -4 L-14 2 Z" fill="#FFC46B"/>
+    <circle cx="0" cy="12" r="6" fill="#131E36"/>
+  </g>
+
+  <!-- partículas -->
+  <circle cx="905" cy="180" r="4" fill="#FF8A00" fill-opacity="0.75"/>
+  <circle cx="1490" cy="640" r="5" fill="#FF8A00" fill-opacity="0.55"/>
+  <circle cx="1520" cy="300" r="3.5" fill="#FFFFFF" fill-opacity="0.45"/>
+  <circle cx="960" cy="700" r="3" fill="#FFFFFF" fill-opacity="0.35"/>
+  <circle cx="1372" cy="800" r="4.5" fill="#FFFFFF" fill-opacity="0.22"/>
+
+  <!-- suaviza a zona do texto -->
+  <rect width="760" height="900" fill="url(#fadeRight)" opacity="0.9"/>
+</svg>
