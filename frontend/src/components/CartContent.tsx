@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingBag, Truck, Shield, CreditCard, ArrowLeft, Trash2, Plus, Minus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ShoppingBag, Truck, Shield, CreditCard, ArrowLeft, Trash2, Plus, Minus, Clock } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
+import { usePendingCheckout } from '@/src/hooks/usePendingCheckout';
+import { paymentsAPI } from '@/src/lib/api';
 
 function formatPrice(price: number): string {
   return price.toFixed(2).replace('.', ',');
@@ -10,7 +13,41 @@ function formatPrice(price: number): string {
 
 export default function CartContent() {
   const { items, removeFromCart, updateQuantity, totalPrice } = useCart();
+  const { settle, readPending } = usePendingCheckout();
+  const [pendingReference, setPendingReference] = useState<string | null>(null);
   const subtotal = totalPrice;
+
+  // Um checkout iniciado no gateway pode já ter sido pago sem o cliente o saber
+  // (o webhook confirma em segundo plano). Aqui resolve-se a ambiguidade: pago,
+  // os artigos saem do carrinho; por pagar, avisa-se que a encomenda está pendente.
+  useEffect(() => {
+    const pending = readPending();
+    if (!pending) return;
+    // Sem sessão não há como consultar o estado — e o interceptor da API
+    // redireccionaria para /login, expulsando o cliente do carrinho.
+    if (!localStorage.getItem('access_token')) {
+      setPendingReference(pending.reference);
+      return;
+    }
+    let cancelled = false;
+    paymentsAPI
+      .status(pending.reference)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.data?.status === 'completed') {
+          settle(pending.reference);
+          setPendingReference(null);
+        } else {
+          setPendingReference(pending.reference);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPendingReference(pending.reference);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [readPending, settle]);
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 py-8">
@@ -25,6 +62,19 @@ export default function CartContent() {
         <ShoppingBag size={32} />
         Seu Carrinho
       </h1>
+
+      {pendingReference && (
+        <div className="flex items-start gap-3 p-4 mb-6 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+          <Clock size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-900">Tem um pagamento por concluir</p>
+            <p className="text-amber-800 mt-1">
+              Os artigos ficam guardados aqui enquanto o pagamento não for confirmado.{' '}
+              <Link href="/account/orders" className="underline font-medium">Ver encomendas</Link>
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Cart Items */}

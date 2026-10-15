@@ -11,6 +11,7 @@ import {
 import AccountLayout from '@/src/components/AccountLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import LightboxImage from '@/src/components/LightboxImage';
+import { usePendingCheckout } from '@/src/hooks/usePendingCheckout';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -39,6 +40,20 @@ const STATUS_COLORS: Record<string, string> = {
   delivered: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
   refunded: 'bg-gray-100 text-gray-700',
+};
+
+// Métodos processados no checkout hospedado do ZumboPay (o cliente sai do site
+// e regressa manualmente — o gateway não aceita URL de retorno).
+const GATEWAY_METHODS = ['mpesa', 'emola', 'card'];
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendente', completed: 'Pago', paid: 'Pago',
+  failed: 'Falhado', refunded: 'Reembolsado',
+};
+
+const PAYMENT_STATUS_COLORS: Record<string, string> = {
+  pending: 'text-amber-600', completed: 'text-green-600', paid: 'text-green-600',
+  failed: 'text-red-600', refunded: 'text-gray-600',
 };
 
 function buildTimeline(order: any) {
@@ -82,6 +97,8 @@ export default function OrderDetailPage() {
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [ticketForm, setTicketForm] = useState({ subject: '', category: 'other', description: '' });
   const [ticketImages, setTicketImages] = useState<File[]>([]);
+  const [paying, setPaying] = useState(false);
+  const { settle } = usePendingCheckout();
 
   const apiHeaders = useCallback(() => {
     const token = localStorage.getItem('access_token');
@@ -96,14 +113,40 @@ export default function OrderDetailPage() {
           fetch(API_URL + '/orders/' + id + '/', { headers: apiHeaders() }),
           fetch(API_URL + '/orders/returns/my/', { headers: apiHeaders() }),
         ]);
-        if (orderRes.ok) setOrder(await orderRes.json());
+        if (orderRes.ok) {
+          const data = await orderRes.json();
+          setOrder(data);
+          // Pagamento já confirmado (pelo webhook ou pela reconciliação):
+          // os artigos podem finalmente sair do carrinho.
+          if (data?.payment_status === 'completed') {
+            settle(data.payment_id || data.order_number);
+          }
+        }
         if (returnsRes.ok) {
           const data = await returnsRes.json();
           setReturns((data.results || data || []).filter((r: any) => r.order === id));
         }
       } catch {} finally { setLoading(false); }
     })();
-  }, [id, apiHeaders]);
+  }, [id, apiHeaders, settle]);
+
+  const handleResumePayment = async () => {
+    setPaying(true); setError('');
+    try {
+      const res = await fetch(API_URL + '/payments/initiate/', {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({ order_ids: [id], method: order.payment_method }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.checkout_url) {
+        throw new Error(data.error || 'Não foi possível retomar o pagamento.');
+      }
+      window.location.href = data.checkout_url;
+    } catch (err: any) {
+      setError(err.message || 'Erro ao iniciar o pagamento.');
+      setPaying(false);
+    }
+  };
 
   const handleRequestReturn = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError('');
@@ -387,12 +430,27 @@ export default function OrderDetailPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Estado</span>
-                    <span className={`font-medium capitalize ${order.payment_status === 'paid' ? 'text-green-600' : 'text-amber-600'}`}>{order.payment_status || '—'}</span>
+                    <span className={`font-medium ${PAYMENT_STATUS_COLORS[order.payment_status] || 'text-amber-600'}`}>
+                      {PAYMENT_STATUS_LABELS[order.payment_status] || order.payment_status || '—'}
+                    </span>
                   </div>
                   {order.shipping_method && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Envio</span>
                       <span className="font-medium">{order.shipping_method}</span>
+                    </div>
+                  )}
+                  {order.payment_status === 'pending' && GATEWAY_METHODS.includes(order.payment_method) && (
+                    <div className="pt-3 border-t border-border space-y-2">
+                      <button onClick={handleResumePayment} disabled={paying}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent/90 disabled:opacity-60 text-accent-foreground text-sm font-semibold rounded-md">
+                        {paying ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                        {paying ? 'A abrir o pagamento…' : 'Concluir Pagamento'}
+                      </button>
+                      <Link href={`/checkout/success?reference=${order.payment_id || order.order_number}`}
+                        className="block text-center text-xs text-accent hover:underline">
+                        Já paguei — verificar estado
+                      </Link>
                     </div>
                   )}
                 </div>

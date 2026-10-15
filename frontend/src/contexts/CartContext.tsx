@@ -22,6 +22,7 @@ interface CartContextType {
   items: CartItem[];
   addToCart: (product: CartProduct, quantity?: number) => void;
   removeFromCart: (productId: string) => void;
+  removeProducts: (productIds: string[]) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   totalPrice: number;
@@ -114,6 +115,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
+  // Remove apenas os artigos indicados (usado quando um pagamento é confirmado,
+  // para não apagar o que o cliente tenha acrescentado entretanto).
+  const removeProducts = useCallback((productIds: string[]) => {
+    const ids = new Set(productIds.map(String));
+    setItems((prev) =>
+      prev.some((i) => ids.has(String(i.product.id)))
+        ? prev.filter((i) => !ids.has(String(i.product.id)))
+        : prev
+    );
+  }, []);
+
   const totalPrice = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
 
   const getCartCount = useCallback(
@@ -123,7 +135,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={useMemo(() => ({ items, addToCart, removeFromCart, updateQuantity, clearCart, totalPrice, isCartOpen, setIsCartOpen, getCartCount }), [items, addToCart, removeFromCart, updateQuantity, clearCart, totalPrice, isCartOpen, getCartCount])}
+      value={useMemo(() => ({ items, addToCart, removeFromCart, removeProducts, updateQuantity, clearCart, totalPrice, isCartOpen, setIsCartOpen, getCartCount }), [items, addToCart, removeFromCart, removeProducts, updateQuantity, clearCart, totalPrice, isCartOpen, getCartCount])}
     >
       {children}
     </CartContext.Provider>

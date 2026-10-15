@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle, Loader2, XCircle, Clock } from 'lucide-react';
 import { paymentsAPI } from '@/src/lib/api';
+import { usePendingCheckout } from '@/src/hooks/usePendingCheckout';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const reference = searchParams.get('reference') || '';
+  const { settle } = usePendingCheckout();
   const [status, setStatus] = useState<'loading' | 'completed' | 'pending' | 'failed' | 'not_found'>('loading');
 
   useEffect(() => {
@@ -28,6 +30,8 @@ function SuccessContent() {
         if (!cancelled) {
           if (st === 'completed') {
             setStatus('completed');
+            // Pagamento confirmado: agora sim os artigos podem sair do carrinho.
+            settle(reference);
             return;
           }
           if (st === 'failed') {
@@ -54,7 +58,7 @@ function SuccessContent() {
     return () => {
       cancelled = true;
     };
-  }, [reference]);
+  }, [reference, settle]);
 
   if (status === 'loading') {
     return (
