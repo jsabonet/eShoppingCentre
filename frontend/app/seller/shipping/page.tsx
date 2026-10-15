@@ -39,6 +39,7 @@ export default function SellerShippingPage() {
 
   const [showZoneForm, setShowZoneForm] = useState(false);
   const [zoneForm, setZoneForm] = useState({ id: '', name: '', provinces: [] as string[] });
+  const [zoneFormError, setZoneFormError] = useState('');
   const [showMethodForm, setShowMethodForm] = useState(false);
   const [methodForm, setMethodForm] = useState({ id: '', name: '', description: '', method_type: 'delivery', pickup_address: '', estimated_days_min: '1', estimated_days_max: '7' });
   const [showRateForm, setShowRateForm] = useState(false);
@@ -82,22 +83,31 @@ export default function SellerShippingPage() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const openZoneForm = (z?: any) => {
+    setZoneFormError('');
     setZoneForm(z ? { id: z.id, name: z.name, provinces: z.provinces || [] } : { id: '', name: '', provinces: [] });
     setShowZoneForm(true);
   };
 
   const saveZone = async (e: React.FormEvent) => {
     e.preventDefault();
+    setZoneFormError('');
     if (!zoneForm.name.trim()) return;
+    if (zoneForm.provinces.length === 0) {
+      setZoneFormError('Escolha pelo menos uma província — sem isso esta zona nunca aplica frete.');
+      return;
+    }
     setSaving('zone');
     try {
       const body = JSON.stringify({ name: zoneForm.name, provinces: zoneForm.provinces, is_active: true });
       const url = zoneForm.id ? `${API_URL}/shipping/zones/${zoneForm.id}/` : `${API_URL}/shipping/zones/`;
       const res = await fetch(url, { method: zoneForm.id ? 'PUT' : 'POST', headers: apiHeaders(), body });
-      if (!res.ok) throw new Error('Erro ao guardar.');
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null);
+        throw new Error(detail?.provinces?.[0] || detail?.name?.[0] || detail?.detail || 'Erro ao guardar.');
+      }
       setShowZoneForm(false);
       fetchAll();
-    } catch (err: any) { alert(err.message); }
+    } catch (err: any) { setZoneFormError(err.message); }
     finally { setSaving(null); }
   };
 
@@ -318,6 +328,11 @@ export default function SellerShippingPage() {
                       })}
                     </div>
                   </div>
+                  {zoneFormError && (
+                    <p className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      <AlertCircle size={15} className="shrink-0" /> {zoneFormError}
+                    </p>
+                  )}
                   <div className="flex gap-3 pt-2">
                     <button type="submit" disabled={saving === 'zone'}
                       className="px-5 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 flex items-center gap-2 transition-colors">
@@ -364,11 +379,17 @@ export default function SellerShippingPage() {
                           </button>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {(z.provinces_display || []).map((prov: string) => (
-                          <span key={prov} className="px-2 py-0.5 bg-muted rounded-md text-[11px] text-muted-foreground">{prov}</span>
-                        ))}
-                      </div>
+                      {(z.provinces_display || []).length === 0 ? (
+                        <p className="flex items-center gap-1 text-[11px] text-amber-600">
+                          <AlertCircle size={12} className="shrink-0" /> Sem províncias — esta zona não aplica frete nenhum
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {(z.provinces_display || []).map((prov: string) => (
+                            <span key={prov} className="px-2 py-0.5 bg-muted rounded-md text-[11px] text-muted-foreground">{prov}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -83,6 +83,20 @@ class ShippingZoneWriteSerializer(serializers.ModelSerializer):
         model = ShippingZone
         fields = ('id', 'name', 'provinces', 'is_active')
 
+    def validate_provinces(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                'Escolha pelo menos uma província. Uma zona sem províncias nunca '
+                'aplica frete — a estimativa não a consegue encontrar.'
+            )
+        known = {slug for slug, _ in MOZAMBIQUE_PROVINCES}
+        unknown = [p for p in value if p not in known]
+        if unknown:
+            raise serializers.ValidationError(
+                f'Província inválida: {", ".join(unknown)}.'
+            )
+        return value
+
 
 # ─── Estimate Serializer ───
 

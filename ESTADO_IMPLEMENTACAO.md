@@ -135,10 +135,15 @@
 | 2 | **Cupões e descontos** — códigos, % ou valor fixo, validade, limites, valor mínimo | ❌ | ❌ |
 | 3 | **Chat vendor-cliente** — WebSocket em tempo real, por produto/encomenda, envio de imagens | ❌ | ❌ |
 | 4 | **Devoluções/reembolsos** — RMA, fluxo de aprovação, estados, disputas | ❌ | ❌ |
-| 5 | **Cálculo de frete** — zonas de entrega, tabela por peso/valor, frete grátis mínimo | ❌ | ❌ |
+| 5 | ~~**Cálculo de frete** — zonas de entrega, tabela por peso/valor, frete grátis mínimo~~ ✅ implementado | ✅ | ✅ |
 | 6 | **Levantamento de saldo** — vendor solicita transferência para M-Pesa/e-Mola/conta | ❌ | ❌ |
 | 7 | **Emails transacionais** — verificação email, encomenda, pagamento, loja aprovada/rejeitada | ❌ | ❌ |
 | 8 | **Relatórios/Gráficos** — vendas diárias/semanais/mensais, analytics no dashboard | ❌ | ❌ |
+
+> **Nota sobre frete:** uma `ShippingZone` sem províncias nunca é encontrada pela estimativa
+> do checkout, pelo que as tarifas dessa zona são inalcançáveis e o sistema cai na taxa fixa
+> da plataforma (350 MZN por defeito). O painel do vendedor avisa e o backend rejeita zonas
+> sem províncias, para que a configuração nunca fique silenciosamente inútil.
 
 ### 🟡 Média Prioridade (14 Funcionalidades)
 
@@ -178,7 +183,7 @@
 
 ### Fase 1 — Core do Marketplace (Semanas 1-3)
 
-1. **Cálculo de frete + zonas de entrega** — essencial para checkout funcionar com produtos físicos
+1. ~~**Cálculo de frete + zonas de entrega** — essencial para checkout funcionar com produtos físicos~~ ✅ feito
 2. **Emails transacionais** — onboarding completo (verificação email, notificações vendor)
 3. **Variantes de produto** — core do e-commerce físico (tamanho, cor, SKU, stock individual)
 
