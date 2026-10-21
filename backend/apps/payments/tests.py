@@ -18,6 +18,7 @@ from apps.orders.models import Order, OrderStatusHistory
 from apps.payments.models import PaymentTransaction
 from apps.payments.services.completion import complete_payment
 from apps.payments.services.paysuite import PaysuiteClient
+from apps.payments.views import _gateway_reference as gateway_reference
 from apps.stores.models import Store
 from apps.wallet.services import get_wallet
 
@@ -120,9 +121,10 @@ def test_initiate_creates_paysuite_payment(digital_order, buyer):
     client = APIClient()
     client.force_authenticate(user=buyer)
 
+    reference = gateway_reference(digital_order.order_number)
     create_resp = {
         'ok': True,
-        'data': {'id': 'pay_123', 'reference': digital_order.order_number, 'checkout_url': 'https://paysuite.tech/pay/123'},
+        'data': {'id': 'pay_123', 'reference': reference, 'checkout_url': 'https://paysuite.tech/pay/123'},
         'message': None,
         'http_status': 201,
     }
@@ -135,18 +137,60 @@ def test_initiate_creates_paysuite_payment(digital_order, buyer):
 
     assert resp.status_code == 200
     assert resp.data['checkout_url'] == 'https://paysuite.tech/pay/123'
-    assert resp.data['reference'] == digital_order.order_number
+    assert resp.data['reference'] == reference
 
     digital_order.refresh_from_db()
-    assert digital_order.payment_id == digital_order.order_number
+    assert digital_order.payment_id == reference
 
-    txn = PaymentTransaction.objects.get(idempotency_key=f'paysuite:{digital_order.order_number}')
+    txn = PaymentTransaction.objects.get(idempotency_key=f'paysuite:{reference}')
     assert txn.provider == 'paysuite'
     assert txn.provider_transaction_id == 'pay_123'
     assert txn.status == 'pending'
     assert txn.amount == Decimal('100.00')
 
 
+@pytest.mark.django_db
+def test_initiate_sends_alphanumeric_reference_to_gateway(digital_order, buyer):
+    """A PaySuite recusa `reference` com hífen (``PED-8B549F72`` → 422)."""
+    client = APIClient()
+    client.force_authenticate(user=buyer)
+
+    sent = {}
+
+    def fake_create_payment(**kwargs):
+        sent.update(kwargs)
+        return {
+            'ok': True,
+            'data': {'id': 'pay_123', 'reference': kwargs['reference'],
+                     'checkout_url': 'https://paysuite.tech/pay/123'},
+            'message': None,
+            'http_status': 201,
+        }
+
+    with mock.patch.object(PaysuiteClient, 'create_payment', side_effect=fake_create_payment):
+        resp = client.post(
+            reverse('payments_initiate'),
+            {'order_ids': [str(digital_order.id)]},
+            format='json',
+        )
+
+    assert resp.status_code == 200
+    assert sent['reference'].isalnum()
+    assert sent['reference'] == gateway_reference(digital_order.order_number)
+    assert len(sent['description']) <= 125
+
+
+def test_gateway_reference_strips_punctuation():
+    assert gateway_reference('PED-8B549F72') == 'PED8B549F72'
+    assert gateway_reference('CHECKOUT-AB12CD34EF') == 'CHECKOUTAB12CD34EF'
+    assert gateway_reference('PED_1.2 3') == 'PED123'
+
+
+def test_gateway_reference_is_bounded():
+    assert len(gateway_reference('A' * 120)) == 50
+
+
+@override_settings(PAYSUITE_WEBHOOK_SECRET='')
 @pytest.mark.django_db
 def test_webhook_success_completes_and_settles(digital_order):
     # Simula o estado pós-initiate: reference gravada no payment_id
@@ -170,6 +214,7 @@ def test_webhook_success_completes_and_settles(digital_order):
     assert txn.status == 'completed'
 
 
+@override_settings(PAYSUITE_WEBHOOK_SECRET='')
 @pytest.mark.django_db
 def test_webhook_success_idempotent(digital_order):
     digital_order.payment_id = digital_order.order_number
@@ -189,6 +234,7 @@ def test_webhook_success_idempotent(digital_order):
     assert seller_wallet.payout_balance == Decimal('100.00')  # liquidado uma vez
 
 
+@override_settings(PAYSUITE_WEBHOOK_SECRET='')
 @pytest.mark.django_db
 def test_webhook_unknown_reference_records_failed():
     client = APIClient()

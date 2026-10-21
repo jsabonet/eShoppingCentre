@@ -1,4 +1,5 @@
 import logging
+import re
 from decimal import Decimal
 
 from django.conf import settings
@@ -15,6 +16,21 @@ from apps.payments.services.completion import complete_payment
 from apps.payments.services.paysuite import PaysuiteClient
 
 logger = logging.getLogger(__name__)
+
+# Limites impostos pela PaySuite em `POST /v1/payments` (ver openapi):
+# `reference` só aceita letras e números (máx. 50) e `description` máx. 125.
+_REFERENCE_MAX = 50
+_DESCRIPTION_MAX = 125
+
+
+def _gateway_reference(value):
+    """Adapta um `order_number` ao formato que a PaySuite aceita.
+
+    Os nossos números são ``PED-8B549F72`` e o gateway responde
+    ``422 The Reference field must only contain letters and numbers``
+    ao hífen — sem isto nenhum pagamento chega a ser criado.
+    """
+    return re.sub(r'[^A-Za-z0-9]', '', value or '')[:_REFERENCE_MAX]
 
 
 def _webhook_url():
@@ -72,11 +88,11 @@ class PaymentsInitiateView(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
         if len(payable) == 1:
-            reference = payable[0].order_number
+            reference = _gateway_reference(payable[0].order_number)
         else:
-            reference = f'CHECKOUT-{get_random_string(10).upper()}'
+            reference = f'CHECKOUT{get_random_string(10).upper()}'
 
-        description = ', '.join(o.order_number for o in payable)[:200]
+        description = ', '.join(o.order_number for o in payable)[:_DESCRIPTION_MAX]
 
         client = PaysuiteClient()
         result = client.create_payment(
