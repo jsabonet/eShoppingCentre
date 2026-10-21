@@ -58,7 +58,13 @@ services:
       - FIREBASE_SERVICE_ACCOUNT_KEY=/app/credentials/firebase-adminsdk.json
       - FRONTEND_URL=https://${DOMAIN}
       - SITE_URL=https://${DOMAIN}
+      - BACKEND_URL=https://${DOMAIN}
       - EMAIL_LOGO_URL=https://${DOMAIN}/icon.png
+      # Gateway de pagamento (PaySuite)
+      - PAYSUITE_BASE_URL=${PAYSUITE_BASE_URL:-https://paysuite.tech/api}
+      - PAYSUITE_API_KEY=${PAYSUITE_API_KEY:-}
+      - PAYSUITE_WEBHOOK_SECRET=${PAYSUITE_WEBHOOK_SECRET:-}
+      - PAYSUITE_WEBHOOK_URL=${PAYSUITE_WEBHOOK_URL:-}
       # Email (Resend)
       - RESEND_API_KEY=${RESEND_API_KEY}
       - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-suporte@e-shoppingcentre.com}

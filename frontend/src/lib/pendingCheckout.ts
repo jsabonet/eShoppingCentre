@@ -1,5 +1,5 @@
 /**
- * Checkout pendente no gateway (ZumboPay).
+ * Checkout pendente no gateway (PaySuite).
  *
  * Um pagamento iniciado não é um pagamento feito. Enquanto o cliente está no
  * checkout hospedado — ou se desistir/lhe falhar o pagamento — os artigos têm

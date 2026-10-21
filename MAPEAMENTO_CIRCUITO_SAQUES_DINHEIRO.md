@@ -248,9 +248,7 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 
 Alinhado com o `PLANO_CARTEIRA_INTERNA.md` (W1–W5):
 
-1. **W0 — Fechar o elo de pagamento (crítico)** ✅ **IMPLEMENTADO via ZumboPay**: o gateway único é o **ZumboPay** (M-Pesa/e-Mola/mKesh/cartões num checkout hospedado). Fluxo: `POST /api/v1/payments/initiate/` cria o pagamento e grava a referência do checkout em `Order.payment_id` → o cliente é redirecionado para a `checkout_url` → o webhook `POST /api/v1/payments/webhook/zumbopay/` (assinado pelo cabeçalho `x-zumbopay-signature`, HMAC-SHA256 do corpo bruto) mapeia a referência para as encomendas e chama `complete_payment()`, que marca `payment_status="completed"` de forma idempotente e despoleta `settle_payment` (escrow/crédito do vendedor). Frontend: redirecionamento no checkout + página `/checkout/success` com polling do estado, acessível a partir do detalhe da encomenda (o gateway não aceita URL de retorno).
-   - ✅ **Rede de segurança (webhooks perdidos):** o webhook deixou de ser o único caminho. `POST /api/v1/payments/reconcile/` *(admin)*, a tarefa Celery `reconcile_pending_payments` (beat, 300 s) e `manage.py reconcile_payments` interrogam o gateway pelos checkouts pendentes e, se estiverem pagos, fecham a encomenda pelo mesmo `complete_payment()` — continuando idempotente. Detalhe em [MAPEAMENTO_ZUMBOPAY_GATEWAY.md](d:/Projectos/eShoppingCentre-main/MAPEAMENTO_ZUMBOPAY_GATEWAY.md) §18.
-   - ✅ **Assinatura com falha fechada:** sem `ZUMBOPAY_WEBHOOK_SECRET` o webhook recusa pedidos (`503`) fora de `DEBUG` — um pedido forjado já não pode marcar uma encomenda como paga. Em desenvolvimento continua a passar com um aviso, e a reconciliação cobre qualquer webhook legitimo que seja recusado.
+1. **W0 — Fechar o elo de pagamento (crítico)** ✅ **IMPLEMENTADO via PaySuite**: o gateway único é o **PaySuite** (M-Pesa/e-Mola/Mkesh/cartões num checkout hospedado). Fluxo: `POST /api/v1/payments/initiate/` cria o pagamento e grava a `reference` na encomenda → o cliente é redirecionado para a `checkout_url` → o webhook `POST /api/v1/payments/webhook/paysuite/` (assinado por `X-Signature` HMAC-SHA256) mapeia `data.reference` para as encomendas e chama `complete_payment()`, que marca `payment_status="completed"` de forma idempotente e despoleta `settle_payment` (escrow/crédito do vendedor). Frontend: redirecionamento no checkout + página `/checkout/success` com polling do estado.
 2. **Unificar afiliados na carteira**: fazer `AffiliateCommission`/`AffiliatePayout` passarem por `wallet.services.credit/debit`, eliminando o circuito paralelo (ou documentar formalmente a separação como decisão de arquitetura).
 3. **Remover stubs**: apagar `PendingPayoutsView`/`ApprovePayoutView` de `users/views_admin.py`, as rotas duplicadas e as funções mortas em `frontend/src/lib/api.ts`.
 4. **Tornar `approve_payout` load-bearing** ou remover o passo: `pay_payout` deveria exigir aprovação prévia (ou documentar o fluxo de pagamento direto).
@@ -278,21 +276,15 @@ Alinhado com o `PLANO_CARTEIRA_INTERNA.md` (W1–W5):
 - [backend/apps/affiliates/views.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/views.py) — endpoints de afiliados/admin.
 - [backend/apps/affiliates/services.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/services.py) / [tasks.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/tasks.py) — aprovar/clawback de comissões.
 - [backend/apps/affiliates/urls.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/urls.py) — rotas de afiliados.
-- [backend/apps/payments/views.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/views.py) — initiate/status/webhook ZumboPay + diagnóstico do gateway + reconciliação manual (W0).
-- [backend/apps/payments/services/zumbopay.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/zumbopay.py) — cliente ZumboPay (criar/consultar pagamento, validar conta + verificação HMAC).
+- [backend/apps/payments/views.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/views.py) — initiate/status/webhook PaySuite (W0).
+- [backend/apps/payments/services/paysuite.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/paysuite.py) — cliente PaySuite (criar/consultar pagamento + verificação HMAC).
 - [backend/apps/payments/services/completion.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/completion.py) — `complete_payment()` idempotente.
-- [backend/apps/payments/services/reconciliation.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/reconciliation.py) — rede de segurança: interroga o gateway pelos checkouts pendentes.
-- [backend/apps/payments/services/references.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/references.py) — mapeamento partilhado gateway ⇄ encomenda (webhook e reconciliação).
-- [backend/apps/payments/tasks.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/tasks.py) — tarefa Celery `reconcile_pending_payments`.
-- [backend/apps/payments/management/commands/reconcile_payments.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/management/commands/reconcile_payments.py) — comando manual (ambientes sem Celery).
-- [frontend/src/components/CheckoutContent.tsx](d:/Projectos/eShoppingCentre-main/frontend/src/components/CheckoutContent.tsx) — redireciona para o checkout hospedado ZumboPay.
-- [frontend/app/account/orders/[id]/page.tsx](d:/Projectos/eShoppingCentre-main/frontend/app/account/orders/[id]/page.tsx) — retomar pagamento pendente + verificar estado.
+- [frontend/src/components/CheckoutContent.tsx](d:/Projectos/eShoppingCentre-main/frontend/src/components/CheckoutContent.tsx) — redireciona para o checkout PaySuite.
 - [frontend/app/checkout/success/page.tsx](d:/Projectos/eShoppingCentre-main/frontend/app/checkout/success/page.tsx) — confirmação/polling pós-pagamento.
 - [backend/apps/stores/views_earnings.py](d:/Projectos/eShoppingCentre-main/backend/apps/stores/views_earnings.py) — ganhos do vendedor.
 - [backend/config/settings/base.py](d:/Projectos/eShoppingCentre-main/backend/config/settings/base.py) — `CELERY_BEAT_SCHEDULE`.
 - [frontend/src/lib/api.ts](d:/Projectos/eShoppingCentre-main/frontend/src/lib/api.ts) — `walletAPI`, `affiliatesAPI`, stubs mortos.
 - [frontend/src/components/admin/AdminWallet.tsx](d:/Projectos/eShoppingCentre-main/frontend/src/components/admin/AdminWallet.tsx) — UI admin de saques/reconciliação.
-- [frontend/src/components/admin/AdminOrders.tsx](d:/Projectos/eShoppingCentre-main/frontend/src/components/admin/AdminOrders.tsx) — botão de verificação do pagamento no gateway (encomendas pendentes).
 - [frontend/src/components/admin/AdminAffiliates.tsx](d:/Projectos/eShoppingCentre-main/frontend/src/components/admin/AdminAffiliates.tsx) — UI admin de afiliados.
 - [frontend/app/seller/earnings/page.tsx](d:/Projectos/eShoppingCentre-main/frontend/app/seller/earnings/page.tsx) — UI do vendedor.
 - [frontend/app/affiliate/earnings/page.tsx](d:/Projectos/eShoppingCentre-main/frontend/app/affiliate/earnings/page.tsx) — UI do afiliado.
