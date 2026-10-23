@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Truck, Shield, CreditCard, MapPin, CheckCircle, Loader2, FlaskConical, Wallet } from 'lucide-react';
+import { Truck, Shield, CreditCard, MapPin, CheckCircle, Loader2, Wallet, ExternalLink } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { walletAPI, paymentsAPI } from '@/src/lib/api';
@@ -33,23 +33,37 @@ const PROVINCES = [
   { value: 'niassa', label: 'Niassa' },
 ];
 
-// Métodos de pagamento online processados via PaySuite (checkout hospedado).
-const PAYSUITE_METHODS = ['mpesa', 'emola', 'card'];
+// Método de pagamento online processado no checkout hospedado VPay.
+// A escolha do método concreto (M-Pesa, e-Mola, Cartão, Carteira VPay,
+// PayPal ou QR Code) é feita no próprio painel VPay — para não repetir a
+// seleção entre o nosso checkout e o gateway.
+const ONLINE_PAYMENT_METHOD = 'vpay';
 
-const PAYMENT_METHODS = [
+type PaymentMethod = {
+  value: string;
+  label: string;
+  desc: string;
+  icon: string;
+  recommended?: boolean;
+  physicalOnly?: boolean;
+  devOnly?: boolean;
+  instructions: { title: string; steps: string[] };
+};
+
+const PAYMENT_METHODS: PaymentMethod[] = [
   {
-    value: 'test',
-    label: '🧪 Modo Teste (Grátis)',
-    desc: 'Checkout simulado — pagamento automático para testes',
-    icon: '🧪',
+    value: ONLINE_PAYMENT_METHOD,
+    label: 'Pagamento Online (VPay)',
+    desc: 'M-Pesa, e-Mola, Cartão, Carteira VPay, PayPal ou QR Code',
+    icon: '🔒',
+    recommended: true,
     instructions: {
-      title: 'Modo de Teste:',
+      title: 'Como funciona o pagamento online:',
       steps: [
-        'Este método simula um pagamento concluído.',
-        'Nenhum pagamento real é processado.',
-        'A encomenda será criada como paga automaticamente.',
-        'Ideal para testar fluxos de compra, cursos e downloads.',
-        'Disponível apenas em ambiente de desenvolvimento.',
+        'Ao confirmar o pedido, será redirecionado para o painel seguro da VPay.',
+        'Escolha o método desejado: M-Pesa, e-Mola, Cartão, Carteira VPay, PayPal ou QR Code.',
+        'Para carteiras móveis (M-Pesa/e-Mola), introduza o número do telefone e confirme com o PIN.',
+        'Depois de pagar, será devolvido ao nosso site para confirmarmos o pagamento.',
       ],
     },
   },
@@ -63,39 +77,6 @@ const PAYMENT_METHODS = [
       steps: [
         'O valor total será debitado do seu saldo de reembolsos.',
         'A encomenda é paga instantaneamente.',
-        'Produtos digitais e cursos ficam disponíveis de imediato.',
-      ],
-    },
-  },
-  {
-    value: 'mpesa',
-    label: 'M-Pesa',
-    desc: 'Pagamento via M-Pesa (Vodacom)',
-    icon: '📱',
-    instructions: {
-      title: 'Instruções M-Pesa:',
-      steps: [
-        'Após confirmar o pedido, você receberá um SMS com instruções',
-        'Abra o menu M-Pesa no seu celular',
-        'Selecione "Pagar" e insira o número fornecido',
-        'Confirme o valor e insira seu PIN',
-        'Você receberá uma confirmação por SMS',
-      ],
-    },
-  },
-  {
-    value: 'emola',
-    label: 'e-Mola',
-    desc: 'Pagamento via e-Mola (Movitel)',
-    icon: '📱',
-    instructions: {
-      title: 'Instruções e-Mola:',
-      steps: [
-        'Após confirmar o pedido, você receberá um SMS com instruções',
-        'Abra o menu e-Mola no seu celular',
-        'Selecione "Transferência" e insira o número fornecido',
-        'Confirme o valor e insira seu PIN',
-        'Você receberá uma confirmação por SMS',
       ],
     },
   },
@@ -107,27 +88,10 @@ const PAYMENT_METHODS = [
     instructions: {
       title: 'Instruções Transferência Bancária:',
       steps: [
-        'Após confirmar o pedido, você receberá um email com dados bancários',
-        'Realize a transferência para a conta indicada',
-        'Envie o comprovante por email ou WhatsApp',
-        'Após confirmação, seu pedido será processado',
-        'Prazo de confirmação: até 24 horas úteis',
-      ],
-    },
-  },
-  {
-    value: 'card',
-    label: 'Cartão de Crédito/Débito',
-    desc: 'Visa, Mastercard',
-    icon: '💳',
-    instructions: {
-      title: 'Instruções Cartão:',
-      steps: [
-        'Após confirmar o pedido, você será redirecionado para o gateway de pagamento',
-        'Insira os dados do seu cartão (Visa ou Mastercard)',
-        'Confirme a transação',
-        'Você receberá confirmação por email',
-        'Seu pedido será processado imediatamente',
+        'Após confirmar, receberá um email com os dados bancários.',
+        'Realize a transferência para a conta indicada.',
+        'Envie o comprovante por email ou WhatsApp.',
+        'Após confirmação, o pedido será processado (até 24 horas úteis).',
       ],
     },
   },
@@ -136,14 +100,28 @@ const PAYMENT_METHODS = [
     label: 'Pagamento na Entrega',
     desc: 'Pague em dinheiro quando receber o produto',
     icon: '💵',
+    physicalOnly: true,
     instructions: {
       title: 'Instruções Pagamento na Entrega:',
       steps: [
-        'Após confirmar o pedido, aguarde o contato da nossa equipa',
-        'Confirme o endereço e horário de entrega',
-        'No dia da entrega, tenha o valor exato em dinheiro',
-        'Pague ao entregador e receba seu produto',
-        'Você receberá recibo por email',
+        'Aguarde o contacto da nossa equipa para confirmar a entrega.',
+        'Tenha o valor exato em dinheiro no momento da entrega.',
+        'Pague ao entregador e receba o seu produto.',
+      ],
+    },
+  },
+  {
+    value: 'test',
+    label: '🧪 Modo Teste (Grátis)',
+    desc: 'Checkout simulado — pagamento automático para testes',
+    icon: '🧪',
+    devOnly: true,
+    instructions: {
+      title: 'Modo de Teste:',
+      steps: [
+        'Este método simula um pagamento concluído.',
+        'Nenhum pagamento real é processado.',
+        'Disponível apenas em ambiente de desenvolvimento.',
       ],
     },
   },
@@ -156,7 +134,7 @@ export default function CheckoutContent() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
   const [confirmed, setConfirmed] = useState(false);
   const [orderData, setOrderData] = useState<any[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState('test');
+  const [paymentMethod, setPaymentMethod] = useState(ONLINE_PAYMENT_METHOD);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [shippingEstimates, setShippingEstimates] = useState<any>(null);
@@ -213,6 +191,17 @@ export default function CheckoutContent() {
   }, [shippingEstimates, shippingSelections]);
 
   const hasPhysicalItems = items.some(it => it.product.productType === 'physical');
+
+  // Métodos visíveis: esconde "Modo Teste" em produção e "Pagamento na Entrega"
+  // quando não há artigos físicos, mantendo a lista coerente e sem redundância.
+  const visiblePaymentMethods = useMemo(() => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    return PAYMENT_METHODS.filter((m) => {
+      if (m.devOnly && isProduction) return false;
+      if (m.physicalOnly && !hasPhysicalItems) return false;
+      return true;
+    });
+  }, [hasPhysicalItems]);
 
   const discountAmount = useMemo(() => {
     if (!couponInfo) return 0;
@@ -379,8 +368,8 @@ export default function CheckoutContent() {
       const orders = Array.isArray(data) ? data : [data];
       setOrderData(orders);
 
-      // Métodos online (M-Pesa/e-Mola/Cartão) → checkout hospedado PaySuite
-      if (PAYSUITE_METHODS.includes(paymentMethod)) {
+      // Métodos online (M-Pesa/e-Mola/Cartão) → checkout hospedado VPay
+      if (paymentMethod === ONLINE_PAYMENT_METHOD) {
         const orderIds = orders.map((o: any) => o.id);
         let checkoutUrl = '';
         let reference = '';
@@ -713,7 +702,7 @@ export default function CheckoutContent() {
               Método de Pagamento
             </h2>
             <div className="space-y-3">
-              {PAYMENT_METHODS.map((method) => {
+              {visiblePaymentMethods.map((method) => {
                 const total = Math.max(0, totalPrice + shippingTotal - discountAmount);
                 const isWallet = method.value === 'wallet';
                 const insufficientWallet = isWallet && walletBalance !== null && walletBalance < total;
@@ -741,6 +730,11 @@ export default function CheckoutContent() {
                     <div className="ml-3 flex-1">
                       <div className="font-semibold">
                         {method.label}
+                        {method.recommended && (
+                          <span className="ml-2 px-1.5 py-0.5 bg-accent text-accent-foreground text-[11px] rounded-full font-semibold">
+                            Recomendado
+                          </span>
+                        )}
                         {isWallet && walletBalance !== null && (
                           <span className="ml-2 text-xs font-normal text-muted-foreground">
                             (Saldo: {walletBalance.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN)
@@ -759,7 +753,13 @@ export default function CheckoutContent() {
 
             {/* Payment Instructions */}
             {currentInstructions && (
-              <div className="mt-4 p-4 bg-muted rounded-lg">
+              <div className={`mt-4 p-4 rounded-lg ${paymentMethod === ONLINE_PAYMENT_METHOD ? 'bg-accent/5 border border-accent/30' : 'bg-muted'}`}>
+                {paymentMethod === ONLINE_PAYMENT_METHOD && (
+                  <div className="flex items-center gap-2 text-sm font-semibold mb-1">
+                    <ExternalLink size={16} className="text-accent" />
+                    Será redirecionado para o painel seguro da VPay
+                  </div>
+                )}
                 <h3 className="font-semibold mb-2">{currentInstructions.title}</h3>
                 <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
                   {currentInstructions.steps.map((step, i) => (

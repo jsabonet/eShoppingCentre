@@ -60,11 +60,12 @@ services:
       - SITE_URL=https://${DOMAIN}
       - BACKEND_URL=https://${DOMAIN}
       - EMAIL_LOGO_URL=https://${DOMAIN}/icon.png
-      # Gateway de pagamento (PaySuite)
-      - PAYSUITE_BASE_URL=${PAYSUITE_BASE_URL:-https://paysuite.tech/api}
-      - PAYSUITE_API_KEY=${PAYSUITE_API_KEY:-}
-      - PAYSUITE_WEBHOOK_SECRET=${PAYSUITE_WEBHOOK_SECRET:-}
-      - PAYSUITE_WEBHOOK_URL=${PAYSUITE_WEBHOOK_URL:-}
+      # Gateway de pagamento (VPay)
+      - VPAY_BASE_URL=${VPAY_BASE_URL:-https://api.vpay.co.mz}
+      - VPAY_CHECKOUT_BASE_URL=${VPAY_CHECKOUT_BASE_URL:-https://checkout.vpay.co.mz}
+      - VPAY_CLIENT_ID=${VPAY_CLIENT_ID:-}
+      - VPAY_CLIENT_SECRET=${VPAY_CLIENT_SECRET:-}
+      - VPAY_WEBHOOK_SECRET=${VPAY_WEBHOOK_SECRET:-}
       # Email (Resend)
       - RESEND_API_KEY=${RESEND_API_KEY}
       - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-suporte@e-shoppingcentre.com}

@@ -310,19 +310,18 @@ ANYMAIL = {
 # Se vazio, os emails usam um wordmark em texto.
 EMAIL_LOGO_URL = config('EMAIL_LOGO_URL', default='')
 
-# ─── Gateway de Pagamento (PaySuite) ───
-# Fonte única de verdade para as credenciais do gateway. O fecho do elo de
-# pagamento (W0) usa estas variáveis no cliente e no webhook PaySuite.
-# Contrato oficial: https://paysuite.tech/docs/
-PAYSUITE_BASE_URL = config('PAYSUITE_BASE_URL', default='https://paysuite.tech/api')
-PAYSUITE_API_KEY = config('PAYSUITE_API_KEY', default='')
-PAYSUITE_WEBHOOK_SECRET = config('PAYSUITE_WEBHOOK_SECRET', default='')
-PAYSUITE_TIMEOUT = config('PAYSUITE_TIMEOUT', default=20, cast=int)
-PAYSUITE_RETRY_TOTAL = config('PAYSUITE_RETRY_TOTAL', default=3, cast=int)
-PAYSUITE_RETRY_BACKOFF = config('PAYSUITE_RETRY_BACKOFF', default=0.5, cast=float)
-# URL pública absoluta para onde o PaySuite envia os webhooks. Se vazia,
-# deriva de BACKEND_URL + /api/v1/payments/webhook/paysuite/.
-PAYSUITE_WEBHOOK_URL = config('PAYSUITE_WEBHOOK_URL', default='')
+# ─── Gateway de Pagamento (VPay) ───
+# Documentação: https://vpay.co.mz/docs/api-reference
+VPAY_BASE_URL = config('VPAY_BASE_URL', default='https://api.vpay.co.mz')
+VPAY_CHECKOUT_BASE_URL = config(
+    'VPAY_CHECKOUT_BASE_URL', default='https://checkout.vpay.co.mz'
+)
+VPAY_CLIENT_ID = config('VPAY_CLIENT_ID', default='')
+VPAY_CLIENT_SECRET = config('VPAY_CLIENT_SECRET', default='')
+VPAY_WEBHOOK_SECRET = config('VPAY_WEBHOOK_SECRET', default='')
+VPAY_TIMEOUT = config('VPAY_TIMEOUT', default=20, cast=int)
+VPAY_RETRY_TOTAL = config('VPAY_RETRY_TOTAL', default=3, cast=int)
+VPAY_RETRY_BACKOFF = config('VPAY_RETRY_BACKOFF', default=0.5, cast=float)
 
 # ─── Cloudflare Stream ───
 CLOUDFLARE_ACCOUNT_ID = config('CLOUDFLARE_ACCOUNT_ID', default='')

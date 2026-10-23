@@ -52,6 +52,17 @@ const PAYMENT_STATUS_COLORS: Record<string, string> = {
   failed: 'text-red-600', refunded: 'text-gray-600',
 };
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  vpay: 'VPay (Online)',
+  mpesa: 'M-Pesa',
+  emola: 'e-Mola',
+  card: 'Cartão',
+  wallet: 'Saldo da Carteira',
+  bank: 'Transferência Bancária',
+  cash: 'Pagamento na Entrega',
+  test: 'Modo Teste',
+};
+
 function buildTimeline(order: any) {
   const steps: { label: string; date: string | null; done: boolean; active: boolean; icon: any }[] = [];
   const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
@@ -403,7 +414,7 @@ export default function OrderDetailPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Método</span>
-                    <span className="font-medium">{order.payment_method || '—'}</span>
+                    <span className="font-medium">{PAYMENT_METHOD_LABELS[order.payment_method] || order.payment_method || '—'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Estado</span>

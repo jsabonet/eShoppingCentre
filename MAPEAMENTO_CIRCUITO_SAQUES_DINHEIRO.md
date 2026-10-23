@@ -14,7 +14,7 @@ A plataforma usa um modelo monetário **manual** (estilo Jumia/Etsy/Shopify manu
 2. A **carteira** (`Wallet`) é um **livro-razão interno e auditável** do que é devido a cada parte — não é uma conta bancária nem processa pagamentos reais.
 3. Os **saques** são **manuais**: o vendedor/afiliado pede o saque, o admin paga fora do sistema (M-Pesa/e-Mola/bank) e depois marca o saque como **pago** no painel, registando a referência.
 
-**Estado geral**: o esqueleto do circuito (modelos, serviços, endpoints, UI) está largamente implementado e coeso, mas **falta o elo crítico** que liga o pagamento real à carteira: **nenhum caminho de código em produção marca `Order.payment_status = "completed"`** (só o método `test` o faz). Consequentemente, `settle_payment`, a criação de escrow e o crédito do vendedor **nunca disparam para pagamentos reais**.
+**Estado geral**: o elo de pagamento real está ligado pela integração VPay: confirmações autenticadas por webhook ou polling verificável marcam `Order.payment_status = "completed"` e acionam `settle_payment`, escrow e crédito do vendedor.
 
 Existe ainda **duplicação**: dois subsistemas de saque paralelos (a carteira `PayoutRequest` vs. o `AffiliatePayout` dos afiliados) e endpoints de admin falsos ("stubs") que coexistem com os endpoints reais.
 
@@ -29,7 +29,7 @@ Existe ainda **duplicação**: dois subsistemas de saque paralelos (a carteira `
 | `wallet` | Núcleo: `Wallet`, `WalletTransaction`, `WalletEntry`, `EscrowHolding`, `PayoutRequest` e toda a camada de serviços de mutação monetária. |
 | `orders` | Criação de encomendas, `settle_payment`, escrow, confirmação de entrega, cancelamento, devolução/reembolso, override admin e tarefas Celery. |
 | `affiliates` | Circuito paralelo de comissões e saques de afiliados (`AffiliateProfile`, `AffiliateCommission`, `AffiliatePayout`, `AffiliateKYC`, `AffiliateSettings`). |
-| `payments` | `PaymentTransaction` + webhooks (M-Pesa e Stripe) — **não ligados** à conclusão do pagamento da encomenda. |
+| `payments` | `PaymentTransaction` + cliente VPay, webhook assinado e polling de estado ligados à conclusão idempotente do pagamento da encomenda. |
 | `stores` | `views_earnings.py` expõe estatísticas/ganhos do vendedor a partir da carteira. |
 | `users` | `signals.py` cria a carteira em cada utilizador; `views_admin.py` contém **stubs** de payout do admin. |
 | `notifications` | `email_service.py` com emails de payout/comissão/KYC. |
@@ -54,7 +54,7 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 | `AffiliateKYC` | Gate de verificação para afiliados. |
 | `AffiliateSettings` | `min_payout_amount` (500 MZN), `approve_after_days` (7), `payout_fee_percent` (default 0) — **`payout_fee_percent` definido mas nunca aplicado**. |
 
-`payments.PaymentTransaction`: regista movimentos do M-Pesa/Stripe, mas não é usado para concluir encomendas.
+`payments.PaymentTransaction`: mantém o registo do pedido VPay e da confirmação do pagamento; pagamentos históricos PaySuite são preservados como legado.
 
 ---
 
@@ -248,7 +248,7 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 
 Alinhado com o `PLANO_CARTEIRA_INTERNA.md` (W1–W5):
 
-1. **W0 — Fechar o elo de pagamento (crítico)** ✅ **IMPLEMENTADO via PaySuite**: o gateway único é o **PaySuite** (M-Pesa/e-Mola/Mkesh/cartões num checkout hospedado). Fluxo: `POST /api/v1/payments/initiate/` cria o pagamento e grava a `reference` na encomenda → o cliente é redirecionado para a `checkout_url` → o webhook `POST /api/v1/payments/webhook/paysuite/` (assinado por `X-Signature` HMAC-SHA256) mapeia `data.reference` para as encomendas e chama `complete_payment()`, que marca `payment_status="completed"` de forma idempotente e despoleta `settle_payment` (escrow/crédito do vendedor). Frontend: redirecionamento no checkout + página `/checkout/success` com polling do estado.
+1. **W0 — Fechar o elo de pagamento (crítico)** ✅ **IMPLEMENTADO via VPay**: o gateway único é a **VPay**. O backend cria pedidos pela API VPay e guarda o `orderId`; o checkout redireciona para a página hospedada. O webhook `POST /api/v1/payments/webhook/vpay/` valida `X-Voidpay-Signature` (HMAC-SHA256 sobre o corpo bruto) e o evento `payment.confirmed`; como fallback, o polling consulta `GET /v1/orders/{order_id}/status`. Só `status="paid"` com valor e moeda correspondentes conclui a encomenda e despoleta `settle_payment` de forma idempotente.
 2. **Unificar afiliados na carteira**: fazer `AffiliateCommission`/`AffiliatePayout` passarem por `wallet.services.credit/debit`, eliminando o circuito paralelo (ou documentar formalmente a separação como decisão de arquitetura).
 3. **Remover stubs**: apagar `PendingPayoutsView`/`ApprovePayoutView` de `users/views_admin.py`, as rotas duplicadas e as funções mortas em `frontend/src/lib/api.ts`.
 4. **Tornar `approve_payout` load-bearing** ou remover o passo: `pay_payout` deveria exigir aprovação prévia (ou documentar o fluxo de pagamento direto).
@@ -276,10 +276,10 @@ Alinhado com o `PLANO_CARTEIRA_INTERNA.md` (W1–W5):
 - [backend/apps/affiliates/views.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/views.py) — endpoints de afiliados/admin.
 - [backend/apps/affiliates/services.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/services.py) / [tasks.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/tasks.py) — aprovar/clawback de comissões.
 - [backend/apps/affiliates/urls.py](d:/Projectos/eShoppingCentre-main/backend/apps/affiliates/urls.py) — rotas de afiliados.
-- [backend/apps/payments/views.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/views.py) — initiate/status/webhook PaySuite (W0).
-- [backend/apps/payments/services/paysuite.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/paysuite.py) — cliente PaySuite (criar/consultar pagamento + verificação HMAC).
+- [backend/apps/payments/views.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/views.py) — initiate/status/webhook VPay (W0).
+- [backend/apps/payments/services/vpay.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/vpay.py) — cliente VPay (autenticação, criação/consulta de pedido + verificação HMAC).
 - [backend/apps/payments/services/completion.py](d:/Projectos/eShoppingCentre-main/backend/apps/payments/services/completion.py) — `complete_payment()` idempotente.
-- [frontend/src/components/CheckoutContent.tsx](d:/Projectos/eShoppingCentre-main/frontend/src/components/CheckoutContent.tsx) — redireciona para o checkout PaySuite.
+- [frontend/src/components/CheckoutContent.tsx](d:/Projectos/eShoppingCentre-main/frontend/src/components/CheckoutContent.tsx) — redireciona para o checkout VPay.
 - [frontend/app/checkout/success/page.tsx](d:/Projectos/eShoppingCentre-main/frontend/app/checkout/success/page.tsx) — confirmação/polling pós-pagamento.
 - [backend/apps/stores/views_earnings.py](d:/Projectos/eShoppingCentre-main/backend/apps/stores/views_earnings.py) — ganhos do vendedor.
 - [backend/config/settings/base.py](d:/Projectos/eShoppingCentre-main/backend/config/settings/base.py) — `CELERY_BEAT_SCHEDULE`.

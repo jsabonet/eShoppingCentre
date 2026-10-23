@@ -1,6 +1,6 @@
 """Conclusão idempotente de pagamento — fecha o elo W0 do circuito de dinheiro.
 
-Quando o gateway (PaySuite) confirma o pagamento via webhook, este módulo mapeia
+Quando o gateway VPay confirma o pagamento via webhook, este módulo mapeia
 o payload para a(s) encomenda(s), marca `payment_status='completed'` de forma
 idempotente e despoleta a liquidação do dinheiro (`settle_payment`), que credita o
 vendedor (digital/curso) ou retém em escrow (físico).

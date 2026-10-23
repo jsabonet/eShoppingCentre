@@ -11,7 +11,8 @@ class PaymentTransaction(BaseModel):
         ('refunded', 'Reembolsada'),
     ]
     PROVIDER_CHOICES = [
-        ('paysuite', 'PaySuite'),
+        ('vpay', 'VPay'),
+        ('paysuite', 'PaySuite (legado)'),
     ]
 
     order = models.ForeignKey(
@@ -22,11 +23,11 @@ class PaymentTransaction(BaseModel):
         blank=True,
         help_text='Encomenda associada (pode ser nula se o webhook não conseguir mapear a encomenda).',
     )
-    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='paysuite')
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='vpay')
     provider_transaction_id = models.CharField(max_length=255, blank=True)
     idempotency_key = models.CharField(
         max_length=255, unique=True, null=True, blank=True,
-        help_text='Chave de idempotência do webhook (ex: paysuite:<gateway_id>).',
+        help_text='Chave de idempotência do webhook (ex: vpay:<order_id>).',
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, default='MZN')

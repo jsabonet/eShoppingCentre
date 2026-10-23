@@ -1,6 +1,6 @@
 import logging
-import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from urllib.parse import quote
 
 from django.conf import settings
 from django.db import transaction
@@ -13,288 +13,315 @@ from rest_framework.views import APIView
 from apps.orders.models import Order
 from apps.payments.models import PaymentTransaction
 from apps.payments.services.completion import complete_payment
-from apps.payments.services.paysuite import PaysuiteClient
+from apps.payments.services.vpay import VPayClient
 
 logger = logging.getLogger(__name__)
 
-# Limites impostos pela PaySuite em `POST /v1/payments` (ver openapi):
-# `reference` só aceita letras e números (máx. 50) e `description` máx. 125.
-_REFERENCE_MAX = 50
-_DESCRIPTION_MAX = 125
+
+def _friendly_error(message):
+    if 'credential' in (message or '').lower() or 'autenticar' in (message or '').lower():
+        return 'O pagamento online está temporariamente indisponível. Tente novamente mais tarde.'
+    return 'Não foi possível iniciar o pagamento. Tente novamente.'
 
 
-def _gateway_reference(value):
-    """Adapta um `order_number` ao formato que a PaySuite aceita.
-
-    Os nossos números são ``PED-8B549F72`` e o gateway responde
-    ``422 The Reference field must only contain letters and numbers``
-    ao hífen — sem isto nenhum pagamento chega a ser criado.
-    """
-    return re.sub(r'[^A-Za-z0-9]', '', value or '')[:_REFERENCE_MAX]
+def _checkout_url(order_id):
+    base_url = settings.VPAY_CHECKOUT_BASE_URL.rstrip('/')
+    return f'{base_url}/{quote(str(order_id), safe="")}'
 
 
-def _webhook_url():
-    base = getattr(settings, 'PAYSUITE_WEBHOOK_URL', None)
-    if base:
-        return base
-    site = getattr(settings, 'BACKEND_URL', '').rstrip('/')
-    return f'{site}/api/v1/payments/webhook/paysuite/' if site else ''
+def _build_order_payload(orders, source_id):
+    buyer = orders[0].buyer
+    # Send each local order total as one item so gateway totals include discounts.
+    items = [{
+        'originProductId': f'order-{order.id}',
+        'name': f'Encomenda {order.order_number}',
+        'quantity': 1,
+        'price': float(order.total),
+    } for order in orders]
+
+    has_physical_items = any(order.has_physical_items for order in orders)
+    payload = {
+        'source': {'source': 'api', 'sourceId': source_id},
+        'customer': {
+            'name': buyer.get_full_name() or buyer.email,
+            'email': buyer.email,
+            **({'phone': buyer.phone} if buyer.phone else {}),
+        },
+        # O nosso checkout recolhe morada e dados de entrega; o painel VPay
+        # trata apenas do pagamento. Mantemos ambos os flags desativados para
+        # nunca repetir a recolha entre as duas páginas.
+        'shippingAddressDisabled': True,
+        'deliveryInfoDisabled': True,
+        'items': items,
+    }
+
+    if has_physical_items:
+        address = orders[0].shipping_address or {}
+        payload['shippingAddress'] = {
+            'street': address.get('address', ''),
+            'city': address.get('city', ''),
+            'country': 'MZ',
+            **({'reference': address['notes']} if address.get('notes') else {}),
+        }
+    return payload
 
 
-def _return_url(reference):
-    frontend = getattr(settings, 'FRONTEND_URL', '').rstrip('/')
-    return f'{frontend}/checkout/success?reference={reference}' if frontend else ''
-
-
-def _resolve_orders(reference):
-    """Mapeia a ``reference`` do webhook para as encomendas do checkout."""
-    if not reference:
+def _orders_for_vpay_id(order_id):
+    if not order_id:
         return Order.objects.none()
-    return Order.objects.filter(payment_id=reference)
+    return Order.objects.filter(payment_id=order_id)
+
+
+def _amount_matches(amount, total):
+    try:
+        parsed_amount = Decimal(str(amount))
+        return parsed_amount.is_finite() and parsed_amount == total
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+
+
+def _valid_amount(amount):
+    try:
+        return Decimal(str(amount)).is_finite()
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+
+
+@transaction.atomic
+def _confirm_payment(order_id, event_data, delivery_id=''):
+    orders = list(_orders_for_vpay_id(order_id).select_related('buyer', 'store__owner'))
+    if not orders:
+        return None, False
+
+    total = sum((order.total for order in orders), Decimal('0.00'))
+    if not _amount_matches(event_data.get('amount'), total):
+        logger.error('VPay amount mismatch for order %s', order_id)
+        return None, False
+    if event_data.get('currency') != 'MZN':
+        logger.error('VPay currency mismatch for order %s', order_id)
+        return None, False
+
+    transaction_id = str(event_data.get('transactionId') or '')
+    record_key = f'vpay:{order_id}'
+    txn, _ = PaymentTransaction.objects.get_or_create(
+        idempotency_key=record_key,
+        defaults={
+            'order': orders[0],
+            'provider': 'vpay',
+            'provider_transaction_id': transaction_id,
+            'amount': total,
+            'currency': 'MZN',
+            'status': 'completed',
+            'provider_response': {
+                'event': event_data,
+                'delivery_id': delivery_id,
+            },
+            'completed_at': timezone.now(),
+        },
+    )
+    if txn.status != 'completed':
+        txn.status = 'completed'
+        txn.provider_transaction_id = transaction_id
+        txn.provider_response = {'event': event_data, 'delivery_id': delivery_id}
+        txn.completed_at = timezone.now()
+        txn.save(update_fields=[
+            'status', 'provider_transaction_id', 'provider_response',
+            'completed_at', 'updated_at',
+        ])
+
+    created_any = False
+    for index, order in enumerate(orders):
+        completed_order, created = complete_payment(
+            order.id,
+            provider='vpay',
+            provider_transaction_id=transaction_id,
+            provider_response=event_data,
+        )
+        orders[index] = completed_order
+        created_any = created_any or created
+    return orders, created_any
 
 
 class PaymentsInitiateView(APIView):
-    """Inicia um pagamento PaySuite para uma ou mais encomendas pendentes.
-
-    Regista a transacção no ledger, grava a `reference` em `Order.payment_id`
-    (para o webhook mapear) e devolve a ``checkout_url`` hospedada do PaySuite.
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         order_ids = request.data.get('order_ids') or [request.data.get('order_id')]
-        order_ids = [str(i) for i in order_ids if i]
-
+        order_ids = [str(order_id) for order_id in order_ids if order_id]
         if not order_ids:
             return Response({'error': 'Nenhuma encomenda indicada.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        orders = Order.objects.filter(id__in=order_ids, buyer=request.user)
-        if orders.count() != len(set(order_ids)):
+        orders = list(Order.objects.filter(
+            id__in=order_ids,
+            buyer=request.user,
+        ).prefetch_related('items'))
+        if len(orders) != len(set(order_ids)):
             return Response({'error': 'Encomenda(s) inválida(s) ou não autorizada(s).'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        pending = [o for o in orders if o.payment_status == 'pending']
-        already_paid = [o for o in orders if o.payment_status == 'completed']
+        pending = [order for order in orders if order.payment_status == 'pending']
+        already_paid = [order for order in orders if order.payment_status == 'completed']
         if already_paid and not pending:
-            return Response({'error': 'Encomenda(s) já pagas.', 'order_ids': [o.id for o in already_paid]},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'error': 'Encomenda(s) já pagas.',
+                'order_ids': [str(order.id) for order in already_paid],
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Um pagamento cobre o total das encomendas ainda por pagar.
         payable = pending or orders
-        total = sum((o.total for o in payable), Decimal('0.00'))
+        total = sum((order.total for order in payable), Decimal('0.00'))
         if total <= 0:
             return Response({'error': 'Montante de pagamento inválido.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        if len(payable) == 1:
-            reference = _gateway_reference(payable[0].order_number)
-        else:
-            reference = f'CHECKOUT{get_random_string(10).upper()}'
-
-        description = ', '.join(o.order_number for o in payable)[:_DESCRIPTION_MAX]
-
-        client = PaysuiteClient()
-        result = client.create_payment(
-            amount=total,
-            reference=reference,
-            description=description,
-            return_url=_return_url(reference),
-            webhook_url=_webhook_url(),
-            method=request.data.get('method'),
-        )
-
+        source_id = f'checkout-{get_random_string(20).lower()}'
+        result = VPayClient().create_order(_build_order_payload(payable, source_id))
         if not result['ok']:
+            message = result.get('message') or 'Erro ao criar pedido na VPay.'
             PaymentTransaction.objects.create(
                 order=payable[0],
-                provider='paysuite',
+                provider='vpay',
                 amount=total,
                 currency='MZN',
                 status='failed',
                 provider_response=result.get('data') or {},
-                error_message=result.get('message') or 'Erro ao criar pagamento.',
+                error_message=message,
             )
             return Response(
-                {'error': result.get('message') or 'Erro ao criar pagamento.'},
+                {'error': _friendly_error(message), 'detail': message},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        data = result['data'] or {}
-        gateway_id = data.get('id', '')
-        checkout_url = data.get('checkout_url', '')
-
+        data = result['data']
+        gateway_order_id = str(data['orderId'])
+        checkout_url = data.get('checkout') or _checkout_url(gateway_order_id)
         with transaction.atomic():
-            txn, _ = PaymentTransaction.objects.get_or_create(
-                idempotency_key=f'paysuite:{reference}',
+            PaymentTransaction.objects.update_or_create(
+                idempotency_key=f'vpay:{gateway_order_id}',
                 defaults={
                     'order': payable[0],
-                    'provider': 'paysuite',
-                    'provider_transaction_id': gateway_id,
+                    'provider': 'vpay',
+                    'provider_transaction_id': gateway_order_id,
                     'amount': total,
                     'currency': 'MZN',
                     'status': 'pending',
                     'provider_response': data,
+                    'error_message': '',
+                    'completed_at': None,
                 },
             )
-            if gateway_id and txn.provider_transaction_id != gateway_id:
-                txn.provider_transaction_id = gateway_id
-                txn.save(update_fields=['provider_transaction_id', 'updated_at'])
-
             for order in payable:
-                order.payment_id = reference
+                order.payment_id = gateway_order_id
                 order.save(update_fields=['payment_id', 'updated_at'])
 
         return Response({
             'checkout_url': checkout_url,
-            'payment_id': gateway_id,
-            'reference': reference,
-            'order_ids': [str(o.id) for o in payable],
+            'payment_id': gateway_order_id,
+            'reference': gateway_order_id,
+            'order_ids': [str(order.id) for order in payable],
         }, status=status.HTTP_200_OK)
 
 
 class PaymentsStatusView(APIView):
-    """Estado do pagamento de um checkout (fallback ao webhook, para polling)."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        reference = request.query_params.get('reference')
-        if not reference:
+        order_id = request.query_params.get('reference')
+        if not order_id:
             return Response({'error': 'Parâmetro `reference` obrigatório.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        orders = _resolve_orders(reference).filter(buyer=request.user)
-        if not orders.exists():
+        orders = list(_orders_for_vpay_id(order_id).filter(
+            buyer=request.user,
+        ).select_related('buyer', 'store__owner'))
+        if not orders:
             return Response({'error': 'Pagamento não encontrado.'},
                             status=status.HTTP_404_NOT_FOUND)
 
-        all_completed = all(o.payment_status == 'completed' for o in orders)
-        any_failed = any(o.payment_status == 'failed' for o in orders)
+        if any(order.payment_status != 'completed' for order in orders):
+            result = VPayClient().get_order_status(order_id)
+            if not result['ok']:
+                return Response(
+                    {'error': 'Não foi possível confirmar o pagamento com a VPay.'},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+            data = result['data']
+            if data.get('orderId') != order_id:
+                return Response({'error': 'Resposta de pagamento inválida da VPay.'},
+                                status=status.HTTP_502_BAD_GATEWAY)
+
+            payment_status = data.get('status')
+            if payment_status == 'paid':
+                total = sum((order.total for order in orders), Decimal('0.00'))
+                if not _amount_matches(data.get('amount'), total):
+                    logger.error('VPay polling amount mismatch for order %s', order_id)
+                    return Response({'error': 'Montante confirmado inválido.'},
+                                    status=status.HTTP_502_BAD_GATEWAY)
+                confirmed_data = {
+                    **data,
+                    'currency': data.get('currency', 'MZN'),
+                    'transactionId': data.get('transactionId', ''),
+                }
+                confirmed_orders, _ = _confirm_payment(order_id, confirmed_data)
+                if confirmed_orders is None:
+                    return Response({'error': 'Dados de pagamento inválidos da VPay.'},
+                                    status=status.HTTP_502_BAD_GATEWAY)
+                orders = confirmed_orders
+            elif payment_status in ('failed', 'cancelled'):
+                PaymentTransaction.objects.filter(
+                    idempotency_key=f'vpay:{order_id}',
+                    status='pending',
+                ).update(status='failed', error_message=f'VPay status: {payment_status}')
+                for order in orders:
+                    if order.payment_status == 'pending':
+                        order.payment_status = 'failed'
+                        order.save(update_fields=['payment_status', 'updated_at'])
+
+        all_completed = all(order.payment_status == 'completed' for order in orders)
         return Response({
-            'reference': reference,
-            'status': 'completed' if all_completed else ('failed' if any_failed else 'pending'),
+            'reference': order_id,
+            'status': 'completed' if all_completed else (
+                'failed' if any(order.payment_status == 'failed' for order in orders) else 'pending'
+            ),
             'orders': [{
-                'id': str(o.id),
-                'order_number': o.order_number,
-                'payment_status': o.payment_status,
-            } for o in orders],
+                'id': str(order.id),
+                'order_number': order.order_number,
+                'payment_status': order.payment_status,
+            } for order in orders],
         }, status=status.HTTP_200_OK)
 
 
-class PaysuiteWebhookView(APIView):
-    """Webhook PaySuite — fecha o elo de pagamento (W0).
-
-    Eventos tratados: `payment.success` (liquida e credita) e `payment.failed`.
-    `payout.*` e `refund.*` são registados para auditoria (fora do âmbito W0).
-    """
+class VPayWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        client = VPayClient()
+        signature = request.META.get('HTTP_X_VOIDPAY_SIGNATURE', '')
         payload = request.body
-        body = payload.decode('utf-8') or ''
-        signature = request.META.get('HTTP_X_SIGNATURE', '')
+        if not client.webhook_secret or not client.verify_signature(payload, signature):
+            logger.warning('VPay webhook rejected: missing or invalid signature.')
+            return Response({'error': 'Invalid signature'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        client = PaysuiteClient()
-        if client.webhook_secret and not client.verify_signature(body, signature):
-            logger.error('Webhook PaySuite com assinatura inválida.')
-            return Response({'error': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
+        event = request.data if isinstance(request.data, dict) else {}
+        if event.get('event') != 'payment.confirmed':
+            return Response({'status': 'ok', 'handled': False}, status=status.HTTP_200_OK)
 
-        data = request.data if isinstance(request.data, dict) else {}
-        event = data.get('event', '')
-        payload_data = data.get('data') or {}
+        order_id = event.get('orderId')
+        if (not order_id or event.get('status') != 'paid'
+                or not _valid_amount(event.get('amount'))
+                or event.get('currency') != 'MZN'):
+            return Response({'error': 'Invalid payment event'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if event == 'payment.success':
-            return self._handle_success(data, payload_data)
-        if event == 'payment.failed':
-            return self._handle_failed(data, payload_data)
-
-        # Eventos de payout/refund fora do âmbito W0: só auditar.
-        logger.info('Webhook PaySuite evento não tratado: %s', event)
-        return Response({'status': 'ok', 'handled': False}, status=status.HTTP_200_OK)
-
-    @staticmethod
-    def _handle_success(data, payload_data):
-        reference = payload_data.get('reference', '')
-        gateway_id = payload_data.get('id', '') or payload_data.get('transaction_id', '')
-
-        orders = _resolve_orders(reference)
-        if not orders.exists():
-            logger.warning('Webhook PaySuite sem encomenda mapeada: %s', data)
-            PaysuiteWebhookView._record_failed(data, 'Encomenda não encontrada para a referência.', gateway_id)
-            return Response({'status': 'ok', 'mapped': False}, status=status.HTTP_200_OK)
-
-        total = sum((o.total for o in orders), Decimal('0.00'))
-        PaysuiteWebhookView._mark_txn_completed(reference, gateway_id, data, total)
-
-        created_any = False
-        for order in orders:
-            _, created = complete_payment(
-                order.id,
-                provider='paysuite',
-                provider_transaction_id=gateway_id,
-                provider_response=data,
-            )
-            created_any = created_any or created
-
+        orders, created = _confirm_payment(
+            str(order_id),
+            event,
+            delivery_id=request.META.get('HTTP_X_VOIDPAY_DELIVERY', ''),
+        )
+        if orders is None:
+            return Response({'error': 'Payment could not be verified'},
+                            status=status.HTTP_400_BAD_REQUEST)
         return Response({
             'status': 'ok',
-            'reference': reference,
-            'orders': [str(o.order_number) for o in orders],
-            'created': created_any,
+            'orderId': str(order_id),
+            'created': created,
         }, status=status.HTTP_200_OK)
-
-    @staticmethod
-    def _handle_failed(data, payload_data):
-        reference = payload_data.get('reference', '')
-        gateway_id = payload_data.get('id', '')
-
-        txn = PaymentTransaction.objects.filter(
-            idempotency_key=f'paysuite:{reference}',
-        ).first() or PaymentTransaction.objects.filter(
-            provider_transaction_id=gateway_id, provider='paysuite',
-        ).first()
-
-        if txn and txn.status != 'failed':
-            txn.status = 'failed'
-            txn.provider_response = data
-            txn.error_message = payload_data.get('message', '') or 'Pagamento falhou.'
-            txn.save(update_fields=['status', 'provider_response', 'error_message', 'updated_at'])
-
-        logger.warning('Webhook PaySuite payment.failed: %s', data)
-        return Response({'status': 'ok'}, status=status.HTTP_200_OK)
-
-    @staticmethod
-    def _mark_txn_completed(reference, gateway_id, data, amount=Decimal('0.00')):
-        txn, _ = PaymentTransaction.objects.get_or_create(
-            idempotency_key=f'paysuite:{reference}',
-            defaults={
-                'provider': 'paysuite',
-                'provider_transaction_id': gateway_id,
-                'amount': amount,
-                'currency': 'MZN',
-                'status': 'completed',
-                'provider_response': data,
-                'completed_at': timezone.now(),
-            },
-        )
-        if txn.status != 'completed':
-            txn.status = 'completed'
-            if gateway_id and not txn.provider_transaction_id:
-                txn.provider_transaction_id = gateway_id
-            txn.provider_response = data
-            txn.completed_at = timezone.now()
-            txn.save(update_fields=['status', 'provider_transaction_id', 'provider_response', 'completed_at', 'updated_at'])
-
-    @staticmethod
-    def _record_failed(data, error_message, gateway_id=''):
-        key = f"paysuite:failed:{gateway_id or data.get('reference', '')}"
-        PaymentTransaction.objects.get_or_create(
-            idempotency_key=key,
-            defaults={
-                'provider': 'paysuite',
-                'amount': 0,
-                'currency': 'MZN',
-                'status': 'failed',
-                'provider_response': data,
-                'error_message': error_message,
-            },
-        )

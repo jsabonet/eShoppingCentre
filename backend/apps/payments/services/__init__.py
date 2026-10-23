@@ -1,7 +1,7 @@
-from .paysuite import PaysuiteClient
 from .completion import complete_payment
+from .vpay import VPayClient
 
 __all__ = [
-    'PaysuiteClient',
+    'VPayClient',
     'complete_payment',
 ]
