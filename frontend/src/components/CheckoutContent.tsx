@@ -7,7 +7,11 @@ import { useRouter } from 'next/navigation';
 import { Truck, CreditCard, MapPin, CheckCircle, Loader2, Info, X } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
 import { paymentsAPI } from '@/src/lib/api';
-import { savePendingCheckout } from '@/src/lib/pendingCheckout';
+import {
+  savePendingCheckout,
+  readPendingCheckout,
+  clearPendingCheckout,
+} from '@/src/lib/pendingCheckout';
 
 function formatPrice(price: number): string {
   return price.toFixed(2).replace('.', ',');
@@ -54,6 +58,7 @@ export default function CheckoutContent() {
   const [couponCode, setCouponCode] = useState('');
   const [couponInfo, setCouponInfo] = useState<any>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [reconcilingPayment, setReconcilingPayment] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -66,12 +71,50 @@ export default function CheckoutContent() {
     notes: '',
   });
 
+  // O checkout hospedado da VPay devolve-nos para `/checkout` (URL de retorno
+  // configurada no painel), sem parâmetro de referência. Se já existir um
+  // checkout pendente, reconciliamos o estado real do pagamento para não
+  // voltar a mostrar as seleções do pedido como se nada tivesse acontecido.
+  useEffect(() => {
+    const pending = readPendingCheckout();
+    if (!pending) return;
+
+    let cancelled = false;
+    setReconcilingPayment(true);
+
+    (async () => {
+      try {
+        const res = await paymentsAPI.status(pending.reference);
+        if (cancelled) return;
+        const st = res.data?.status;
+        if (st === 'completed' || st === 'pending') {
+          // `completed`: fecha o ciclo e confirma. `pending`: a página de
+          // sucesso continua a fazer poll até à confirmação (ou falha), evitando
+          // que o cliente volte a submeter e crie uma encomenda duplicada.
+          router.replace(`/checkout/success?reference=${pending.reference}`);
+          return;
+        }
+        // `failed`/`not_found`: pagamento não concretizado; limpa o registo
+        // para o cliente poder tentar de novo sem estado antigo.
+        clearPendingCheckout();
+      } catch {
+        // Sem ligação/estado: mantém a página e o registo para nova tentativa.
+      } finally {
+        if (!cancelled) setReconcilingPayment(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
   // Redirect to cart if empty (only on initial load, not after confirmation)
   useEffect(() => {
-    if (items.length === 0) {
+    if (items.length === 0 && !reconcilingPayment) {
       router.push('/cart');
     }
-  }, [items, router]);
+  }, [items, router, reconcilingPayment]);
 
   // Calculate displayed shipping total from selections
   const shippingTotal = useMemo(() => {
@@ -283,6 +326,12 @@ export default function CheckoutContent() {
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 py-8">
+      {reconcilingPayment && (
+        <div className="max-w-xl mx-auto mb-6 flex items-center justify-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700">
+          <Loader2 size={18} className="animate-spin shrink-0" />
+          A confirmar o estado do seu pagamento…
+        </div>
+      )}
       {showPaymentNotice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
           <section
