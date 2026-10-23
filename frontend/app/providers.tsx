@@ -15,6 +15,7 @@ import PWAInstall from "@/src/components/PWAInstall";
 import NavigationLoader from "@/src/components/NavigationLoader";
 import ChatWidget from "@/src/components/ChatWidget";
 import { PaymentReturnReconciler } from "@/src/components/PaymentReturnReconciler";
+import { PaymentReturnRedirect } from "@/src/components/PaymentReturnRedirect";
 
 /** Rotas que precisam de auth resolvida antes de renderizar */
 const PROTECTED_PREFIXES = ['/admin', '/seller', '/account', '/checkout', '/my-courses', '/affiliate'];
@@ -62,6 +63,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <AcademyProvider>
         <ChatProvider>
         <TooltipProvider>
+          <PaymentReturnRedirect />
           <AuthGate>
             <Header />
             <VerificationBanner />

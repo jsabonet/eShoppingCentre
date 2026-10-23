@@ -10,7 +10,6 @@ import { paymentsAPI } from '@/src/lib/api';
 import {
   savePendingCheckout,
   markPaymentReturn,
-  consumePaymentReturn,
 } from '@/src/lib/pendingCheckout';
 
 function formatPrice(price: number): string {
@@ -70,24 +69,8 @@ export default function CheckoutContent() {
     notes: '',
   });
 
-  // O checkout hospedado da VPay devolve-nos para `/checkout`, muitas vezes
-  // via botão "voltar" (back/forward cache), sem recarregar a página — o que
-  // voltaria a mostrar as seleções do pedido. Sempre que a nossa página volta
-  // a ser exibida depois de um pagamento, redirecionamos para a home, onde o
-  // estado do pedido é reconciliado e o carrinho é ajustado.
-  useEffect(() => {
-    const redirectHome = () => {
-      if (consumePaymentReturn()) {
-        router.replace('/');
-      }
-    };
-
-    // Cobre o regresso por redirecionamento normal (fresh load).
-    redirectHome();
-    // Cobre o regresso pelo botão voltar do browser/telemóvel (bfcache restore).
-    window.addEventListener('pageshow', redirectHome);
-    return () => window.removeEventListener('pageshow', redirectHome);
-  }, [router]);
+  // O redirecionamento de volta para a home é feito pelo <PaymentReturnRedirect/>
+  // (montado antes do AuthGate), para não esperar pela validação de sessão.
 
   // Redirect to cart if empty (only on initial load, not after confirmation)
   useEffect(() => {
