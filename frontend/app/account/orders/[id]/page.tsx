@@ -12,6 +12,7 @@ import AccountLayout from '@/src/components/AccountLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import LightboxImage from '@/src/components/LightboxImage';
 import { usePendingCheckout } from '@/src/hooks/usePendingCheckout';
+import { usePaymentReconciliation } from '@/src/hooks/usePaymentReconciliation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -111,30 +112,38 @@ export default function OrderDetailPage() {
     return { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}), };
   }, []);
 
-  useEffect(() => {
+  const loadOrder = useCallback(async () => {
     if (!id) return;
-    (async () => {
-      try {
-        const [orderRes, returnsRes] = await Promise.all([
-          fetch(API_URL + '/orders/' + id + '/', { headers: apiHeaders() }),
-          fetch(API_URL + '/orders/returns/my/', { headers: apiHeaders() }),
-        ]);
-        if (orderRes.ok) {
-          const data = await orderRes.json();
-          setOrder(data);
-          // Pagamento já confirmado pelo webhook: os artigos podem sair do
-          // carrinho, mesmo que o cliente não tenha voltado à página de sucesso.
-          if (data?.payment_status === 'completed') {
-            settle(data.payment_id || data.order_number);
-          }
+    try {
+      const [orderRes, returnsRes] = await Promise.all([
+        fetch(API_URL + '/orders/' + id + '/', { headers: apiHeaders() }),
+        fetch(API_URL + '/orders/returns/my/', { headers: apiHeaders() }),
+      ]);
+      if (orderRes.ok) {
+        const data = await orderRes.json();
+        setOrder(data);
+        // Pagamento já confirmado pelo webhook: os artigos podem sair do
+        // carrinho, mesmo que o cliente não tenha voltado à página de sucesso.
+        if (data?.payment_status === 'completed') {
+          settle(data.payment_id || data.order_number);
         }
-        if (returnsRes.ok) {
-          const data = await returnsRes.json();
-          setReturns((data.results || data || []).filter((r: any) => r.order === id));
-        }
-      } catch {} finally { setLoading(false); }
-    })();
+      }
+      if (returnsRes.ok) {
+        const data = await returnsRes.json();
+        setReturns((data.results || data || []).filter((r: any) => r.order === id));
+      }
+    } catch {} finally { setLoading(false); }
   }, [id, apiHeaders, settle]);
+
+  useEffect(() => {
+    loadOrder();
+  }, [loadOrder]);
+
+  // Poll na VPay enquanto a encomenda estiver pendente, para o cliente ver
+  // "Pago" em tempo real mesmo sem ter voltado à página de sucesso.
+  usePaymentReconciliation(order ? [order] : [], () => {
+    loadOrder();
+  });
 
   const handleRequestReturn = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError('');

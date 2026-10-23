@@ -8,6 +8,7 @@ import { Search, ChevronRight, Clock, CheckCircle, Truck, XCircle, ShoppingBag, 
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import AccountLayout from '@/src/components/AccountLayout';
 import { useAuth } from '@/src/hooks/useAuth';
+import { usePaymentReconciliation } from '@/src/hooks/usePaymentReconciliation';
 import { ordersAPI } from '@/src/lib/api';
 
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -42,6 +43,12 @@ export default function OrdersPage() {
     } catch {} finally { setLoading(false); }
   };
 
+  // Se o cliente pagou mas não foi redirecionado de volta, o webhook pode
+  // demorar: poll na VPay e actualiza a lista assim que confirmar.
+  const { pendingCount } = usePaymentReconciliation(orders, () => {
+    loadOrders();
+  });
+
   const filtered = orders.filter((o: any) =>
     (o.order_number || o.id || '').toLowerCase().includes(search.toLowerCase())
   );
@@ -61,6 +68,13 @@ export default function OrdersPage() {
               className="w-full pl-9 pr-4 py-2 border border-border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
         </div>
+
+        {pendingCount > 0 && (
+          <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+            <Clock size={16} className="shrink-0" />
+            A confirmar o pagamento de {pendingCount} {pendingCount === 1 ? 'encomenda' : 'encomendas'}…
+          </div>
+        )}
 
         {loading ? (
           <LoadingSpinner size={24} message="A carregar..." />

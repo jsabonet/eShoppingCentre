@@ -187,6 +187,7 @@ export interface Order {
   items: OrderItem[];
   payment_method: string;
   payment_status: string;
+  payment_id: string | null;
   shipping_address: Record<string, string>;
   tracking_code: string | null;
   affiliate_commission: number;
