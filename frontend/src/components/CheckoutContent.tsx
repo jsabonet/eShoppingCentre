@@ -3,10 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Truck, Shield, CreditCard, MapPin, CheckCircle, Loader2, Wallet, ExternalLink } from 'lucide-react';
+import { Truck, CreditCard, MapPin, CheckCircle, Loader2, Info, X } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
-import { useAuth } from '@/src/hooks/useAuth';
-import { walletAPI, paymentsAPI } from '@/src/lib/api';
+import { paymentsAPI } from '@/src/lib/api';
 import { savePendingCheckout } from '@/src/lib/pendingCheckout';
 
 function formatPrice(price: number): string {
@@ -33,109 +32,19 @@ const PROVINCES = [
   { value: 'niassa', label: 'Niassa' },
 ];
 
-// Método de pagamento online processado no checkout hospedado VPay.
-// A escolha do método concreto (M-Pesa, e-Mola, Cartão, Carteira VPay,
-// PayPal ou QR Code) é feita no próprio painel VPay — para não repetir a
-// seleção entre o nosso checkout e o gateway.
-const ONLINE_PAYMENT_METHOD = 'vpay';
-
-type PaymentMethod = {
-  value: string;
-  label: string;
-  desc: string;
-  icon: string;
-  recommended?: boolean;
-  physicalOnly?: boolean;
-  devOnly?: boolean;
-  instructions: { title: string; steps: string[] };
-};
-
-const PAYMENT_METHODS: PaymentMethod[] = [
-  {
-    value: ONLINE_PAYMENT_METHOD,
-    label: 'Pagamento Online (VPay)',
-    desc: 'M-Pesa, e-Mola, Cartão, Carteira VPay, PayPal ou QR Code',
-    icon: '🔒',
-    recommended: true,
-    instructions: {
-      title: 'Como funciona o pagamento online:',
-      steps: [
-        'Ao confirmar o pedido, será redirecionado para o painel seguro da VPay.',
-        'Escolha o método desejado: M-Pesa, e-Mola, Cartão, Carteira VPay, PayPal ou QR Code.',
-        'Para carteiras móveis (M-Pesa/e-Mola), introduza o número do telefone e confirme com o PIN.',
-        'Depois de pagar, será devolvido ao nosso site para confirmarmos o pagamento.',
-      ],
-    },
-  },
-  {
-    value: 'wallet',
-    label: '👛 Saldo da Carteira',
-    desc: 'Pague com o saldo de reembolsos disponível',
-    icon: '👛',
-    instructions: {
-      title: 'Pagamento com Saldo:',
-      steps: [
-        'O valor total será debitado do seu saldo de reembolsos.',
-        'A encomenda é paga instantaneamente.',
-      ],
-    },
-  },
-  {
-    value: 'bank',
-    label: 'Transferência Bancária',
-    desc: 'Transferência para conta bancária',
-    icon: '🏦',
-    instructions: {
-      title: 'Instruções Transferência Bancária:',
-      steps: [
-        'Após confirmar, receberá um email com os dados bancários.',
-        'Realize a transferência para a conta indicada.',
-        'Envie o comprovante por email ou WhatsApp.',
-        'Após confirmação, o pedido será processado (até 24 horas úteis).',
-      ],
-    },
-  },
-  {
-    value: 'cash',
-    label: 'Pagamento na Entrega',
-    desc: 'Pague em dinheiro quando receber o produto',
-    icon: '💵',
-    physicalOnly: true,
-    instructions: {
-      title: 'Instruções Pagamento na Entrega:',
-      steps: [
-        'Aguarde o contacto da nossa equipa para confirmar a entrega.',
-        'Tenha o valor exato em dinheiro no momento da entrega.',
-        'Pague ao entregador e receba o seu produto.',
-      ],
-    },
-  },
-  {
-    value: 'test',
-    label: '🧪 Modo Teste (Grátis)',
-    desc: 'Checkout simulado — pagamento automático para testes',
-    icon: '🧪',
-    devOnly: true,
-    instructions: {
-      title: 'Modo de Teste:',
-      steps: [
-        'Este método simula um pagamento concluído.',
-        'Nenhum pagamento real é processado.',
-        'Disponível apenas em ambiente de desenvolvimento.',
-      ],
-    },
-  },
+const PAYMENT_METHOD = 'mpesa';
+const PAYMENT_INSTRUCTIONS = [
+  'No próximo passo, indique o número M-Pesa a debitar; pode ser diferente do telefone de contacto.',
+  'Confirme o valor e autorize a operação no seu telefone.',
+  'A encomenda só será atualizada depois da confirmação do pagamento.',
 ];
 
 export default function CheckoutContent() {
   const router = useRouter();
-  const { items, totalPrice, clearCart } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { items, totalPrice } = useCart();
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-  const [confirmed, setConfirmed] = useState(false);
-  const [orderData, setOrderData] = useState<any[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState(ONLINE_PAYMENT_METHOD);
   const [submitting, setSubmitting] = useState(false);
+  const [showPaymentNotice, setShowPaymentNotice] = useState(true);
   const [error, setError] = useState('');
   const [shippingEstimates, setShippingEstimates] = useState<any>(null);
   const [shippingSelections, setShippingSelections] = useState<Record<string, string>>({});
@@ -144,7 +53,6 @@ export default function CheckoutContent() {
   const [couponCode, setCouponCode] = useState('');
   const [couponInfo, setCouponInfo] = useState<any>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   // Form state
   const [form, setForm] = useState({
@@ -159,23 +67,10 @@ export default function CheckoutContent() {
 
   // Redirect to cart if empty (only on initial load, not after confirmation)
   useEffect(() => {
-    if (items.length === 0 && !confirmed) {
+    if (items.length === 0) {
       router.push('/cart');
     }
-  }, [items, confirmed, router]);
-
-  // Load buyer wallet balance for pay-with-balance
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    walletAPI.myWallet()
-      .then((res) => setWalletBalance(Number(res.data?.balance || 0)))
-      .catch(() => setWalletBalance(null));
-  }, [isAuthenticated]);
-
-  const currentInstructions = useMemo(
-    () => PAYMENT_METHODS.find((m) => m.value === paymentMethod)?.instructions,
-    [paymentMethod]
-  );
+  }, [items, router]);
 
   // Calculate displayed shipping total from selections
   const shippingTotal = useMemo(() => {
@@ -191,17 +86,6 @@ export default function CheckoutContent() {
   }, [shippingEstimates, shippingSelections]);
 
   const hasPhysicalItems = items.some(it => it.product.productType === 'physical');
-
-  // Métodos visíveis: esconde "Modo Teste" em produção e "Pagamento na Entrega"
-  // quando não há artigos físicos, mantendo a lista coerente e sem redundância.
-  const visiblePaymentMethods = useMemo(() => {
-    const isProduction = process.env.NODE_ENV === 'production';
-    return PAYMENT_METHODS.filter((m) => {
-      if (m.devOnly && isProduction) return false;
-      if (m.physicalOnly && !hasPhysicalItems) return false;
-      return true;
-    });
-  }, [hasPhysicalItems]);
 
   const discountAmount = useMemo(() => {
     if (!couponInfo) return 0;
@@ -343,7 +227,7 @@ export default function CheckoutContent() {
               phone: form.phone,
               email: form.email,
             },
-        payment_method: paymentMethod,
+        payment_method: PAYMENT_METHOD,
         shipping_selections: shippingSelections,
         buyer_notes: form.notes,
         ...(couponInfo?.code ? { coupon_code: couponInfo.code } : {}),
@@ -366,39 +250,27 @@ export default function CheckoutContent() {
 
       const data = await res.json();
       const orders = Array.isArray(data) ? data : [data];
-      setOrderData(orders);
 
-      // Métodos online (M-Pesa/e-Mola/Cartão) → checkout hospedado VPay
-      if (paymentMethod === ONLINE_PAYMENT_METHOD) {
-        const orderIds = orders.map((o: any) => o.id);
-        let checkoutUrl = '';
-        let reference = '';
-        try {
-          const payRes = await paymentsAPI.initiate({ order_ids: orderIds, method: paymentMethod });
-          checkoutUrl = payRes.data?.checkout_url || '';
-          reference = payRes.data?.reference || '';
-        } catch (err: any) {
-          setError(err?.response?.data?.error || 'Erro ao iniciar pagamento.');
-          setSubmitting(false);
-          return;
-        }
-        if (checkoutUrl) {
-          // O carrinho NÃO é esvaziado aqui: um pagamento iniciado não é um
-          // pagamento feito. Se o cliente desistir no checkout do gateway ou o
-          // pagamento falhar, os artigos continuam no carrinho. Só saem quando o
-          // pagamento for confirmado (ver usePendingCheckout).
-          savePendingCheckout(reference, items.map((i) => i.product.id));
-          window.location.href = checkoutUrl;
-          return;
-        }
-        setError('Não foi possível iniciar o pagamento. Tente novamente.');
+      const orderIds = orders.map((o: any) => o.id);
+      let checkoutUrl = '';
+      let reference = '';
+      try {
+        const payRes = await paymentsAPI.initiate({ order_ids: orderIds, method: PAYMENT_METHOD });
+        checkoutUrl = payRes.data?.checkout_url || '';
+        reference = payRes.data?.reference || '';
+      } catch (err: any) {
+        setError(err?.response?.data?.error || 'Erro ao iniciar pagamento.');
         setSubmitting(false);
         return;
       }
-
-      setConfirmed(true);
-      clearCart();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (checkoutUrl) {
+        // O carrinho só é limpo depois da confirmação do pagamento.
+        savePendingCheckout(reference, items.map((i) => i.product.id));
+        window.location.href = checkoutUrl;
+        return;
+      }
+      setError('Não foi possível iniciar o pagamento. Tente novamente.');
+      setSubmitting(false);
     } catch (err: any) {
       setError(err.message || 'Erro ao processar encomenda.');
     } finally {
@@ -406,77 +278,47 @@ export default function CheckoutContent() {
     }
   };
 
-  // Confirmation screen
-  if (confirmed && orderData.length > 0) {
-    const allPaid = orderData.every((o: any) => o.payment_status === 'completed');
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-        <CheckCircle className="mx-auto text-green-600 mb-6" size={80} />
-        <h2 className="text-3xl font-bold mb-4">Pedido Confirmado!</h2>
-        <p className="text-lg text-muted-foreground mb-6">
-          {paymentMethod === 'test'
-            ? '🧪 Modo Teste — a sua encomenda foi criada com pagamento automático.'
-            : paymentMethod === 'wallet'
-              ? '👛 Pagamento com saldo concluído — o valor foi debitado da sua carteira.'
-              : 'Obrigado pela sua compra. Receberá um email com os detalhes.'}
-        </p>
-        <div className="bg-card border border-border rounded-lg p-6 mb-6 space-y-4">
-          {orderData.map((o: any) => (
-            <div key={o.id || o.order_number} className="text-left border border-border rounded-lg p-4">
-              <p className="text-xs text-muted-foreground mb-1">{o.store_name ? `Loja: ${o.store_name}` : 'Encomenda'}</p>
-              <p className="font-semibold mb-2">Número do Pedido:</p>
-              <p className="text-2xl font-bold text-accent">{o.order_number}</p>
-              <p className="text-sm text-muted-foreground mt-2">Estado: {o.status}</p>
-              {o.payment_status === 'completed' && (
-                <span className="inline-block mt-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                  ✅ Pago
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="bg-muted rounded-lg p-6 mb-6 text-left">
-          <h3 className="font-semibold mb-3">Próximos Passos:</h3>
-          <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-            {allPaid ? (
-              <>
-                <li>A(s) encomenda(s) foram processadas automaticamente</li>
-                <li>Produtos digitais e cursos já estão disponíveis</li>
-                <li>Pode ver os seus cursos em <Link href="/my-courses" className="text-accent hover:underline">Meus Cursos</Link></li>
-                <li>Downloads disponíveis em <Link href="/account/downloads" className="text-accent hover:underline">Minha Conta → Downloads</Link></li>
-              </>
-            ) : (
-              <>
-                <li>Verifique seu email para confirmação do pedido</li>
-                <li>Siga as instruções de pagamento recebidas</li>
-                <li>Após confirmação do pagamento, enviaremos seu produto</li>
-                <li>Receberá código de rastreamento por email</li>
-              </>
-            )}
-          </ol>
-        </div>
-        <div className="flex gap-3 justify-center">
-          <Link
-            href="/account/orders"
-            className="inline-block px-6 py-3 border border-border hover:bg-muted font-semibold rounded-md transition-colors"
-          >
-            Ver Encomendas
-          </Link>
-          <Link
-            href="/"
-            className="inline-block px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors"
-          >
-            Continuar Comprando
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   if (items.length === 0) return null;
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 py-8">
+      {showPaymentNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="payment-notice-title"
+            className="relative w-full max-w-md rounded-xl bg-card p-6 shadow-xl"
+          >
+            <button
+              type="button"
+              onClick={() => setShowPaymentNotice(false)}
+              aria-label="Fechar aviso"
+              className="absolute right-4 top-4 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <X size={20} />
+            </button>
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-accent/10 text-accent">
+              <Info size={22} />
+            </div>
+            <h2 id="payment-notice-title" className="mb-2 text-xl font-bold">
+              Pagamento disponível
+            </h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Neste momento, aceitamos pagamentos apenas por M-Pesa. O e-Mola e as
+              restantes carteiras serão disponibilizados mais tarde.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowPaymentNotice(false)}
+              className="mt-6 w-full rounded-md bg-accent px-4 py-3 font-semibold text-accent-foreground transition-colors hover:bg-accent/90"
+            >
+              Entendi, continuar
+            </button>
+          </section>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
         <Link href="/" className="hover:text-foreground transition-colors">Início</Link>
@@ -512,7 +354,7 @@ export default function CheckoutContent() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-medium mb-2">Telefone *</label>
+                  <label htmlFor="phone" className="block text-sm font-medium mb-2">Telefone de Contacto *</label>
                   <input
                     type="tel"
                     id="phone"
@@ -701,73 +543,20 @@ export default function CheckoutContent() {
               <CreditCard className="text-foreground" size={24} />
               Método de Pagamento
             </h2>
-            <div className="space-y-3">
-              {visiblePaymentMethods.map((method) => {
-                const total = Math.max(0, totalPrice + shippingTotal - discountAmount);
-                const isWallet = method.value === 'wallet';
-                const insufficientWallet = isWallet && walletBalance !== null && walletBalance < total;
-                const disabled = insufficientWallet;
-                return (
-                  <label
-                    key={method.value}
-                    className={`flex items-center p-4 border-2 rounded-lg transition-colors ${
-                      disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                    } ${
-                      paymentMethod === method.value
-                        ? 'border-accent'
-                        : 'border-border hover:border-accent'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="payment"
-                      value={method.value}
-                      checked={paymentMethod === method.value}
-                      onChange={() => !disabled && setPaymentMethod(method.value)}
-                      disabled={disabled}
-                      className="w-5 h-5 text-accent"
-                    />
-                    <div className="ml-3 flex-1">
-                      <div className="font-semibold">
-                        {method.label}
-                        {method.recommended && (
-                          <span className="ml-2 px-1.5 py-0.5 bg-accent text-accent-foreground text-[11px] rounded-full font-semibold">
-                            Recomendado
-                          </span>
-                        )}
-                        {isWallet && walletBalance !== null && (
-                          <span className="ml-2 text-xs font-normal text-muted-foreground">
-                            (Saldo: {walletBalance.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN)
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {insufficientWallet ? 'Saldo insuficiente para este pedido.' : method.desc}
-                      </div>
-                    </div>
-                    <div className="text-2xl">{isWallet ? <Wallet size={24} /> : method.icon}</div>
-                  </label>
-                );
-              })}
+            <div className="flex items-center gap-3 rounded-lg border-2 border-accent bg-accent/5 p-4">
+              <span className="text-2xl" aria-hidden="true">📱</span>
+              <div>
+                <p className="font-semibold">M-Pesa</p>
+                <p className="text-sm text-muted-foreground">Pagamento móvel pela rede Vodacom</p>
+              </div>
             </div>
 
-            {/* Payment Instructions */}
-            {currentInstructions && (
-              <div className={`mt-4 p-4 rounded-lg ${paymentMethod === ONLINE_PAYMENT_METHOD ? 'bg-accent/5 border border-accent/30' : 'bg-muted'}`}>
-                {paymentMethod === ONLINE_PAYMENT_METHOD && (
-                  <div className="flex items-center gap-2 text-sm font-semibold mb-1">
-                    <ExternalLink size={16} className="text-accent" />
-                    Será redirecionado para o painel seguro da VPay
-                  </div>
-                )}
-                <h3 className="font-semibold mb-2">{currentInstructions.title}</h3>
-                <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                  {currentInstructions.steps.map((step, i) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
+            <div className="mt-4 rounded-lg bg-muted p-4">
+              <h3 className="mb-2 font-semibold">Próximos passos:</h3>
+              <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                {PAYMENT_INSTRUCTIONS.map((step) => <li key={step}>{step}</li>)}
+              </ol>
+            </div>
           </div>
         </div>
 
@@ -873,23 +662,6 @@ export default function CheckoutContent() {
               </div>
             )}
 
-            <div className="mt-4 pt-4 border-t border-border space-y-2">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Shield size={14} className="text-foreground" />
-                <span>Compra 100% segura — Proteção ao comprador</span>
-              </div>
-              {hasPhysicalItems ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Truck size={14} className="text-foreground" />
-                  <span>Entrega em todas as províncias de Moçambique</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <CheckCircle size={14} className="text-foreground" />
-                  <span>Acesso imediato após confirmação do pagamento</span>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </form>
