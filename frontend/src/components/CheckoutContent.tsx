@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Truck, CreditCard, MapPin, CheckCircle, Loader2, Info, X } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
@@ -544,7 +545,13 @@ export default function CheckoutContent() {
               Método de Pagamento
             </h2>
             <div className="flex items-center gap-3 rounded-lg border-2 border-accent bg-accent/5 p-4">
-              <span className="text-2xl" aria-hidden="true">📱</span>
+              <Image
+                src="/m-pesa.png"
+                alt="M-Pesa"
+                width={76}
+                height={62}
+                className="h-14 w-[76px] object-contain"
+              />
               <div>
                 <p className="font-semibold">M-Pesa</p>
                 <p className="text-sm text-muted-foreground">Pagamento móvel pela rede Vodacom</p>
