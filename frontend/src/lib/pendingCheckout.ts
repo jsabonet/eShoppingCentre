@@ -10,6 +10,31 @@
 
 const STORAGE_KEY = 'eshoppingcentre-pending-checkout-v1';
 
+/**
+ * Marca a sessão como "a voltar de um pagamento no gateway".
+ *
+ * Usa `sessionStorage` (e não `localStorage`) porque este sinal só interessa
+ * durante a viagem ao checkout hospedado e regresso — não deve sobreviver ao
+ * fecho do separador. Sobrevive ao back/forward cache do browser.
+ */
+const RETURN_FLAG_KEY = 'eshoppingcentre-payment-return-v1';
+
+export function markPaymentReturn(): void {
+  try {
+    sessionStorage.setItem(RETURN_FLAG_KEY, '1');
+  } catch {}
+}
+
+export function consumePaymentReturn(): boolean {
+  try {
+    if (sessionStorage.getItem(RETURN_FLAG_KEY)) {
+      sessionStorage.removeItem(RETURN_FLAG_KEY);
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 /** Um checkout por pagar deixa de ser relevante ao fim deste prazo. */
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
