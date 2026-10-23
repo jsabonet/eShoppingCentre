@@ -243,6 +243,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.orders.tasks.release_escrow_after_return_window',
         'schedule': 3600.0,  # a cada hora
     },
+    'auto-release-unpaid-orders': {
+        'task': 'apps.orders.tasks.auto_release_unpaid_orders',
+        'schedule': 300.0,  # a cada 5 minutos
+    },
     'delete-stale-unverified-users': {
         'task': 'apps.users.tasks.delete_stale_unverified_users',
         'schedule': crontab(hour=2, minute=30),  # diariamente às 02:30
@@ -322,6 +326,11 @@ VPAY_WEBHOOK_SECRET = config('VPAY_WEBHOOK_SECRET', default='')
 VPAY_TIMEOUT = config('VPAY_TIMEOUT', default=20, cast=int)
 VPAY_RETRY_TOTAL = config('VPAY_RETRY_TOTAL', default=3, cast=int)
 VPAY_RETRY_BACKOFF = config('VPAY_RETRY_BACKOFF', default=0.5, cast=float)
+
+# ─── Reserva de stock durante o checkout ───
+# Tempo (em minutos) que uma encomenda pendente segura stock antes de ser
+# libertada automaticamente por `auto_release_unpaid_orders`.
+ORDER_RESERVATION_MINUTES = config('ORDER_RESERVATION_MINUTES', default=30, cast=int)
 
 # ─── Cloudflare Stream ───
 CLOUDFLARE_ACCOUNT_ID = config('CLOUDFLARE_ACCOUNT_ID', default='')

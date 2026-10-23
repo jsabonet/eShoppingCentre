@@ -39,7 +39,7 @@ def log_status_change(order, new_status, user, notes=''):
         notes=notes,
     )
 from .serializers import OrderSerializer, CreateOrderSerializer, ReturnRequestSerializer, ReturnResolveSerializer, ReturnShipSerializer, ReturnImageSerializer, AdminOverrideSerializer, SupportTicketSerializer, SupportTicketImageSerializer
-from .services import send_order_emails
+from .services import send_order_emails, cancel_order
 
 
 class CreateOrderView(APIView):
@@ -218,42 +218,13 @@ class CancelOrderView(APIView):
     def post(self, request, pk):
         try:
             order = Order.objects.get(id=pk, buyer=request.user)
-            if order.status in ['pending', 'confirmed']:
-                order.status = 'cancelled'
-                order.save()
-                # Restaurar stock
-                for item in order.items.all():
-                    if item.product and item.product.product_type == 'physical':
-                        old_stock = item.product.stock
-                        item.product.stock += item.quantity
-                        item.product.save(update_fields=['stock'])
-                        from apps.products.models import StockLog
-                        StockLog.objects.create(
-                            product=item.product, change_type='cancel',
-                            quantity=item.quantity,
-                            stock_before=old_stock, stock_after=item.product.stock,
-                            reference=f'Order {order.order_number}',
-                            changed_by=request.user,
-                            notes='Stock restaurado por cancelamento',
-                        )
-                # ─── W2 Escrow: reverter retenção do vendedor (se ainda retida) ───
-                from apps.wallet.services import reverse_escrow
-                reverse_escrow(order)
-
-                # ─── W1 Carteira: reembolsar o comprador ───
-                if order.payment_status == 'completed' and order.total > 0:
-                    from apps.wallet.services import get_wallet, credit
-                    buyer_wallet = get_wallet(order.buyer)
-                    credit(
-                        buyer_wallet, order.total, kind='buyer',
-                        ref_type='order', ref_id=order.id,
-                        description=f'Reembolso por cancelamento {order.order_number}',
-                        txn_type='refund',
-                    )
-
-                # Reverter comissão de afiliado (se existir)
-                from apps.affiliates.services import reject_commissions_for_order
-                reject_commissions_for_order(order, 'Encomenda cancelada')
+            cancelled = cancel_order(
+                order,
+                changed_by=request.user,
+                notes='Stock restaurado por cancelamento',
+                stock_change_type='cancel',
+            )
+            if cancelled:
                 return Response({'detail': 'Encomenda cancelada.'})
             return Response({'detail': 'Não é possível cancelar esta encomenda.'},
                           status=status.HTTP_400_BAD_REQUEST)

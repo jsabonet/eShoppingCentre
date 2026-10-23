@@ -31,6 +31,10 @@ class Order(BaseModel):
     payment_method = models.CharField(max_length=50)
     payment_status = models.CharField(max_length=20, default='pending')
     payment_id = models.CharField(max_length=255, blank=True)
+    reserved_until = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Prazo da reserva de stock enquanto o pagamento está pendente.',
+    )
     shipping_address = models.JSONField()
     shipping_method = models.CharField(max_length=100, blank=True)
     is_pickup = models.BooleanField(default=False, help_text='Se a encomenda usa levantamento na loja em vez de entrega')

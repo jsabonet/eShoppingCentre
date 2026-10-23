@@ -26,13 +26,39 @@ def complete_payment(order_id, *, provider, provider_transaction_id='',
     if order.payment_status == 'completed':
         return order, False
 
+    # Pagamento chegou depois de a encomenda ter sido cancelada (reserva expirada).
+    # Não liquidar nem libertar conteúdo — sinalizar para reembolso manual.
+    if order.status == 'cancelled':
+        order.payment_status = 'completed'
+        order.save(update_fields=['payment_status', 'updated_at'])
+        from apps.notifications.models import Notification
+        Notification.objects.create(
+            user=order.buyer,
+            title='Pagamento recebido em encomenda cancelada',
+            message=(
+                f'O pagamento da encomenda {order.order_number} foi recebido após a '
+                'reserva ter expirado. A nossa equipa vai processar o reembolso.'
+            ),
+            notification_type='order_update',
+            link=f'/account/orders/{order.id}',
+        )
+        from apps.notifications.email_service import dispatch, send_admin_alert_email
+        dispatch(
+            send_admin_alert_email,
+            f'Pagamento tardio em encomenda cancelada {order.order_number}',
+            f'A encomenda {order.order_number} foi paga via {provider} após o cancelamento '
+            'automático. Reembolso manual necessário.',
+        )
+        return order, True
+
     previous_status = order.status
     order.payment_status = 'completed'
     if provider_transaction_id and not order.payment_id:
         order.payment_id = provider_transaction_id
     if order.status == 'pending':
         order.status = 'confirmed'
-    order.save(update_fields=['payment_status', 'payment_id', 'status'])
+    order.reserved_until = None
+    order.save(update_fields=['payment_status', 'payment_id', 'status', 'reserved_until'])
 
     if previous_status != order.status:
         OrderStatusHistory.objects.create(

@@ -6,7 +6,92 @@ libere conteúdo digital antes de o dinheiro entrar.
 """
 from datetime import timedelta
 
+from django.db import transaction
 from django.utils import timezone
+
+
+def set_reservation(order, minutes=None):
+    """Marca o prazo de reserva de stock de uma encomenda pendente.
+
+    Devolve a data-limite (ou None se não for aplicável).
+    """
+    from django.conf import settings
+    if order.payment_status != 'pending':
+        order.reserved_until = None
+        order.save(update_fields=['reserved_until', 'updated_at'])
+        return None
+    minutes = minutes if minutes is not None else settings.ORDER_RESERVATION_MINUTES
+    reserved_until = timezone.now() + timedelta(minutes=minutes)
+    order.reserved_until = reserved_until
+    order.save(update_fields=['reserved_until', 'updated_at'])
+    return reserved_until
+
+
+def restore_order_stock(order, *, changed_by=None, change_type='reserve_release',
+                        notes='Stock libertado por reserva expirada'):
+    """Repõe o stock dos itens físicos de uma encomenda (uma única vez por cancelamento)."""
+    from apps.products.models import StockLog
+
+    for item in order.items.all():
+        product = item.product
+        if not product or product.product_type != 'physical':
+            continue
+        old_stock = product.stock
+        product.stock += item.quantity
+        product.save(update_fields=['stock'])
+        StockLog.objects.create(
+            product=product,
+            change_type=change_type,
+            quantity=item.quantity,
+            stock_before=old_stock,
+            stock_after=product.stock,
+            reference=f'Order {order.order_number}',
+            changed_by=changed_by,
+            notes=notes,
+        )
+
+
+@transaction.atomic
+def cancel_order(order, *, changed_by=None, notes='Encomenda cancelada',
+                 stock_change_type='cancel'):
+    """Cancela uma encomenda pendente/confirmada e desfaz os efeitos colaterais.
+
+    - restaura o stock dos itens físicos;
+    - reverte o escrow ainda retido (vendedor);
+    - reembolsa o comprador se a encomenda já estava paga;
+    - rejeita comissões de afiliado.
+
+    Idempotente: devolve False se a encomenda já não puder ser cancelada.
+    """
+    from apps.affiliates.services import reject_commissions_for_order
+    from apps.wallet.services import reverse_escrow, get_wallet, credit
+
+    if order.status not in ('pending', 'confirmed'):
+        return False
+
+    order.status = 'cancelled'
+    order.reserved_until = None
+    order.save(update_fields=['status', 'reserved_until', 'updated_at'])
+
+    restore_order_stock(order, changed_by=changed_by, change_type=stock_change_type, notes=notes)
+
+    # W2 Escrow: reverter retenção do vendedor (se ainda retida)
+    reverse_escrow(order)
+
+    # W1 Carteira: reembolsar o comprador (apenas encomendas já pagas)
+    if order.payment_status == 'completed' and order.total > 0:
+        credit(
+            get_wallet(order.buyer), order.total, kind='buyer',
+            ref_type='order', ref_id=order.id,
+            description=f'Reembolso por cancelamento {order.order_number}',
+            txn_type='refund',
+            idempotency_key=f'order:{order.id}:cancel_refund',
+        )
+
+    # Reverter comissão de afiliado
+    reject_commissions_for_order(order, notes)
+
+    return True
 
 
 def process_delivery(order):

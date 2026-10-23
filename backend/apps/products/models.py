@@ -205,6 +205,7 @@ class StockLog(BaseModel):
         ('cancel', 'Cancelamento'),
         ('return', 'Devolução'),
         ('adjustment', 'Ajuste Manual'),
+        ('reserve_release', 'Libertação de Reserva'),
     ]
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_logs')

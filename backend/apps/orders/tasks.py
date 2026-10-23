@@ -173,6 +173,73 @@ def recover_abandoned_carts():
 
 
 @shared_task
+def auto_release_unpaid_orders():
+    """
+    Cancela encomendas `pending` cuja reserva de stock expirou, restaurando o
+    stock e notificando o comprador de forma suave (não agressiva).
+    """
+    from django.db import transaction
+    from apps.orders.models import Order, OrderStatusHistory
+    from apps.orders.services import cancel_order
+    from apps.notifications.models import Notification
+    from apps.notifications import email_service
+
+    now = timezone.now()
+    expired = Order.objects.filter(
+        payment_status='pending',
+        status='pending',
+        reserved_until__lte=now,
+    ).select_related('buyer', 'store__owner').prefetch_related('items')
+
+    count = 0
+    for order in expired:
+        buyer = order.buyer
+
+        items = [
+            {'product_id': str(item.product_id) if item.product_id else '',
+             'name': item.product_name,
+             'price': str(item.unit_price)}
+            for item in order.items.all()
+        ]
+
+        with transaction.atomic():
+            previous_status = order.status
+            cancelled = cancel_order(
+                order,
+                changed_by=None,
+                notes='Reserva de stock expirada (pagamento não confirmado)',
+                stock_change_type='reserve_release',
+            )
+            if not cancelled:
+                continue
+            OrderStatusHistory.objects.create(
+                order=order,
+                previous_status=previous_status,
+                new_status='cancelled',
+                changed_by=None,
+                notes='Reserva de stock expirada (pagamento não confirmado)',
+            )
+
+        # Notificação + email suaves (fora da transação, não bloqueiam o cancelamento)
+        Notification.objects.create(
+            user=buyer,
+            title='Reserva expirada',
+            message='A reserva dos seus artigos expirou. Pode concluir novamente a compra para garantir os produtos.',
+            notification_type='order_update',
+            link='/cart',
+        )
+        if buyer.email:
+            email_service.dispatch(
+                email_service.send_order_reservation_expired_email,
+                buyer.email, buyer.first_name, items, '/cart',
+            )
+
+        count += 1
+
+    return f'{count} encomenda(s) não paga(s) libertada(s).'
+
+
+@shared_task
 def release_escrow_after_return_window():
     """
     Liberta escrows de encomendas físicas entregues há mais de ESCROW_RELEASE_DAYS dias,

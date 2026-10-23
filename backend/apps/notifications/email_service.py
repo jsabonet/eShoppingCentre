@@ -642,6 +642,26 @@ def send_abandoned_cart_email(email, first_name, items, cart_link) -> None:
     )
 
 
+def send_order_reservation_expired_email(email, first_name, items, cart_link) -> None:
+    """Email suave quando a reserva de stock de uma encomenda não paga expira."""
+    safe_items = items or []
+    send_templated(
+        subject=f'Os seus artigos reservados foram libertados — {SITE_NAME}',
+        template_name='order_reservation_expired.html',
+        recipient=email,
+        text_message=(
+            'A reserva dos seus artigos expirou e o stock foi libertado. '
+            'Pode concluir novamente a compra para garantir os produtos.'
+        ),
+        context=base_context(
+            first_name=first_name,
+            items=safe_items,
+            items_count=len(safe_items),
+            cart_link=cart_link,
+        ),
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # Inventário / Seguidores
 # ─────────────────────────────────────────────────────────────

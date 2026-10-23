@@ -374,6 +374,13 @@ class CreateOrderSerializer(serializers.Serializer):
         payment_status = 'completed' if is_instant else 'pending'
         order_status = 'confirmed' if is_instant else 'pending'
 
+        from django.conf import settings
+        from datetime import timedelta
+        from django.utils import timezone
+        reserved_until = (
+            None if is_instant else timezone.now() + timedelta(minutes=settings.ORDER_RESERVATION_MINUTES)
+        )
+
         from apps.products.models import StockLog
 
         orders = []
@@ -398,6 +405,7 @@ class CreateOrderSerializer(serializers.Serializer):
                 payment_method=validated_data['payment_method'],
                 payment_status=payment_status,
                 status=order_status,
+                reserved_until=reserved_until,
                 shipping_address=validated_data['shipping_address'],
                 shipping_method=ship['method_name'],
                 is_pickup=ship['is_pickup'],
