@@ -3,6 +3,7 @@ from decimal import Decimal
 from rest_framework import serializers
 from django.db import transaction
 from .models import Order, OrderItem, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket, SupportTicketImage
+from .services import process_delivery
 from apps.products.models import Product
 
 
@@ -461,7 +462,7 @@ class CreateOrderSerializer(serializers.Serializer):
 
             # Processar entregas digitais e matrículas imediatamente
             if order.payment_status == 'completed':
-                self._process_delivery(order)
+                process_delivery(order)
 
             orders.append(order)
 
@@ -505,46 +506,6 @@ class CreateOrderSerializer(serializers.Serializer):
                 settle_payment(order)
 
         return orders
-
-    def _process_delivery(self, order):
-        """Liberta downloads digitais e matricula em cursos após pagamento confirmado."""
-        for item in order.items.all():
-            product = item.product
-            if not product:
-                continue
-
-            if product.product_type == 'digital':
-                from apps.products.models import DigitalDownload
-                DigitalDownload.objects.get_or_create(
-                    user=order.buyer,
-                    product=product,
-                    order=order,
-                )
-
-            elif product.product_type == 'course' and hasattr(product, 'course'):
-                from apps.courses.models import Enrollment
-                from django.utils import timezone
-                from datetime import timedelta
-
-                course = product.course
-                defaults = {'order': order}
-                if course.access_duration_days:
-                    defaults['access_expires_at'] = timezone.now() + timedelta(days=course.access_duration_days)
-
-                Enrollment.objects.get_or_create(
-                    user=order.buyer,
-                    course=course,
-                    defaults=defaults,
-                )
-
-        # Pedidos 100% digitais/cursos são concluídos de imediato (não há envio)
-        if order.is_digital_only and order.status != 'delivered':
-            from django.utils import timezone
-            now = timezone.now()
-            order.status = 'delivered'
-            order.confirmed_at = order.confirmed_at or now
-            order.delivered_at = order.delivered_at or now
-            order.save(update_fields=['status', 'confirmed_at', 'delivered_at'])
 
     def _get_product_image(self, product):
         img = product.images.filter(is_primary=True).first()

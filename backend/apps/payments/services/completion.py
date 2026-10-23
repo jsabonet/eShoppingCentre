@@ -47,6 +47,10 @@ def complete_payment(order_id, *, provider, provider_transaction_id='',
     from apps.wallet.services import settle_payment
     settle_payment(order)
 
+    # Libertar conteúdo digital / matrículas apenas agora que o pagamento entrou.
+    from apps.orders.services import process_delivery
+    process_delivery(order)
+
     # Notificações em memória (não bloqueiam o webhook).
     from apps.notifications.models import Notification
     Notification.objects.create(
@@ -64,5 +68,12 @@ def complete_payment(order_id, *, provider, provider_transaction_id='',
             notification_type='order_update',
             link=f'/seller/orders',
         )
+
+    # Emails de confirmação/nova venda — apenas na primeira confirmação e só
+    # depois de a transação confirmar (evita enviar email se houver rollback
+    # e não segura o lock da encomenda durante I/O de rede).
+    from apps.orders.services import send_order_emails, reconcile_cart_after_payment
+    reconcile_cart_after_payment(order)
+    transaction.on_commit(lambda: send_order_emails(order))
 
     return order, True

@@ -139,6 +139,15 @@ def _confirm_payment(order_id, event_data, delivery_id=''):
         )
         orders[index] = completed_order
         created_any = created_any or created
+
+    # Email-resumo único quando o checkout foi dividido por várias lojas.
+    if created_any and len(orders) > 1:
+        from apps.notifications import email_service
+        transaction.on_commit(lambda: email_service.dispatch(
+            email_service.send_checkout_summary_email,
+            [str(order.id) for order in orders],
+        ))
+
     return orders, created_any
 
 

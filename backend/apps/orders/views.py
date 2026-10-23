@@ -39,6 +39,7 @@ def log_status_change(order, new_status, user, notes=''):
         notes=notes,
     )
 from .serializers import OrderSerializer, CreateOrderSerializer, ReturnRequestSerializer, ReturnResolveSerializer, ReturnShipSerializer, ReturnImageSerializer, AdminOverrideSerializer, SupportTicketSerializer, SupportTicketImageSerializer
+from .services import send_order_emails
 
 
 class CreateOrderView(APIView):
@@ -50,23 +51,25 @@ class CreateOrderView(APIView):
         orders = serializer.save()
         for order in orders:
             log_status_change(order, order.status, request.user, 'Encomenda criada')
-            email_service.dispatch(email_service.send_order_confirmation_email, str(order.id))
-            email_service.dispatch(email_service.send_new_sale_email, str(order.id))
-            email_service.dispatch(email_service.send_admin_new_sale_email, str(order.id))
-            if order.affiliate_id and order.affiliate_commission and order.affiliate_commission > 0:
-                email_service.dispatch(email_service.send_affiliate_sale_email, str(order.id))
 
-        # Email-resumo único quando o checkout é dividido por várias lojas
-        if len(orders) > 1:
-            email_service.dispatch(
-                email_service.send_checkout_summary_email,
-                [str(order.id) for order in orders],
+        # Emails de confirmação/nova venda só depois de o pagamento estar confirmado.
+        # Encomendas pagas de imediato (carteira/teste) são notificadas já aqui;
+        # as restantes são notificadas pelo webhook de confirmação da VPay.
+        if all(order.payment_status == 'completed' for order in orders):
+            for order in orders:
+                send_order_emails(order)
+
+            # Email-resumo único quando o checkout é dividido por várias lojas
+            if len(orders) > 1:
+                email_service.dispatch(
+                    email_service.send_checkout_summary_email,
+                    [str(order.id) for order in orders],
+                )
+
+            # Marcar carrinho como recuperado (compra já paga)
+            AbandonedCart.objects.filter(user=request.user).update(
+                recovered=True, recovered_at=timezone.now(), items=[]
             )
-
-        # Marcar carrinho como recuperado
-        AbandonedCart.objects.filter(user=request.user).update(
-            recovered=True, recovered_at=timezone.now(), items=[]
-        )
 
         return Response(OrderSerializer(orders, many=True).data, status=status.HTTP_201_CREATED)
 

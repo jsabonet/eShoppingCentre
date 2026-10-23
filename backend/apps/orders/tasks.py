@@ -124,15 +124,22 @@ def recover_abandoned_carts():
     Envia email + notificação a utilizadores com carrinhos abandonados
     (sem atividade há mais de ABANDONED_CART_HOURS horas e ainda não notificados).
     """
-    from apps.orders.models import AbandonedCart
+    from apps.orders.models import AbandonedCart, Order
     from apps.notifications.models import Notification
 
     cutoff = timezone.now() - timedelta(hours=ABANDONED_CART_HOURS)
+    # Não importunar utilizadores que já iniciaram o checkout e aguardam
+    # confirmação de pagamento (encomenda pendente) — para eles o carrinho
+    # ainda está "ativo" e será limpo assim que o pagamento for confirmado.
+    pending_buyer_ids = Order.objects.filter(
+        payment_status='pending',
+    ).values_list('buyer_id', flat=True).distinct()
+
     carts = AbandonedCart.objects.filter(
         recovered=False,
         notified_at__isnull=True,
         last_activity__lte=cutoff,
-    ).select_related('user')
+    ).exclude(user_id__in=pending_buyer_ids).select_related('user')
 
     count = 0
     for cart in carts:
