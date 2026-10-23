@@ -31,15 +31,26 @@ def _checkout_url(order_id):
 
 def _build_order_payload(orders, source_id):
     buyer = orders[0].buyer
-    # Send each local order total as one item so gateway totals include discounts.
-    items = [{
-        'originProductId': f'order-{order.id}',
-        'name': f'Encomenda {order.order_number}',
-        'quantity': 1,
-        'price': float(order.total),
-    } for order in orders]
+    items = []
+    shipping_total = Decimal('0.00')
 
-    has_physical_items = any(order.has_physical_items for order in orders)
+    for order in orders:
+        goods_value = (order.subtotal or Decimal('0.00')) - (order.discount or Decimal('0.00'))
+        shipping_total += order.shipping_cost or Decimal('0.00')
+        order_items = list(order.items.all())
+
+        if order_items:
+            items.extend(_order_items_to_payload(order, order_items, goods_value))
+        else:
+            # Encomenda legado/sem itens: colapsa num único item para o gateway
+            # totalizar o valor líquido (subtotal - desconto) corretamente.
+            items.append({
+                'originProductId': f'order-{order.id}',
+                'name': f'Encomenda {order.order_number}',
+                'quantity': 1,
+                'price': float(goods_value),
+            })
+
     payload = {
         'source': {'source': 'api', 'sourceId': source_id},
         'customer': {
@@ -55,15 +66,58 @@ def _build_order_payload(orders, source_id):
         'items': items,
     }
 
+    if shipping_total > 0:
+        payload['shippingCost'] = float(shipping_total)
+
+    has_physical_items = any(order.has_physical_items for order in orders)
     if has_physical_items:
         address = orders[0].shipping_address or {}
         payload['shippingAddress'] = {
-            'street': address.get('address', ''),
+            'street': address.get('address') or address.get('street') or '',
             'city': address.get('city', ''),
             'country': 'MZ',
-            **({'reference': address['notes']} if address.get('notes') else {}),
         }
     return payload
+
+
+def _order_items_to_payload(order, order_items, goods_value):
+    """Distribui o valor líquido (subtotal - desconto) pelos itens da encomenda.
+
+    O desconto é rateado proporcionalmente a cada item para que a soma
+    (preço × quantidade) iguale `goods_value`, evitando divergência de cêntimos
+    face ao total cobrado pelo gateway.
+    """
+    from decimal import ROUND_HALF_UP
+
+    totals = [item.total_price or Decimal('0.00') for item in order_items]
+    sum_totals = sum(totals, Decimal('0.00'))
+    last_index = len(order_items) - 1
+    remaining = goods_value
+    result = []
+
+    for index, item in enumerate(order_items):
+        quantity = item.quantity or 1
+        if index == last_index:
+            effective_total = remaining
+        elif sum_totals > 0:
+            share = (totals[index] / sum_totals) * goods_value
+            effective_total = share.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            remaining -= effective_total
+        else:
+            effective_total = Decimal('0.00')
+
+        unit_price = effective_total / Decimal(quantity)
+        item_payload = {
+            'originProductId': str(item.product_id) if item.product_id else f'orderitem-{item.id}',
+            'name': item.product_name or 'Produto',
+            'quantity': quantity,
+            'price': float(unit_price),
+        }
+        if item.product_image:
+            item_payload['imageUrl'] = item.product_image
+        result.append(item_payload)
+
+    return result
 
 
 def _orders_for_vpay_id(order_id):
@@ -75,7 +129,9 @@ def _orders_for_vpay_id(order_id):
 def _amount_matches(amount, total):
     try:
         parsed_amount = Decimal(str(amount))
-        return parsed_amount.is_finite() and parsed_amount == total
+        # Tolerância de 1 cêntimo para absorver arredondamentos de float na
+        # distribuição do valor pelos itens do gateway.
+        return parsed_amount.is_finite() and abs(parsed_amount - total) <= Decimal('0.01')
     except (InvalidOperation, TypeError, ValueError):
         return False
 

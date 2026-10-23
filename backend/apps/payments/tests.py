@@ -478,11 +478,12 @@ def test_payment_payload_disables_collection_but_sends_shipping_address(db, buye
     assert payload['shippingAddress']['street'] == 'Rua X'
     assert payload['shippingAddress']['city'] == 'Maputo'
     assert payload['shippingAddress']['country'] == 'MZ'
-    assert payload['shippingAddress']['reference'] == 'Ref'
+    assert 'reference' not in payload['shippingAddress']
+    assert payload['shippingCost'] == 20.0
 
 
 @pytest.mark.django_db
-def test_payment_payload_uses_discounted_order_total(digital_order):
+def test_payment_payload_splits_goods_and_shipping(digital_order):
     digital_order.subtotal = Decimal('100.00')
     digital_order.discount = Decimal('20.00')
     digital_order.shipping_cost = Decimal('10.00')
@@ -491,5 +492,43 @@ def test_payment_payload_uses_discounted_order_total(digital_order):
 
     payload = _build_order_payload([digital_order], 'checkout-test')
 
-    assert sum(item['price'] * item['quantity'] for item in payload['items']) == 90.0
-    assert 'shippingCost' not in payload
+    # O valor líquido (subtotal - desconto) vai nos itens e o frete é enviado
+    # separadamente, para o gateway não o mostrar como "grátis".
+    assert sum(item['price'] * item['quantity'] for item in payload['items']) == 80.0
+    assert payload['shippingCost'] == 10.0
+
+
+@pytest.mark.django_db
+def test_payment_payload_sends_item_images_and_breakdown(db, buyer, store):
+    order = Order.objects.create(
+        buyer=buyer,
+        store=store,
+        subtotal=Decimal('300.00'),
+        discount=Decimal('30.00'),
+        shipping_cost=Decimal('50.00'),
+        total=Decimal('320.00'),
+        platform_fee=Decimal('0.00'),
+        affiliate_commission=Decimal('0.00'),
+        payment_method='vpay',
+        payment_status='pending',
+        shipping_address={},
+    )
+    OrderItem.objects.create(
+        order=order,
+        product=None,
+        product_name='Produto A',
+        product_image='https://cdn.example.com/a.png',
+        quantity=2,
+        unit_price=Decimal('150.00'),
+        total_price=Decimal('300.00'),
+        product_type='physical',
+    )
+
+    payload = _build_order_payload([order], 'checkout-test')
+
+    assert payload['shippingCost'] == 50.0
+    assert payload['items'][0]['imageUrl'] == 'https://cdn.example.com/a.png'
+    assert payload['items'][0]['quantity'] == 2
+    assert payload['items'][0]['originProductId'] == f'orderitem-{order.items.first().id}'
+    # subtotal - desconto = 270, distribuído pelo único item da encomenda
+    assert payload['items'][0]['price'] * payload['items'][0]['quantity'] == 270.0
