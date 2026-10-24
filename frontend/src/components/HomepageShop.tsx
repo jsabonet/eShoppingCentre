@@ -10,6 +10,7 @@ export interface ProductSection {
   title: string;
   titleIcon?: string;
   products: Product[];
+  layout?: 'carousel' | 'grid';
   viewAllLink?: string;
   viewAllLabel?: string;
   bgClass?: string;
@@ -84,43 +85,50 @@ export default function HomepageShop({ sections }: HomepageShopProps) {
               )}
             </div>
 
-            <div className="relative">
-              <div
-                ref={(el) => { scrollRefs.current[section.id] = el; }}
-                onClickCapture={onCaptureClick}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={endDrag}
-                onPointerLeave={endDrag}
-                onDragStart={(e) => e.preventDefault()}
-                className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x pb-2 select-none cursor-grab active:cursor-grabbing"
-              >
+            {section.layout === 'grid' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {section.products.map((product) => (
-                  <div
-                    key={product.id}
-                    className="shrink-0 w-[170px] sm:w-[220px] md:w-[240px] snap-start"
-                  >
-                    <ProductCard product={product} />
-                  </div>
+                  <ProductCard key={product.id} product={product} />
                 ))}
               </div>
+              ) : (
+                <div className="relative">
+                  <div
+                    ref={(el) => { scrollRefs.current[section.id] = el; }}
+                    onClickCapture={onCaptureClick}
+                    onPointerDown={onPointerDown}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={endDrag}
+                    onPointerLeave={endDrag}
+                    onDragStart={(e) => e.preventDefault()}
+                    className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x pb-2 select-none cursor-grab active:cursor-grabbing"
+                  >
+                    {section.products.map((product) => (
+                      <div
+                        key={product.id}
+                        className="shrink-0 w-[170px] sm:w-[220px] md:w-[240px] snap-start"
+                      >
+                        <ProductCard product={product} />
+                      </div>
+                    ))}
+                  </div>
 
-              {/* Setas overlay — navegação por cursor (desktop) */}
-              <button
-                onClick={() => scroll(section.id, -1)}
-                aria-label={`Anterior: ${section.title}`}
-                className="hidden md:flex items-center justify-center absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-card/90 border border-border rounded-full shadow-md hover:bg-muted transition-colors z-10"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                onClick={() => scroll(section.id, 1)}
-                aria-label={`Seguinte: ${section.title}`}
-                className="hidden md:flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-card/90 border border-border rounded-full shadow-md hover:bg-muted transition-colors z-10"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
+                  <button
+                    onClick={() => scroll(section.id, -1)}
+                    aria-label={`Anterior: ${section.title}`}
+                    className="hidden md:flex items-center justify-center absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-card/90 border border-border rounded-full shadow-md hover:bg-muted transition-colors z-10"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    onClick={() => scroll(section.id, 1)}
+                    aria-label={`Seguinte: ${section.title}`}
+                    className="hidden md:flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-card/90 border border-border rounded-full shadow-md hover:bg-muted transition-colors z-10"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+              )}
           </div>
         </section>
       ))}

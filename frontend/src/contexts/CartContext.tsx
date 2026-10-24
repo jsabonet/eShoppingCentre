@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Product } from '../data/marketplace';
+import { isInfoProduct } from '../lib/productType';
 
 export type CartProduct = Product;
 
@@ -94,12 +95,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items]);
 
   const addToCart = useCallback((product: CartProduct, quantity = 1) => {
-    const normalized = normalizeItem({ product, quantity });
+    // Infoprodutos (digital/course) são sempre vendidos em unidade única.
+    const effectiveQuantity = isInfoProduct(product.productType) ? 1 : quantity;
+    const normalized = normalizeItem({ product, quantity: effectiveQuantity });
     setItems((prev) => {
       const existing = prev.find((i) => i.product.id === normalized.product.id);
       if (existing) {
         return prev.map((i) =>
-          i.product.id === normalized.product.id ? { ...i, quantity: i.quantity + quantity } : i
+          i.product.id === normalized.product.id
+            ? { ...i, quantity: isInfoProduct(i.product.productType) ? 1 : i.quantity + effectiveQuantity }
+            : i
         );
       }
       return [...prev, normalized];
@@ -112,13 +117,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateQuantity = useCallback((productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      setItems((prev) => prev.filter((i) => i.product.id !== productId));
-    } else {
-      setItems((prev) =>
-        prev.map((i) => (i.product.id === productId ? { ...i, quantity } : i))
-      );
-    }
+    setItems((prev) =>
+      prev
+        .map((i) => {
+          if (i.product.id !== productId) return i;
+          // Infoprodutos têm quantidade fixa em 1 — ignoramos qualquer alteração.
+          if (isInfoProduct(i.product.productType)) return i;
+          return quantity <= 0 ? null : { ...i, quantity };
+        })
+        .filter((i): i is CartItem => i !== null)
+    );
   }, []);
 
   const clearCart = useCallback(() => setItems([]), []);

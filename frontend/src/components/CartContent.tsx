@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ShoppingBag, Truck, Shield, CreditCard, ArrowLeft, Trash2, Plus, Minus, Clock } from 'lucide-react';
+import { ShoppingBag, Truck, Shield, CreditCard, ArrowLeft, Trash2, Plus, Minus, Clock, Lock } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
 import { usePendingCheckout } from '@/src/hooks/usePendingCheckout';
 import { paymentsAPI } from '@/src/lib/api';
+import { isInfoProduct } from '@/src/lib/productType';
 
 function formatPrice(price: number): string {
   return price.toFixed(2).replace('.', ',');
@@ -98,6 +99,7 @@ export default function CartContent() {
             <div className="space-y-4">
               {items.map((item) => {
                 const itemTotal = item.product.price * item.quantity;
+                const isInfo = isInfoProduct(item.product.productType);
                 return (
                   <div
                     key={item.product.id}
@@ -120,23 +122,30 @@ export default function CartContent() {
                       <p className="text-lg font-bold mt-2">MZN {formatPrice(item.product.price)}</p>
                       <p className="text-xs text-muted-foreground">{(item.product as any).storeName || ''}</p>
                       <div className="flex items-center gap-3 mt-3">
-                        <div className="flex items-center border border-border rounded-md">
-                          <button
-                            className="p-2 hover:bg-muted transition-colors"
-                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                            aria-label="Diminuir quantidade"
-                          >
-                            <Minus size={14} />
-                          </button>
-                          <span className="px-3 text-sm font-medium">{item.quantity}</span>
-                          <button
-                            className="p-2 hover:bg-muted transition-colors"
-                            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                            aria-label="Aumentar quantidade"
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
+                        {isInfo ? (
+                          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <Lock size={14} />
+                            Quantidade fixa: 1
+                          </span>
+                        ) : (
+                          <div className="flex items-center border border-border rounded-md">
+                            <button
+                              className="p-2 hover:bg-muted transition-colors"
+                              onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                              aria-label="Diminuir quantidade"
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span className="px-3 text-sm font-medium">{item.quantity}</span>
+                            <button
+                              className="p-2 hover:bg-muted transition-colors"
+                              onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                              aria-label="Aumentar quantidade"
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        )}
                         <button
                           className="text-sm text-destructive hover:underline flex items-center gap-1"
                           onClick={() => removeFromCart(item.product.id)}

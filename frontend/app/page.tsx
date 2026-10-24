@@ -127,21 +127,25 @@ export default async function Home() {
     {
       id: 'ofertas', title: 'Ofertas do Dia', titleIcon: '⚡',
       products: deals,
+      layout: 'carousel' as const,
       viewAllLink: '/#ofertas', viewAllLabel: 'Ver todas →', bgClass: 'bg-accent/5',
     },
     {
       id: 'mais-vendidos', title: 'Mais Vendidos', titleIcon: '🔥',
       products: bestsellers,
+      layout: 'grid' as const,
       bgClass: '',
     },
     {
       id: 'novidades', title: 'Novidades', titleIcon: '✨',
       products: newArrivals,
+      layout: 'grid' as const,
       bgClass: '',
     },
     {
       id: 'destaques', title: 'Produtos em Destaque', titleIcon: '⭐',
       products: featured.length > 0 ? featured : bestsellers,
+      layout: 'carousel' as const,
       viewAllLink: '/#destaques', viewAllLabel: 'Ver mais →', bgClass: 'bg-accent/5',
     },
   ];
@@ -177,10 +181,10 @@ export default async function Home() {
 
       <section id="categories" className="py-12 px-4 max-w-[1500px] mx-auto">
         <h2 className="text-2xl font-bold mb-6">Compre por Categoria</h2>
-        <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 md:grid md:grid-cols-4 lg:grid-cols-8 md:overflow-visible">
+        <div className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2">
           {categories.length > 0 ? categories.slice(0, 12).map((cat) => (
             <Link key={cat.slug} href={'/category/' + cat.slug}
-              className="category-card shrink-0 w-[120px] md:w-auto group bg-card border border-border rounded-lg p-4 text-center hover:shadow-md transition-all">
+              className="category-card shrink-0 w-[120px] snap-start group bg-card border border-border rounded-lg p-4 text-center hover:shadow-md transition-all">
               <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted overflow-hidden flex items-center justify-center">
                 <img src={categoryCardImage(cat)} alt={cat.name} className="w-full h-full object-cover" />
               </div>

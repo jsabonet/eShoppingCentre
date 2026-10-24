@@ -1,7 +1,8 @@
 "use client";
 
-import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
+import { X, Plus, Minus, Trash2, ShoppingBag, Lock } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
+import { isInfoProduct } from '../lib/productType';
 
 export default function CartDrawer() {
   const { items, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, totalPrice } = useCart();
@@ -51,7 +52,9 @@ export default function CartDrawer() {
             </div>
           ) : (
             <div className="space-y-4">
-              {items.map((item) => (
+              {items.map((item) => {
+                const isInfo = isInfoProduct(item.product.productType);
+                return (
                 <div
                   key={item.product.id}
                   className="flex gap-3 p-3 border border-border rounded-lg"
@@ -69,23 +72,32 @@ export default function CartDrawer() {
                       MZN {item.product.price.toFixed(2).replace('.', ',')}
                     </p>
                     <div className="flex items-center gap-2 mt-2">
-                      <button
-                        onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                        className="p-1 border border-border rounded hover:bg-muted transition-colors"
-                        aria-label="Diminuir quantidade"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <span className="text-sm font-medium w-8 text-center">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                        className="p-1 border border-border rounded hover:bg-muted transition-colors"
-                        aria-label="Aumentar quantidade"
-                      >
-                        <Plus size={14} />
-                      </button>
+                      {isInfo ? (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Lock size={12} />
+                          Quantidade fixa: 1
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                            className="p-1 border border-border rounded hover:bg-muted transition-colors"
+                            aria-label="Diminuir quantidade"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span className="text-sm font-medium w-8 text-center">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                            className="p-1 border border-border rounded hover:bg-muted transition-colors"
+                            aria-label="Aumentar quantidade"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </>
+                      )}
                       <button
                         onClick={() => removeFromCart(item.product.id)}
                         className="ml-auto p-1 text-destructive hover:bg-destructive/10 rounded transition-colors"
@@ -96,7 +108,8 @@ export default function CartDrawer() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

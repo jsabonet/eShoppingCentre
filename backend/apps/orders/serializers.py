@@ -182,6 +182,11 @@ class CreateOrderSerializer(serializers.Serializer):
                     raise serializers.ValidationError(
                         f'Não pode comprar o seu próprio produto "{product.name}".'
                     )
+                # Infoprodutos (digitais e cursos) são vendidos em unidade única.
+                if product.product_type in ('digital', 'course') and item['quantity'] > 1:
+                    raise serializers.ValidationError(
+                        f'O produto "{product.name}" só pode ser adquirido em quantidade única.'
+                    )
                 if product.product_type == 'physical' and not product.allow_backorder and item['quantity'] > product.stock:
                     raise serializers.ValidationError(
                         f'Stock insuficiente para {product.name}. Disponível: {product.stock}'
