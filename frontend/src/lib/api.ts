@@ -906,6 +906,7 @@ export const adminAPI = {
   createBlogPost: (data: FormData | any) => api.post('/admin/blog/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   updateBlogPost: (id: string, data: FormData | any) => api.patch(`/admin/blog/${id}/`, data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   deleteBlogPost: (id: string) => api.delete(`/admin/blog/${id}/`),
+  notifyBlogSubscribers: (id: string) => api.post<{ campaign_id: string; status: string; recipient_count: number; detail: string }>(`/admin/blog/${id}/notify-subscribers/`),
   uploadBlogImage: (file: File) => {
     const formData = new FormData();
     formData.append('image', file);

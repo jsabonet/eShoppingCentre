@@ -16,6 +16,8 @@ from .models import (
     BlogInlineImage,
     BlogLike,
     BlogPost,
+    NewsletterCampaign,
+    NewsletterCampaignDelivery,
     NewsletterSubscription,
 )
 
@@ -648,6 +650,137 @@ class BlogEngagementTests(TestCase):
         deletion = self.client.delete(f'/api/v1/admin/blog/newsletter/{subscription.id}/')
         self.assertEqual(deletion.status_code, 204)
         self.assertFalse(NewsletterSubscription.objects.filter(id=subscription.id).exists())
+
+
+class BlogNewsletterCampaignTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_superuser(
+            email='newsletter-admin@test.local',
+            username='newsletteradmin',
+            password='TestPass123!',
+        )
+        self.blog_category = BlogCategory.objects.create(
+            name='Notícias',
+            slug='noticias-newsletter',
+        )
+        self.post = BlogPost.objects.create(
+            slug='novidade-newsletter',
+            title='Novidade no blog',
+            excerpt='Resumo da novidade',
+            content='<p>Conteúdo da novidade</p>',
+            author_name='Equipa',
+            category='Notícias',
+            blog_category=self.blog_category,
+            is_published=False,
+        )
+        self.active_subscription = NewsletterSubscription.objects.create(
+            email='leitor-ativo@example.com',
+        )
+        self.inactive_subscription = NewsletterSubscription.objects.create(
+            email='leitor-inativo@example.com',
+            is_active=False,
+        )
+
+    @patch('apps.notifications.email_service.dispatch')
+    def test_first_publication_queues_one_automatic_campaign(self, dispatch):
+        self.client.force_authenticate(user=self.admin)
+        payload = {
+            'title': self.post.title,
+            'excerpt': self.post.excerpt,
+            'content': self.post.content,
+            'category': self.post.category,
+            'author_name': self.post.author_name,
+            'is_published': True,
+        }
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.patch(
+                f'/api/v1/admin/blog/{self.post.id}/',
+                payload,
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        campaign = NewsletterCampaign.objects.get()
+        self.assertEqual(campaign.trigger, NewsletterCampaign.Trigger.PUBLICATION)
+        self.assertEqual(campaign.recipient_count, 1)
+        self.assertEqual(campaign.deliveries.get().subscription, self.active_subscription)
+        dispatch.assert_called_once()
+
+        self.client.patch(
+            f'/api/v1/admin/blog/{self.post.id}/',
+            {'title': 'Título corrigido'},
+            format='json',
+        )
+        self.assertEqual(NewsletterCampaign.objects.count(), 1)
+
+    @patch('apps.notifications.email_service.dispatch')
+    def test_admin_can_manually_notify_about_a_published_article(self, dispatch):
+        self.post.is_published = True
+        self.post.save()
+        self.client.force_authenticate(user=self.admin)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f'/api/v1/admin/blog/{self.post.id}/notify-subscribers/',
+            )
+
+        self.assertEqual(response.status_code, 202, response.data)
+        self.assertEqual(response.data['recipient_count'], 1)
+        campaign = NewsletterCampaign.objects.get()
+        self.assertEqual(campaign.trigger, NewsletterCampaign.Trigger.MANUAL)
+        dispatch.assert_called_once()
+
+    def test_admin_can_only_notify_published_articles(self):
+        anonymous = self.client.post(
+            f'/api/v1/admin/blog/{self.post.id}/notify-subscribers/',
+        )
+        self.assertIn(anonymous.status_code, (401, 403))
+
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            f'/api/v1/admin/blog/{self.post.id}/notify-subscribers/',
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(NewsletterCampaign.objects.exists())
+
+    @patch('apps.blog.tasks.send_templated')
+    def test_campaign_sends_individual_email_and_skips_unsubscribed_reader(self, send_templated):
+        self.post.is_published = True
+        self.post.save()
+        self.inactive_subscription.is_active = True
+        self.inactive_subscription.save(update_fields=['is_active'])
+        from apps.blog.newsletter import queue_blog_post_newsletter
+
+        campaign, _ = queue_blog_post_newsletter(
+            self.post,
+            self.admin,
+            NewsletterCampaign.Trigger.MANUAL,
+        )
+        self.active_subscription.is_active = False
+        self.active_subscription.save(update_fields=['is_active'])
+
+        from apps.blog.tasks import send_blog_newsletter_campaign
+        send_blog_newsletter_campaign.run(str(campaign.id))
+
+        send_templated.assert_called_once()
+        email = send_templated.call_args.kwargs
+        self.assertEqual(email['recipient'], self.inactive_subscription.email)
+        self.assertIn('/blog/novidade-newsletter', email['context']['article_url'])
+        self.assertIn(
+            str(self.inactive_subscription.unsubscribe_token),
+            email['context']['unsubscribe_url'],
+        )
+        delivery = NewsletterCampaignDelivery.objects.get(subscription=self.active_subscription)
+        self.assertEqual(delivery.status, NewsletterCampaignDelivery.Status.SKIPPED)
+        sent_delivery = NewsletterCampaignDelivery.objects.get(subscription=self.inactive_subscription)
+        self.assertEqual(sent_delivery.status, NewsletterCampaignDelivery.Status.SENT)
+        campaign.refresh_from_db()
+        self.assertEqual(campaign.status, NewsletterCampaign.Status.SENT)
+        self.assertEqual(campaign.sent_count, 1)
 
 
 class AdminBlogImageUploadTests(TestCase):

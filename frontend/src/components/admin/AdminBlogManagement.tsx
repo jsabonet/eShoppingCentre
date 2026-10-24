@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   ArrowDownUp, Check, ChevronLeft, ChevronRight, Copy,
   Download, Edit3, Eye, FileText, FolderOpen, LoaderCircle, Mail, MessageSquare, Plus, Search,
-  Trash2, X,
+  Send, Trash2, X,
 } from 'lucide-react';
 import { adminAPI, getMediaUrl, type BlogPostDetail } from '@/src/lib/api';
 import AdminBlogComments from './AdminBlogComments';
@@ -33,6 +33,7 @@ export default function AdminBlogManagement() {
   const [deletePost, setDeletePost] = useState<BlogPostDetail | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [notifyingId, setNotifyingId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const pageSize = 10;
 
@@ -145,6 +146,22 @@ export default function AdminBlogManagement() {
       setError('Não foi possível duplicar o artigo. Tente novamente.');
     } finally {
       setDuplicatingId(null);
+    }
+  };
+
+  const notifySubscribers = async (post: BlogPostDetail) => {
+    if (!window.confirm(`Enviar “${post.title}” por email a todos os subscritores ativos?`)) return;
+    setNotifyingId(post.id);
+    setError('');
+    setNotice('');
+    try {
+      const { data } = await adminAPI.notifyBlogSubscribers(post.id);
+      setNotice(data.detail);
+    } catch (notifyError) {
+      console.error('Não foi possível notificar os subscritores.', notifyError);
+      setError('Não foi possível iniciar o envio da newsletter. Tente novamente.');
+    } finally {
+      setNotifyingId(null);
     }
   };
 
@@ -294,7 +311,7 @@ export default function AdminBlogManagement() {
                       <td className="px-4 py-3.5 text-slate-600">{post.author_name || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3.5 text-slate-500">{formatDate(post.published_at || post.created_at)}</td>
                       <td className="px-4 py-3.5">
-                        <PostActions post={post} onDelete={() => setDeletePost(post)} onDuplicate={() => void duplicatePost(post)} duplicating={duplicatingId === post.id} />
+                        <PostActions post={post} onDelete={() => setDeletePost(post)} onDuplicate={() => void duplicatePost(post)} onNotify={() => void notifySubscribers(post)} duplicating={duplicatingId === post.id} notifying={notifyingId === post.id} />
                       </td>
                     </tr>
                   ))}
@@ -317,7 +334,7 @@ export default function AdminBlogManagement() {
                     </div>
                   </div>
                   <p className="mt-3 line-clamp-2 text-sm text-slate-500">{post.excerpt}</p>
-                  <PostActions post={post} onDelete={() => setDeletePost(post)} onDuplicate={() => void duplicatePost(post)} duplicating={duplicatingId === post.id} />
+                  <PostActions post={post} onDelete={() => setDeletePost(post)} onDuplicate={() => void duplicatePost(post)} onNotify={() => void notifySubscribers(post)} duplicating={duplicatingId === post.id} notifying={notifyingId === post.id} />
                 </li>
               ))}
             </ul>
@@ -388,14 +405,17 @@ function StatusBadge({ published }: { published: boolean }) {
     : <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"><Edit3 size={12} /> Rascunho</span>;
 }
 
-function PostActions({ post, onDelete, onDuplicate, duplicating }: { post: BlogPostDetail; onDelete: () => void; onDuplicate: () => void; duplicating: boolean }) {
+function PostActions({ post, onDelete, onDuplicate, onNotify, duplicating, notifying }: { post: BlogPostDetail; onDelete: () => void; onDuplicate: () => void; onNotify: () => void; duplicating: boolean; notifying: boolean }) {
   return (
-    <div className="mt-3 flex items-center gap-2 md:mt-0 md:justify-end">
+    <div className="mt-3 flex flex-wrap items-center gap-2 md:mt-0 md:justify-end">
       <Link href={`/admin/blog/editor?id=${encodeURIComponent(post.id)}`} className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 md:flex-none" aria-label={`Editar ${post.title}`}>
         <Edit3 size={14} /> Editar
       </Link>
       {post.is_published && (
         <Link href={`/blog/${post.slug}`} target="_blank" rel="noreferrer" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label={`Ver ${post.title}`} title="Ver artigo"><Eye size={15} /></Link>
+      )}
+      {post.is_published && (
+        <button type="button" onClick={onNotify} disabled={notifying} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-indigo-100 text-indigo-600 hover:bg-indigo-50 disabled:opacity-50" aria-label={`Notificar subscritores sobre ${post.title}`} title="Notificar subscritores">{notifying ? <LoaderCircle size={15} className="animate-spin" /> : <Send size={15} />}</button>
       )}
       <button type="button" onClick={onDuplicate} disabled={duplicating} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50" aria-label={`Duplicar ${post.title} como rascunho`} title="Duplicar como rascunho">{duplicating ? <LoaderCircle size={15} className="animate-spin" /> : <Copy size={15} />}</button>
       <button type="button" onClick={onDelete} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-100 text-red-600 hover:bg-red-50" aria-label={`Eliminar ${post.title}`} title="Eliminar artigo"><Trash2 size={15} /></button>

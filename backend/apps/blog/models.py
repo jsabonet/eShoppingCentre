@@ -177,3 +177,82 @@ class NewsletterSubscription(BaseModel):
 
     def __str__(self):
         return self.email
+
+
+class NewsletterCampaign(BaseModel):
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'Na fila'
+        SENDING = 'sending', 'A enviar'
+        SENT = 'sent', 'Enviada'
+        PARTIAL = 'partial', 'Parcialmente enviada'
+        FAILED = 'failed', 'Falhou'
+
+    class Trigger(models.TextChoices):
+        PUBLICATION = 'publication', 'Primeira publicação'
+        MANUAL = 'manual', 'Envio manual'
+
+    post = models.ForeignKey(
+        BlogPost,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='newsletter_campaigns',
+    )
+    post_title = models.CharField(max_length=500)
+    post_slug = models.SlugField(max_length=255)
+    post_excerpt = models.TextField()
+    trigger = models.CharField(max_length=20, choices=Trigger.choices)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.QUEUED, db_index=True)
+    recipient_count = models.PositiveIntegerField(default=0)
+    sent_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    requested_by_email = models.EmailField(blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta(BaseModel.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=('post', 'trigger'),
+                condition=models.Q(trigger='publication'),
+                name='unique_blog_publication_newsletter',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.post_title} — {self.get_status_display()}'
+
+
+class NewsletterCampaignDelivery(BaseModel):
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'Na fila'
+        SENDING = 'sending', 'A enviar'
+        SENT = 'sent', 'Enviado'
+        FAILED = 'failed', 'Falhou'
+        SKIPPED = 'skipped', 'Ignorado'
+
+    campaign = models.ForeignKey(
+        NewsletterCampaign,
+        on_delete=models.CASCADE,
+        related_name='deliveries',
+    )
+    subscription = models.ForeignKey(
+        NewsletterSubscription,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='newsletter_deliveries',
+    )
+    email = models.EmailField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.QUEUED, db_index=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta(BaseModel.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=('campaign', 'email'),
+                name='unique_newsletter_campaign_recipient',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.email} — {self.get_status_display()}'

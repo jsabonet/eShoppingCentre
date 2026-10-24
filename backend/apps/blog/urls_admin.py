@@ -8,6 +8,7 @@ from .views_admin import (
     AdminBlogDetailView,
     AdminBlogImageUploadView,
     AdminBlogListCreateView,
+    AdminBlogNewsletterSendView,
     AdminNewsletterDetailView,
     AdminNewsletterListView,
 )
@@ -22,5 +23,6 @@ urlpatterns = [
     path('comments/<uuid:pk>/', AdminBlogCommentDetailView.as_view(), name='admin_blog_comment_detail'),
     path('newsletter/', AdminNewsletterListView.as_view(), name='admin_newsletter_list'),
     path('newsletter/<uuid:pk>/', AdminNewsletterDetailView.as_view(), name='admin_newsletter_detail'),
+    path('<uuid:pk>/notify-subscribers/', AdminBlogNewsletterSendView.as_view(), name='admin_blog_notify_subscribers'),
     path('<uuid:pk>/', AdminBlogDetailView.as_view(), name='admin_blog_detail'),
 ]
