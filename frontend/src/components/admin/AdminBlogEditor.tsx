@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { adminAPI, getMediaUrl, type BlogPostDetail } from '@/src/lib/api';
 import { absoluteUrl } from '@/src/lib/seo';
+import { toast } from '@/src/lib/toast';
 import { useAuth } from '@/src/hooks/useAuth';
 import BlogRichTextEditor, { sanitizeEditorHtml } from './BlogRichTextEditor';
 import BlogSeoPanel, { BlogImageCreditFields, type BlogSeoValues, type TwitterCard } from './BlogSeoPanel';
@@ -23,6 +24,8 @@ interface BlogForm extends BlogSeoValues {
   author_name: string;
   is_published: boolean;
 }
+
+type TextFormField = Exclude<keyof BlogForm, 'is_published' | 'noindex' | 'nofollow' | 'twitter_card'>;
 
 const EMPTY_FORM: BlogForm = {
   title: '',
@@ -47,18 +50,117 @@ const EMPTY_FORM: BlogForm = {
 };
 const DRAFT_STORAGE_KEY = 'admin-blog-editor-draft-v1';
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const MAX_CONTENT_LENGTH = 100_000;
 
-function getApiError(error: unknown) {
-  if (!axios.isAxiosError(error)) return 'Não foi possível guardar o artigo. Tente novamente.';
+const API_FIELD_LABELS: Record<string, string> = {
+  title: 'Título',
+  excerpt: 'Resumo',
+  content: 'Conteúdo',
+  category: 'Categoria',
+  author_name: 'Autor',
+  image: 'Imagem de capa',
+  image_url: 'Ligação da imagem de capa',
+  meta_title: 'Título SEO',
+  meta_description: 'Meta descrição',
+  canonical_url: 'URL canónica',
+  focus_keyword: 'Palavra-chave foco',
+  og_title: 'Título de partilha',
+  og_description: 'Descrição de partilha',
+  twitter_card: 'Cartão social',
+  image_caption: 'Legenda da imagem',
+  image_credit: 'Crédito da imagem',
+  image_source_url: 'Fonte da imagem',
+  is_published: 'Estado de publicação',
+  non_field_errors: 'Formulário',
+  detail: 'Formulário',
+};
+
+function parseApiErrors(error: unknown): { summary: string; fields: Record<string, string> } {
+  if (!axios.isAxiosError(error)) {
+    return { summary: 'Não foi possível guardar o artigo. Tente novamente.', fields: {} };
+  }
   const data = error.response?.data;
   if (data && typeof data === 'object') {
-    if ('detail' in data && typeof data.detail === 'string') return data.detail;
-    const messages = Object.entries(data).map(([field, value]) =>
-      `${field}: ${Array.isArray(value) ? value.join(', ') : String(value)}`,
-    );
-    if (messages.length) return messages.join(' ');
+    const fields: Record<string, string> = {};
+    for (const [field, value] of Object.entries(data)) {
+      const messages = Array.isArray(value) ? value : [value];
+      fields[field] = messages
+        .map((message) => typeof message === 'string' ? message : JSON.stringify(message))
+        .join(' ');
+    }
+    const summary = Object.entries(fields)
+      .map(([field, message]) => `${API_FIELD_LABELS[field] || field}: ${message}`)
+      .join(' ');
+    if (summary) return { summary, fields };
   }
-  return 'Não foi possível guardar o artigo. Verifique os campos e tente novamente.';
+  return {
+    summary: error.response?.status === 413
+      ? 'O pedido é demasiado grande. Reduza o conteúdo ou a imagem e tente novamente.'
+      : 'Não foi possível guardar o artigo. Verifique os campos e tente novamente.',
+    fields: {},
+  };
+}
+
+function getContentTextLength(content: string) {
+  return content.replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').trim().length;
+}
+
+function validateBlogForm(form: BlogForm) {
+  const errors: Record<string, string> = {};
+  const requiredFields: Array<[TextFormField, string]> = [
+    ['title', 'Título'],
+    ['excerpt', 'Resumo'],
+    ['category', 'Categoria'],
+    ['author_name', 'Autor'],
+  ];
+  for (const [field, label] of requiredFields) {
+    if (!form[field].trim()) errors[field] = `${label} é obrigatório.`;
+  }
+  if (!getContentTextLength(sanitizeEditorHtml(form.content))) errors.content = 'O conteúdo do artigo é obrigatório.';
+
+  const textLengths: Array<[TextFormField, string, number]> = [
+    ['title', 'Título', 200],
+    ['excerpt', 'Resumo', 500],
+    ['category', 'Categoria', 100],
+    ['author_name', 'Autor', 255],
+    ['content', 'Conteúdo', MAX_CONTENT_LENGTH],
+    ['image_url', 'Ligação da imagem de capa', 1000],
+    ['meta_title', 'Título SEO', 255],
+    ['meta_description', 'Meta descrição', 500],
+    ['canonical_url', 'URL canónica', 500],
+    ['focus_keyword', 'Palavra-chave foco', 120],
+    ['og_title', 'Título de partilha', 255],
+    ['og_description', 'Descrição de partilha', 500],
+    ['image_caption', 'Legenda da imagem', 255],
+    ['image_credit', 'Crédito da imagem', 255],
+    ['image_source_url', 'Fonte da imagem', 500],
+  ];
+  for (const [field, label, limit] of textLengths) {
+    const length = form[field].length;
+    if (length > limit) errors[field] = `${label} excede o máximo de ${limit} caracteres.`;
+  }
+
+  const urlFields: Array<[TextFormField, string]> = [
+    ['image_url', 'Ligação da imagem de capa'],
+    ['canonical_url', 'URL canónica'],
+    ['image_source_url', 'Fonte da imagem'],
+  ];
+  for (const [field, label] of urlFields) {
+    const value = form[field].trim();
+    if (!value) continue;
+    try {
+      const url = new URL(value);
+      if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) {
+        throw new Error('URL não permitida');
+      }
+    } catch {
+      errors[field] = `${label} deve ser uma URL http:// ou https:// válida, sem credenciais.`;
+    }
+  }
+  if (!['summary', 'summary_large_image'].includes(form.twitter_card)) {
+    errors.twitter_card = 'Selecione um formato de cartão social válido.';
+  }
+  return errors;
 }
 
 export default function AdminBlogEditor({ postId }: { postId: string | null }) {
@@ -74,6 +176,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
   const [loading, setLoading] = useState(Boolean(postId));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState('');
   const [preview, setPreview] = useState(false);
   const isEditing = Boolean(postId);
@@ -134,9 +237,11 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
     }).catch((loadError) => {
       if (!active) return;
       console.error('Não foi possível carregar o artigo para edição.', loadError);
-      setError(axios.isAxiosError(loadError) && loadError.response?.status === 404
+      const message = axios.isAxiosError(loadError) && loadError.response?.status === 404
         ? 'Este artigo não foi encontrado.'
-        : 'Não foi possível carregar o artigo. Verifique a ligação e as permissões.');
+        : 'Não foi possível carregar o artigo. Verifique a ligação e as permissões.';
+      setError(message);
+      toast.error('Não foi possível abrir o artigo', message);
     }).finally(() => {
       if (active) setLoading(false);
     });
@@ -183,12 +288,29 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
 
   const patchSeo = useCallback((patch: Partial<BlogSeoValues>) => {
     setForm((current) => ({ ...current, ...patch }));
+    setFieldErrors((current) => {
+      const next = { ...current };
+      Object.keys(patch).forEach((field) => delete next[field]);
+      return next;
+    });
+    setError('');
   }, []);
+
+  const updateField = <K extends keyof BlogForm>(field: K, value: BlogForm[K]) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setFieldErrors((current) => {
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+    setError('');
+  };
 
   const save = useCallback(async (event: FormEvent<HTMLFormElement> | undefined, publish: boolean) => {
     event?.preventDefault();
     setSaving(true);
     setError('');
+    setFieldErrors({});
     setNotice('');
     const payload = new FormData();
     payload.append('title', form.title.trim());
@@ -219,10 +341,17 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
         await adminAPI.createBlogPost(payload);
         localStorage.removeItem(DRAFT_STORAGE_KEY);
       }
+      toast.success(
+        postId ? 'Artigo atualizado' : publish ? 'Artigo publicado' : 'Rascunho guardado',
+        postId ? 'As alterações foram guardadas com sucesso.' : publish ? 'O artigo já está disponível no blog.' : 'O artigo foi guardado como rascunho.',
+      );
       router.push('/admin?tab=blog');
     } catch (saveError) {
       console.error('Não foi possível guardar o artigo do blog.', saveError);
-      setError(getApiError(saveError));
+      const apiErrors = parseApiErrors(saveError);
+      setError(apiErrors.summary);
+      setFieldErrors(apiErrors.fields);
+      toast.error(isEditing ? 'Não foi possível atualizar o artigo' : 'Não foi possível guardar o artigo', apiErrors.summary);
       setSaving(false);
     }
   }, [form, imageFile, postId, router]);
@@ -230,21 +359,30 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
   const handleImage = (file?: File) => {
     setError('');
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError('Selecione um ficheiro de imagem válido.');
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedImageTypes.includes(file.type)) {
+      const message = 'Selecione um ficheiro de imagem válido. Use JPG, PNG, WebP ou GIF.';
+      setError(message);
+      setFieldErrors({ image: message });
+      toast.error('Formato de imagem inválido', message);
       return;
     }
     if (file.size > MAX_IMAGE_SIZE) {
-      setError('A imagem deve ter no máximo 10 MB.');
+      const message = 'A imagem deve ter no máximo 10 MB.';
+      setError(message);
+      setFieldErrors({ image: message });
+      toast.error('Imagem demasiado grande', message);
       return;
     }
+    setError('');
+    setFieldErrors({});
     setForm((current) => ({ ...current, image_url: '' }));
     setImageFile(file);
   };
 
   const handleImageUrl = (value: string) => {
     setImageFile(null);
-    setForm((current) => ({ ...current, image_url: value }));
+    updateField('image_url', value);
     const normalizedUrl = value.trim();
     setImagePreview(normalizedUrl
       ? getMediaUrl(normalizedUrl)
@@ -254,12 +392,26 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
   };
 
   const validateAndSave = (publish: boolean) => {
-    const hasContent = form.content.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').trim();
-    if (!form.title.trim() || !form.excerpt.trim() || !hasContent || !form.category.trim() || !form.author_name.trim()) {
-      setError('Preencha o título, resumo, conteúdo, categoria e autor antes de guardar.');
+    const errors = validateBlogForm(form);
+    if (Object.keys(errors).length) {
+      const summary = Object.values(errors).join(' ');
+      setFieldErrors(errors);
+      setError(summary);
+      toast.warning('Verifique os dados do artigo', summary);
       setPreview(false);
+      const fieldIds: Record<string, string> = {
+        title: 'blog-title',
+        excerpt: 'blog-excerpt',
+        category: 'blog-category',
+        author_name: 'blog-author',
+        image_url: 'blog-cover-url',
+      };
+      const fieldId = fieldIds[Object.keys(errors)[0]];
+      if (fieldId) document.getElementById(fieldId)?.focus();
       return;
     }
+    setFieldErrors({});
+    setError('');
     const formElement = document.getElementById('blog-editor-form') as HTMLFormElement | null;
     if (formElement && !formElement.reportValidity()) return;
     void save(undefined, publish);
@@ -305,7 +457,12 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
       </header>
 
       {notice && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{notice}</p>}
-      {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p className="font-semibold">{isEditing ? 'Não foi possível atualizar o artigo.' : 'Revise os dados antes de continuar.'}</p>
+          <p className="mt-1">{error}</p>
+        </div>
+      )}
 
       {preview ? (
         <article className="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-10">
@@ -337,14 +494,14 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <div className="mb-5 flex items-center gap-2"><FileText size={18} className="text-indigo-600" /><h2 className="font-semibold text-slate-900">Conteúdo do artigo</h2></div>
               <div className="space-y-5">
-                <Field label="Título" required htmlFor="blog-title" hint={`${form.title.length}/200`}>
-                  <input id="blog-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} maxLength={200} required placeholder="Escreva um título claro e descritivo" className="h-12 w-full rounded-lg border border-slate-200 px-3 text-base outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                <Field label="Título" required htmlFor="blog-title" hint={`${form.title.length}/200`} error={fieldErrors.title}>
+                  <input id="blog-title" value={form.title} onChange={(event) => updateField('title', event.target.value)} maxLength={200} required aria-invalid={Boolean(fieldErrors.title)} placeholder="Escreva um título claro e descritivo" className="h-12 w-full rounded-lg border border-slate-200 px-3 text-base outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                 </Field>
-                <Field label="Resumo" required htmlFor="blog-excerpt" hint={`${form.excerpt.length}/500`}>
-                  <textarea id="blog-excerpt" value={form.excerpt} onChange={(event) => setForm({ ...form, excerpt: event.target.value })} maxLength={500} required rows={3} placeholder="Apresente o tema do artigo em poucas frases" className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-6 outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                <Field label="Resumo" required htmlFor="blog-excerpt" hint={`${form.excerpt.length}/500`} error={fieldErrors.excerpt}>
+                  <textarea id="blog-excerpt" value={form.excerpt} onChange={(event) => updateField('excerpt', event.target.value)} maxLength={500} required aria-invalid={Boolean(fieldErrors.excerpt)} rows={3} placeholder="Apresente o tema do artigo em poucas frases" className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-6 outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                 </Field>
-                <Field label="Corpo do artigo" required hint={`${readingTime} de leitura`}>
-                  <BlogRichTextEditor value={form.content} onChange={(content) => setForm((current) => ({ ...current, content }))} />
+                <Field label="Corpo do artigo" required hint={`${form.content.length}/${MAX_CONTENT_LENGTH} caracteres · ${readingTime} de leitura`} error={fieldErrors.content}>
+                  <BlogRichTextEditor value={form.content} onChange={(content) => updateField('content', content)} />
                   <p className="mt-2 text-xs text-slate-500">Use a barra de ferramentas para formatar texto, inserir ligações e adicionar imagens por endereço URL.</p>
                 </Field>
               </div>
@@ -355,6 +512,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
               article={{ title: form.title, excerpt: form.excerpt, content: form.content }}
               permalink={permalink}
               imageUrl={imagePreview}
+              fieldErrors={fieldErrors}
             />
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -379,11 +537,11 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex items-center gap-2"><FileImage size={18} className="text-indigo-600" /><h2 className="font-semibold text-slate-900">Detalhes do artigo</h2></div>
               <div className="space-y-4">
-                <Field label="Categoria" required htmlFor="blog-category">
-                  <input id="blog-category" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} required maxLength={100} placeholder="Ex.: Tecnologia" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                <Field label="Categoria" required htmlFor="blog-category" hint={`${form.category.length}/100`} error={fieldErrors.category}>
+                  <input id="blog-category" value={form.category} onChange={(event) => updateField('category', event.target.value)} required maxLength={100} aria-invalid={Boolean(fieldErrors.category)} placeholder="Ex.: Tecnologia" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                 </Field>
-                <Field label="Autor" required htmlFor="blog-author">
-                  <input id="blog-author" value={form.author_name} onChange={(event) => setForm({ ...form, author_name: event.target.value })} required maxLength={255} placeholder="Nome apresentado ao leitor" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                <Field label="Autor" required htmlFor="blog-author" hint={`${form.author_name.length}/255`} error={fieldErrors.author_name}>
+                  <input id="blog-author" value={form.author_name} onChange={(event) => updateField('author_name', event.target.value)} required maxLength={255} aria-invalid={Boolean(fieldErrors.author_name)} placeholder="Nome apresentado ao leitor" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                 </Field>
               </div>
             </section>
@@ -413,12 +571,15 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
                 value={form.image_url}
                 onChange={(event) => handleImageUrl(event.target.value)}
                 maxLength={1000}
+                aria-invalid={Boolean(fieldErrors.image_url)}
                 placeholder="https://exemplo.com/imagem.jpg"
                 className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               />
+              {fieldErrors.image_url && <p role="alert" className="mt-1.5 text-xs text-red-700">{fieldErrors.image_url}</p>}
+              {fieldErrors.image && <p role="alert" className="mt-1.5 text-xs text-red-700">{fieldErrors.image}</p>}
               <p className="mt-1 text-xs leading-5 text-slate-500">Use um endereço público e direto para o ficheiro de imagem. A ligação ficará armazenada como fornecida.</p>
               {imageFile && <button type="button" onClick={() => { setImageFile(null); setImagePreview(getMediaUrl(post?.image)); }} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"><X size={13} /> Remover novo ficheiro</button>}
-              <BlogImageCreditFields values={form} onChange={patchSeo} imageUrl={imagePreview} />
+              <BlogImageCreditFields values={form} onChange={patchSeo} imageUrl={imagePreview} fieldErrors={fieldErrors} />
             </section>
           </aside>
         </form>
@@ -427,7 +588,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
   );
 }
 
-function Field({ label, required, hint, htmlFor, children }: { label: string; required?: boolean; hint?: string; htmlFor?: string; children: React.ReactNode }) {
+function Field({ label, required, hint, htmlFor, error, children }: { label: string; required?: boolean; hint?: string; htmlFor?: string; error?: string; children: React.ReactNode }) {
   const labelText = <>{label}{required && <span className="ml-1 text-red-600" aria-hidden="true">*</span>}</>;
   return (
     <div className="block">
@@ -436,6 +597,7 @@ function Field({ label, required, hint, htmlFor, children }: { label: string; re
         {hint && <span className="text-xs font-normal text-slate-500">{hint}</span>}
       </div>
       {children}
+      {error && <p role="alert" className="mt-1.5 text-xs text-red-700">{error}</p>}
     </div>
   );
 }

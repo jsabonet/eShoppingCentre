@@ -8,6 +8,7 @@ import {
   Strikethrough, Subscript, Superscript, Table2, Underline, Undo2, Unlink,
 } from 'lucide-react';
 import { adminAPI } from '@/src/lib/api';
+import { toast } from '@/src/lib/toast';
 
 const ALLOWED_TAGS = new Set([
   'A', 'B', 'BLOCKQUOTE', 'BR', 'CODE', 'DEL', 'DIV', 'EM', 'FIGCAPTION',
@@ -255,12 +256,16 @@ export default function BlogRichTextEditor({ value, onChange }: BlogRichTextEdit
     setUploadNotice(null);
     if (!file) return;
     if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
-      setUploadError('Formato não suportado. Use JPG, PNG, WEBP ou GIF.');
+      const message = 'Formato não suportado. Use JPG, PNG, WEBP ou GIF.';
+      setUploadError(message);
+      toast.error('Formato de imagem inválido', message);
       input.value = '';
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
-      setUploadError('A imagem excede 5 MB. Otimize o ficheiro antes de carregar.');
+      const message = 'A imagem excede 5 MB. Otimize o ficheiro antes de carregar.';
+      setUploadError(message);
+      toast.error('Imagem demasiado grande', message);
       input.value = '';
       return;
     }
@@ -271,7 +276,9 @@ export default function BlogRichTextEditor({ value, onChange }: BlogRichTextEdit
       insertImageMarkup(data.url, alt);
       setUploadNotice(`Imagem “${file.name}” inserida no artigo.`);
     } catch (error) {
-      setUploadError(describeUploadError(error));
+      const message = describeUploadError(error);
+      setUploadError(message);
+      toast.error('Não foi possível carregar a imagem', message);
     } finally {
       setIsUploading(false);
       input.value = '';

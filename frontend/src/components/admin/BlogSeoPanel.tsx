@@ -83,9 +83,9 @@ function lengthTone(length: number, max: number) {
 }
 
 function FieldShell({
-  label, hint, tone, htmlFor, children,
+  label, hint, tone, htmlFor, error, children,
 }: {
-  label: string; hint?: string; tone?: string; htmlFor?: string; children: React.ReactNode;
+  label: string; hint?: string; tone?: string; htmlFor?: string; error?: string; children: React.ReactNode;
 }) {
   return (
     <div>
@@ -94,6 +94,7 @@ function FieldShell({
         {hint && <span className={`text-xs ${tone || 'text-slate-500'}`}>{hint}</span>}
       </div>
       {children}
+      {error && <p role="alert" className="mt-1.5 text-xs text-red-700">{error}</p>}
     </div>
   );
 }
@@ -101,13 +102,14 @@ function FieldShell({
 const inputClass = 'h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100';
 
 export default function BlogSeoPanel({
-  values, onChange, article, permalink, imageUrl,
+  values, onChange, article, permalink, imageUrl, fieldErrors = {},
 }: {
   values: BlogSeoValues;
   onChange: (patch: Partial<BlogSeoValues>) => void;
   article: BlogSeoArticle;
   permalink: string;
   imageUrl: string | null;
+  fieldErrors?: Record<string, string>;
 }) {
   const uid = useId();
   const analysis = useMemo(() => analyzeKeyword(article, values), [article, values]);
@@ -202,13 +204,14 @@ export default function BlogSeoPanel({
               />
             </FieldShell>
 
-            <FieldShell label="URL canónica" htmlFor={`${uid}-canonical`} hint="opcional">
+            <FieldShell label="URL canónica" htmlFor={`${uid}-canonical`} hint="opcional" error={fieldErrors.canonical_url}>
               <input
                 id={`${uid}-canonical`}
                 type="url"
                 value={values.canonical_url}
                 onChange={(event) => onChange({ canonical_url: event.target.value })}
                 maxLength={500}
+                aria-invalid={Boolean(fieldErrors.canonical_url)}
                 placeholder={permalink}
                 className={inputClass}
               />
@@ -316,11 +319,12 @@ export default function BlogSeoPanel({
 }
 
 export function BlogImageCreditFields({
-  values, onChange, imageUrl,
+  values, onChange, imageUrl, fieldErrors = {},
 }: {
   values: Pick<BlogSeoValues, 'image_caption' | 'image_credit' | 'image_source_url'>;
   onChange: (patch: Partial<BlogSeoValues>) => void;
   imageUrl: string | null;
+  fieldErrors?: Record<string, string>;
 }) {
   const uid = useId();
   return (
@@ -333,8 +337,8 @@ export function BlogImageCreditFields({
       <FieldShell label="Crédito / autoria" htmlFor={`${uid}-credit`}>
         <input id={`${uid}-credit`} value={values.image_credit} onChange={(event) => onChange({ image_credit: event.target.value.slice(0, 255) })} maxLength={255} disabled={!imageUrl} placeholder="Ex.: Fotografia de Ana Silva" className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-400`} />
       </FieldShell>
-      <FieldShell label="Fonte / licença" htmlFor={`${uid}-source`}>
-        <input id={`${uid}-source`} type="url" value={values.image_source_url} onChange={(event) => onChange({ image_source_url: event.target.value })} maxLength={500} disabled={!imageUrl} placeholder="https://exemplo.com/licenca" className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-400`} />
+      <FieldShell label="Fonte / licença" htmlFor={`${uid}-source`} error={fieldErrors.image_source_url}>
+        <input id={`${uid}-source`} type="url" value={values.image_source_url} onChange={(event) => onChange({ image_source_url: event.target.value })} maxLength={500} aria-invalid={Boolean(fieldErrors.image_source_url)} disabled={!imageUrl} placeholder="https://exemplo.com/licenca" className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-400`} />
       </FieldShell>
       <p className="text-xs leading-5 text-slate-500">O crédito documenta a autoria, mas não substitui autorização de uso. Utilize apenas imagens próprias ou licenciadas.</p>
     </div>

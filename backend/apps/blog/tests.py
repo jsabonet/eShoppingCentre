@@ -237,6 +237,114 @@ class BlogSeoFieldTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('image_url', response.data)
 
+    def test_admin_post_validation_reports_required_and_max_length_errors(self):
+        admin = User.objects.create_superuser(
+            email='validation-admin@test.local', username='validationadmin', password='TestPass123!'
+        )
+        client = APIClient()
+        client.force_authenticate(user=admin)
+
+        missing = client.post('/api/v1/admin/blog/', {}, format='json')
+        self.assertEqual(missing.status_code, 400)
+        self.assertTrue({'title', 'excerpt', 'content', 'category', 'author_name'}.issubset(missing.data))
+
+        oversized = client.post(
+            '/api/v1/admin/blog/',
+            {
+                'title': 'T' * 201,
+                'excerpt': 'Resumo',
+                'content': '<p>Conteúdo</p>',
+                'category': 'Tecnologia',
+                'author_name': 'Equipa',
+            },
+            format='json',
+        )
+        self.assertEqual(oversized.status_code, 400)
+        self.assertIn('title', oversized.data)
+        self.assertFalse(BlogPost.objects.filter(title='T' * 201).exists())
+
+        oversized_content = client.post(
+            '/api/v1/admin/blog/',
+            {
+                'title': 'Artigo extenso',
+                'excerpt': 'Resumo',
+                'content': '<p>' + ('x' * 100_001) + '</p>',
+                'category': 'Tecnologia',
+                'author_name': 'Equipa',
+            },
+            format='json',
+        )
+        self.assertEqual(oversized_content.status_code, 400)
+        self.assertIn('content', oversized_content.data)
+    def test_admin_post_sanitizes_html_and_rejects_invalid_credit_url(self):
+        admin = User.objects.create_superuser(
+            email='sanitize-admin@test.local', username='sanitizeadmin', password='TestPass123!'
+        )
+        client = APIClient()
+        client.force_authenticate(user=admin)
+        payload = {
+            'title': 'Artigo com conteúdo seguro',
+            'excerpt': 'Resumo',
+            'content': '<p>Texto seguro <strong>formatado</strong><script>alert(1)</script>'
+                       '<a href="javascript:alert(1)" onclick="alert(1)">ligação</a></p>',
+            'category': 'Tecnologia',
+            'author_name': 'Equipa',
+            'is_published': True,
+        }
+
+        response = client.post('/api/v1/admin/blog/', payload, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        saved_content = BlogPost.objects.get(id=response.data['id']).content
+        self.assertIn('<strong>formatado</strong>', saved_content)
+        self.assertNotIn('<script', saved_content)
+        self.assertNotIn('javascript:', saved_content)
+        self.assertNotIn('onclick', saved_content)
+        self.assertIn('ligação', saved_content)
+
+        payload['title'] = 'Artigo com fonte inválida'
+        payload['image_source_url'] = 'javascript:alert(1)'
+        invalid_url = client.post('/api/v1/admin/blog/', payload, format='json')
+        self.assertEqual(invalid_url.status_code, 400)
+        self.assertIn('image_source_url', invalid_url.data)
+
+        payload['title'] = 'Artigo com canónica inválida'
+        payload['image_source_url'] = ''
+        payload['canonical_url'] = 'ftp://example.com/artigo'
+        invalid_canonical = client.post('/api/v1/admin/blog/', payload, format='json')
+        self.assertEqual(invalid_canonical.status_code, 400)
+        self.assertIn('canonical_url', invalid_canonical.data)
+
+        payload['title'] = 'Artigo sem conteúdo visível'
+        payload['canonical_url'] = ''
+        payload['content'] = '<script>alert(1)</script>'
+        empty_after_sanitize = client.post('/api/v1/admin/blog/', payload, format='json')
+        self.assertEqual(empty_after_sanitize.status_code, 400)
+        self.assertIn('content', empty_after_sanitize.data)
+
+    def test_admin_post_rejects_non_image_cover_upload(self):
+        admin = User.objects.create_superuser(
+            email='invalid-image-admin@test.local', username='invalidimageadmin', password='TestPass123!'
+        )
+        client = APIClient()
+        client.force_authenticate(user=admin)
+
+        response = client.post(
+            '/api/v1/admin/blog/',
+            {
+                'title': 'Artigo com ficheiro inválido',
+                'excerpt': 'Resumo',
+                'content': '<p>Texto do artigo</p>',
+                'category': 'Tecnologia',
+                'author_name': 'Equipa',
+                'image': SimpleUploadedFile('capa.png', b'isto nao e uma imagem', content_type='image/png'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('image', response.data)
+
 
 class BlogEngagementTests(TestCase):
     """Comentários, gostos e newsletter."""
