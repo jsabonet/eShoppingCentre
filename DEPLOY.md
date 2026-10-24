@@ -280,7 +280,7 @@ docker compose -f /app/eShoppingCentre/docker-compose.yml stop nginx 2>/dev/null
 
 # Obter certificado
 certbot certonly --standalone \
-  -d e-shoppingcentre.com\
+  -d e-shoppingcentre.com \
   -d www.e-shoppingcentre.com \
   --email suporte@e-shoppingcentre.com \
   --agree-tos --non-interactive
@@ -288,13 +288,41 @@ certbot certonly --standalone \
 # Copiar para nginx
 cp /etc/letsencrypt/live/e-shoppingcentre.com/fullchain.pem /app/eShoppingCentre/nginx/ssl/
 cp /etc/letsencrypt/live/e-shoppingcentre.com/privkey.pem /app/eShoppingCentre/nginx/ssl/
+
+# Subir o nginx
+cd /app/eShoppingCentre && docker compose up -d nginx
 ```
 
-### 9.2 Renovação automática
+### 9.2 Renovação (manual + automática)
+
+A renovação usa o script [`scripts/renew-ssl.sh`](./scripts/renew-ssl.sh), que
+trata de três coisas que antes falhavam isoladamente:
+
+1. para o nginx para libertar a porta 80 (exigida pelo HTTP-01 `--standalone`);
+2. **copia os certificados renovados** para `nginx/ssl/` (o nginx serve os
+   ficheiros copiados, não os de `/etc/letsencrypt/live/` — o hook antigo só
+   reiniciava o nginx, por isso continuava a servir o certificado antigo);
+3. volta a subir o nginx e valida as datas do certificado.
+
+**Renovação manual (uso imediato quando o certificado já expirou):**
 
 ```bash
-(crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'cd /app/eShoppingCentre && docker compose restart nginx'") | crontab -
+cd /app/eShoppingCentre
+sudo bash scripts/renew-ssl.sh --force
 ```
+
+**Renovação automática (cron diário):**
+
+```bash
+# O certbot já corre internamente só quando faltam <30 dias; sem --force.
+# Instalar no crontab do root (o certbot exige root): `sudo crontab -e`
+(crontab -l 2>/dev/null; echo "0 3 * * * cd /app/eShoppingCentre && bash scripts/renew-ssl.sh >> /var/log/renew-ssl.log 2>&1") | crontab -
+```
+
+> 💡 O cron corre às 03:00 todos os dias. Como o script usa `--standalone`,
+> há uma paragem de alguns segundos do nginx durante a renovação (aceitável e
+> só acontece quando a renovação é efetivamente necessária).
+
 
 ---
 
@@ -440,7 +468,7 @@ git revert HEAD --no-edit
 | **502 Bad Gateway** | `docker compose logs backend --tail=50` — verificar migrações, .env |
 | **500 Internal Error** | `docker compose exec backend python manage.py check --deploy` |
 | **Frontend 404** | `docker compose build --no-cache frontend && docker compose up -d frontend` |
-| **SSL expirado** | `certbot renew --force-renewal` + copiar certs + restart nginx |
+| **SSL expirado** | `cd /app/eShoppingCentre && sudo bash scripts/renew-ssl.sh --force` |
 | **Disco cheio** | `docker system prune -af --volumes` |
 | **Reiniciar tudo** | `docker compose down && docker compose up -d` |
 | **Logs de um serviço** | `docker compose logs -f <servico>` |
