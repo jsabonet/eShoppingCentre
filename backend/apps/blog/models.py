@@ -23,6 +23,13 @@ class BlogPost(BaseModel):
     image_url = models.URLField(max_length=1000, blank=True)
     author_name = models.CharField(max_length=255)
     category = models.CharField(max_length=100)
+    blog_category = models.ForeignKey(
+        'BlogCategory',
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='posts',
+    )
     read_time = models.CharField(max_length=20, blank=True)
     is_published = models.BooleanField(default=False)
     published_at = models.DateTimeField(null=True, blank=True)
@@ -85,6 +92,19 @@ class BlogPost(BaseModel):
             'nofollow' if self.nofollow else 'follow',
         ]
         return ','.join(directives) + ('' if self.is_published else ',noarchive')
+
+
+class BlogCategory(BaseModel):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=120, unique=True)
+    description = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ('name',)
+        verbose_name_plural = 'blog categories'
+
+    def __str__(self):
+        return self.name
 
 
 class BlogInlineImage(BaseModel):

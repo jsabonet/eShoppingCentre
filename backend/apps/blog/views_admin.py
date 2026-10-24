@@ -1,10 +1,13 @@
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.db.models.deletion import ProtectedError
 from rest_framework import generics, permissions
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import BlogComment, BlogPost, NewsletterSubscription
+from .models import BlogCategory, BlogComment, BlogPost, NewsletterSubscription
 from .serializers import (
+    BlogCategorySerializer,
     BlogCommentAdminSerializer,
     BlogCommentBulkSerializer,
     BlogInlineImageSerializer,
@@ -13,16 +16,39 @@ from .serializers import (
 )
 
 
+class AdminBlogCategoryListCreateView(generics.ListCreateAPIView):
+    serializer_class = BlogCategorySerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = BlogCategory.objects.annotate(post_count=Count('posts'))
+
+
+class AdminBlogCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = BlogCategorySerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = BlogCategory.objects.annotate(post_count=Count('posts'))
+    lookup_field = 'pk'
+
+    def perform_destroy(self, instance):
+        if instance.posts.exists():
+            raise ValidationError({'detail': 'Não é possível eliminar uma categoria que está associada a artigos.'})
+        try:
+            instance.delete()
+        except ProtectedError as error:
+            raise ValidationError({
+                'detail': 'Não é possível eliminar uma categoria que está associada a artigos.'
+            }) from error
+
+
 class AdminBlogListCreateView(generics.ListCreateAPIView):
     """Admin: listar e criar posts do blog"""
-    queryset = BlogPost.objects.all()
+    queryset = BlogPost.objects.select_related('blog_category')
     serializer_class = BlogPostDetailSerializer
     permission_classes = [permissions.IsAdminUser]
 
 
 class AdminBlogDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Admin: ver, editar e eliminar post"""
-    queryset = BlogPost.objects.all()
+    queryset = BlogPost.objects.select_related('blog_category')
     serializer_class = BlogPostDetailSerializer
     permission_classes = [permissions.IsAdminUser]
     lookup_field = 'pk'

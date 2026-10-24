@@ -4,11 +4,12 @@ from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 
+from django.db import transaction
 from django.utils.text import slugify
 from django.utils.html import strip_tags
 from rest_framework import serializers
 
-from .models import BlogComment, BlogInlineImage, BlogLike, BlogPost, NewsletterSubscription
+from .models import BlogCategory, BlogComment, BlogInlineImage, BlogLike, BlogPost, NewsletterSubscription
 
 MAX_INLINE_IMAGE_SIZE = 5 * 1024 * 1024
 MAX_COVER_IMAGE_SIZE = 10 * 1024 * 1024
@@ -195,10 +196,12 @@ class BlogPostDetailSerializer(serializers.ModelSerializer):
     liked_by_me = serializers.SerializerMethodField()
     image = BlogCoverImageField(required=False)
     image_url = serializers.URLField(required=False, allow_blank=True, max_length=1000)
+    category_id = serializers.UUIDField(write_only=True, required=False)
+    blog_category_id = serializers.UUIDField(source='blog_category.id', read_only=True)
     title = serializers.CharField(max_length=200, allow_blank=False, trim_whitespace=True)
     excerpt = serializers.CharField(max_length=500, allow_blank=False, trim_whitespace=True)
     content = serializers.CharField(max_length=BLOG_CONTENT_MAX_LENGTH, allow_blank=False, trim_whitespace=True)
-    category = serializers.CharField(max_length=100, allow_blank=False, trim_whitespace=True)
+    category = serializers.CharField(max_length=100, required=False, allow_blank=False, trim_whitespace=True)
     author_name = serializers.CharField(max_length=255, allow_blank=False, trim_whitespace=True)
     meta_title = serializers.CharField(max_length=255, required=False, allow_blank=True)
     meta_description = serializers.CharField(max_length=500, required=False, allow_blank=True)
@@ -261,6 +264,24 @@ class BlogPostDetailSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'image_url': 'Escolha uma imagem carregada ou uma ligação, não ambas.'
             })
+        category_id = attrs.pop('category_id', None)
+        category_name = attrs.get('category')
+        if category_id:
+            try:
+                blog_category = BlogCategory.objects.get(id=category_id)
+            except BlogCategory.DoesNotExist:
+                raise serializers.ValidationError({'category_id': 'Selecione uma categoria de blog existente.'})
+        elif category_name:
+            blog_category = BlogCategory.objects.filter(name__iexact=category_name).first()
+            if not blog_category:
+                raise serializers.ValidationError({'category': 'Selecione uma categoria de blog existente.'})
+        elif self.instance is None:
+            raise serializers.ValidationError({'category_id': 'Selecione uma categoria para o artigo.'})
+        else:
+            blog_category = None
+        if blog_category:
+            attrs['blog_category'] = blog_category
+            attrs['category'] = blog_category.name
         if 'content' in attrs:
             clean_content = sanitize_blog_content(attrs['content'])
             visible_text = unescape(strip_tags(clean_content)).replace('\xa0', ' ').strip()
@@ -292,6 +313,46 @@ class BlogPostDetailSerializer(serializers.ModelSerializer):
         elif 'image' in validated_data:
             validated_data['image_url'] = ''
         return super().update(instance, validated_data)
+
+
+class BlogCategorySerializer(serializers.ModelSerializer):
+    post_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BlogCategory
+        fields = ('id', 'name', 'slug', 'description', 'post_count', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'slug', 'post_count', 'created_at', 'updated_at')
+
+    def get_post_count(self, obj):
+        count = getattr(obj, 'post_count', None)
+        return count if count is not None else obj.posts.count()
+
+    def validate_name(self, value):
+        value = value.strip()
+        duplicates = BlogCategory.objects.filter(name__iexact=value)
+        if self.instance:
+            duplicates = duplicates.exclude(id=self.instance.id)
+        if duplicates.exists():
+            raise serializers.ValidationError('Já existe uma categoria de blog com este nome.')
+        if not slugify(value):
+            raise serializers.ValidationError('O nome deve conter letras ou números.')
+        return value
+
+    def create(self, validated_data):
+        base_slug = slugify(validated_data['name'])[:120]
+        slug = base_slug
+        suffix = 2
+        while BlogCategory.objects.filter(slug=slug).exists():
+            suffix_text = f'-{suffix}'
+            slug = f'{base_slug[:120 - len(suffix_text)]}{suffix_text}'
+            suffix += 1
+        return super().create({**validated_data, 'slug': slug})
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            updated = super().update(instance, validated_data)
+            BlogPost.objects.filter(blog_category=updated).update(category=updated.name)
+            return updated
 
 
 class BlogInlineImageSerializer(serializers.ModelSerializer):

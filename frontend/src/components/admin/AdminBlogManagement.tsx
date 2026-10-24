@@ -134,6 +134,7 @@ export default function AdminBlogManagement() {
         excerpt: post.excerpt,
         content: post.content,
         category: post.category,
+        ...(post.blog_category_id ? { category_id: post.blog_category_id } : {}),
         author_name: post.author_name,
         is_published: false,
       });

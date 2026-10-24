@@ -8,7 +8,7 @@ import {
   ArrowLeft, Check, Eye, FileImage, FileText, LoaderCircle, Save, Send,
   Link2, Upload, X,
 } from 'lucide-react';
-import { adminAPI, getMediaUrl, type BlogPostDetail } from '@/src/lib/api';
+import { adminAPI, getMediaUrl, type BlogCategory, type BlogPostDetail } from '@/src/lib/api';
 import { absoluteUrl } from '@/src/lib/seo';
 import { toast } from '@/src/lib/toast';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -21,6 +21,7 @@ interface BlogForm extends BlogSeoValues {
   content: string;
   image_url: string;
   category: string;
+  category_id: string;
   author_name: string;
   is_published: boolean;
 }
@@ -33,6 +34,7 @@ const EMPTY_FORM: BlogForm = {
   content: '',
   image_url: '',
   category: '',
+  category_id: '',
   author_name: '',
   is_published: false,
   meta_title: '',
@@ -57,6 +59,7 @@ const API_FIELD_LABELS: Record<string, string> = {
   excerpt: 'Resumo',
   content: 'Conteúdo',
   category: 'Categoria',
+  category_id: 'Categoria',
   author_name: 'Autor',
   image: 'Imagem de capa',
   image_url: 'Ligação da imagem de capa',
@@ -110,7 +113,7 @@ function validateBlogForm(form: BlogForm) {
   const requiredFields: Array<[TextFormField, string]> = [
     ['title', 'Título'],
     ['excerpt', 'Resumo'],
-    ['category', 'Categoria'],
+    ['category_id', 'Categoria'],
     ['author_name', 'Autor'],
   ];
   for (const [field, label] of requiredFields) {
@@ -171,6 +174,8 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
     author_name: user?.first_name || user?.username || '',
   }));
   const [post, setPost] = useState<BlogPostDetail | null>(null);
+  const [blogCategories, setBlogCategories] = useState<BlogCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(postId));
@@ -180,6 +185,27 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
   const [notice, setNotice] = useState('');
   const [preview, setPreview] = useState(false);
   const isEditing = Boolean(postId);
+
+  useEffect(() => {
+    let active = true;
+    adminAPI.listBlogCategories({ page_size: 100 }).then(({ data }) => {
+      if (!active) return;
+      setBlogCategories(data.results);
+      setCategoriesLoading(false);
+    }).catch((loadError) => {
+      if (!active) return;
+      console.error('Não foi possível carregar as categorias do blog para o editor.', loadError);
+      setCategoriesLoading(false);
+      toast.error('Não foi possível carregar as categorias', 'Verifique a ligação e tente novamente.');
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if ((postId && !post) || !blogCategories.length || form.category_id) return;
+    const matchingCategory = blogCategories.find((category) => category.name.toLocaleLowerCase() === form.category.toLocaleLowerCase());
+    if (matchingCategory) setForm((current) => ({ ...current, category_id: matchingCategory.id }));
+  }, [postId, post, blogCategories, form.category, form.category_id]);
 
   useEffect(() => {
     if (postId) return;
@@ -218,6 +244,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
         content: data.content,
         image_url: data.image_url || '',
         category: data.category,
+        category_id: data.blog_category_id || '',
         author_name: data.author_name,
         is_published: data.is_published,
         meta_title: data.meta_title || '',
@@ -317,6 +344,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
     payload.append('excerpt', form.excerpt.trim());
     payload.append('content', sanitizeEditorHtml(form.content));
     payload.append('category', form.category.trim());
+    payload.append('category_id', form.category_id);
     payload.append('author_name', form.author_name.trim());
     payload.append('is_published', String(publish));
     payload.append('image_url', form.image_url.trim());
@@ -402,7 +430,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
       const fieldIds: Record<string, string> = {
         title: 'blog-title',
         excerpt: 'blog-excerpt',
-        category: 'blog-category',
+        category_id: 'blog-category',
         author_name: 'blog-author',
         image_url: 'blog-cover-url',
       };
@@ -537,8 +565,35 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex items-center gap-2"><FileImage size={18} className="text-indigo-600" /><h2 className="font-semibold text-slate-900">Detalhes do artigo</h2></div>
               <div className="space-y-4">
-                <Field label="Categoria" required htmlFor="blog-category" hint={`${form.category.length}/100`} error={fieldErrors.category}>
-                  <input id="blog-category" value={form.category} onChange={(event) => updateField('category', event.target.value)} required maxLength={100} aria-invalid={Boolean(fieldErrors.category)} placeholder="Ex.: Tecnologia" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                <Field label="Categoria" required htmlFor="blog-category" error={fieldErrors.category_id}>
+                  <select
+                    id="blog-category"
+                    value={form.category_id}
+                    required
+                    disabled={categoriesLoading || !blogCategories.length}
+                    aria-invalid={Boolean(fieldErrors.category_id)}
+                    onChange={(event) => {
+                      const selectedCategory = blogCategories.find((category) => category.id === event.target.value);
+                      setForm((current) => ({
+                        ...current,
+                        category_id: event.target.value,
+                        category: selectedCategory?.name || '',
+                      }));
+                      setFieldErrors((current) => {
+                        const next = { ...current };
+                        delete next.category_id;
+                        delete next.category;
+                        return next;
+                      });
+                    }}
+                    className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50"
+                  >
+                    <option value="">{categoriesLoading ? 'A carregar categorias…' : 'Selecione uma categoria'}</option>
+                    {blogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  </select>
+                  {!categoriesLoading && !blogCategories.length && (
+                    <p className="mt-1 text-xs text-amber-700">Crie primeiro uma categoria no painel de Categorias.</p>
+                  )}
                 </Field>
                 <Field label="Autor" required htmlFor="blog-author" hint={`${form.author_name.length}/255`} error={fieldErrors.author_name}>
                   <input id="blog-author" value={form.author_name} onChange={(event) => updateField('author_name', event.target.value)} required maxLength={255} aria-invalid={Boolean(fieldErrors.author_name)} placeholder="Nome apresentado ao leitor" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />

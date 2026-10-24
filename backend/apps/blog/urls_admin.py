@@ -1,5 +1,7 @@
 from django.urls import path
 from .views_admin import (
+    AdminBlogCategoryDetailView,
+    AdminBlogCategoryListCreateView,
     AdminBlogCommentBulkView,
     AdminBlogCommentDetailView,
     AdminBlogCommentListView,
@@ -11,6 +13,8 @@ from .views_admin import (
 )
 
 urlpatterns = [
+    path('categories/', AdminBlogCategoryListCreateView.as_view(), name='admin_blog_category_list'),
+    path('categories/<uuid:pk>/', AdminBlogCategoryDetailView.as_view(), name='admin_blog_category_detail'),
     path('', AdminBlogListCreateView.as_view(), name='admin_blog_list'),
     path('images/', AdminBlogImageUploadView.as_view(), name='admin_blog_image_upload'),
     path('comments/', AdminBlogCommentListView.as_view(), name='admin_blog_comment_list'),

@@ -415,6 +415,7 @@ export interface BlogPost {
   image_url?: string;
   author_name: string;
   category: string;
+  blog_category_id?: string | null;
   read_time: string;
   published_at: string | null;
   created_at: string;
@@ -450,6 +451,16 @@ export interface BlogPostDetail extends BlogPost {
   likes_count: number;
   liked_by_me: boolean;
   seo: BlogSeoMeta;
+}
+
+export interface BlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  post_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export type BlogCommentStatus = 'pending' | 'approved' | 'rejected';
@@ -882,6 +893,13 @@ export const adminAPI = {
   updateCategory: (id: string, data: FormData | any) => api.patch(`/admin/categories/${id}/`, data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}/`),
   // Blog
+  listBlogCategories: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<BlogCategory>>('/admin/blog/categories/', { params }),
+  createBlogCategory: (data: { name: string; description?: string }) =>
+    api.post<BlogCategory>('/admin/blog/categories/', data),
+  updateBlogCategory: (id: string, data: { name?: string; description?: string }) =>
+    api.patch<BlogCategory>(`/admin/blog/categories/${id}/`, data),
+  deleteBlogCategory: (id: string) => api.delete(`/admin/blog/categories/${id}/`),
   listBlogPosts: (params?: Record<string, any>) => api.get<PaginatedResponse<BlogPostDetail>>('/admin/blog/', { params }),
   getBlogPost: (id: string) => api.get<BlogPostDetail>(`/admin/blog/${id}/`),
   createBlogPost: (data: FormData | any) => api.post('/admin/blog/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),

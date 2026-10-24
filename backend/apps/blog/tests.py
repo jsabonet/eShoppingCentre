@@ -11,6 +11,7 @@ from apps.users.models import User
 
 from .models import (
     META_DESCRIPTION_MAX,
+    BlogCategory,
     BlogComment,
     BlogInlineImage,
     BlogLike,
@@ -94,6 +95,9 @@ class PublicBlogApiTests(TestCase):
 
 class BlogSeoFieldTests(TestCase):
     """Campos de SEO e de créditos da imagem de destaque."""
+
+    def setUp(self):
+        self.blog_category = BlogCategory.objects.create(name='Tecnologia', slug='tecnologia')
 
     def create_post(self, slug='artigo-seo', **overrides):
         fields = {
@@ -187,6 +191,76 @@ class BlogSeoFieldTests(TestCase):
         self.assertEqual(response.data['seo']['robots'], 'noindex,nofollow')
         self.assertEqual(response.data['seo']['title'], 'Artigo com SEO otimizado')
 
+    def test_admin_manages_blog_categories_and_posts_use_the_selected_category(self):
+        admin = User.objects.create_superuser(
+            email='blog-categories-admin@test.local', username='blogcategoriesadmin', password='TestPass123!'
+        )
+        client = APIClient()
+        client.force_authenticate(user=admin)
+
+        created_category = client.post(
+            '/api/v1/admin/blog/categories/',
+            {'name': 'Notícias', 'description': 'Atualizações do blog'},
+            format='json',
+        )
+        self.assertEqual(created_category.status_code, 201, created_category.data)
+        self.assertEqual(created_category.data['slug'], 'noticias')
+
+        created_post = client.post(
+            '/api/v1/admin/blog/',
+            {
+                'title': 'Artigo de notícias',
+                'excerpt': 'Resumo',
+                'content': '<p>Conteúdo</p>',
+                'category_id': created_category.data['id'],
+                'author_name': 'Equipa',
+            },
+            format='json',
+        )
+        self.assertEqual(created_post.status_code, 201, created_post.data)
+        self.assertEqual(created_post.data['blog_category_id'], created_category.data['id'])
+
+        renamed = client.patch(
+            f"/api/v1/admin/blog/categories/{created_category.data['id']}/",
+            {'name': 'Atualizações'},
+            format='json',
+        )
+        self.assertEqual(renamed.status_code, 200, renamed.data)
+        post = BlogPost.objects.get(id=created_post.data['id'])
+        self.assertEqual(post.blog_category_id, BlogCategory.objects.get(id=created_category.data['id']).id)
+        self.assertEqual(post.category, 'Atualizações')
+
+        deleted_in_use = client.delete(f"/api/v1/admin/blog/categories/{created_category.data['id']}/")
+        self.assertEqual(deleted_in_use.status_code, 400)
+        self.assertIn('detail', deleted_in_use.data)
+
+        listed = client.get('/api/v1/admin/blog/categories/')
+        self.assertEqual(listed.status_code, 200)
+        self.assertIn('Atualizações', [item['name'] for item in listed.data['results']])
+
+    def test_admin_rejects_unknown_blog_category_when_creating_post(self):
+        admin = User.objects.create_superuser(
+            email='invalid-blog-category@test.local', username='invalidblogcategory', password='TestPass123!'
+        )
+        client = APIClient()
+        client.force_authenticate(user=admin)
+
+        response = client.post(
+            '/api/v1/admin/blog/',
+            {
+                'title': 'Categoria inválida',
+                'excerpt': 'Resumo',
+                'content': '<p>Conteúdo</p>',
+                'category': 'Tecnologia',
+                'category_id': '00000000-0000-0000-0000-000000000000',
+                'author_name': 'Equipa',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('category_id', response.data)
+
     def test_admin_can_store_cover_image_url_and_public_api_uses_it(self):
         admin = User.objects.create_superuser(
             email='cover-url-admin@test.local', username='coverurladmin', password='TestPass123!'
@@ -246,7 +320,20 @@ class BlogSeoFieldTests(TestCase):
 
         missing = client.post('/api/v1/admin/blog/', {}, format='json')
         self.assertEqual(missing.status_code, 400)
-        self.assertTrue({'title', 'excerpt', 'content', 'category', 'author_name'}.issubset(missing.data))
+        self.assertTrue({'title', 'excerpt', 'content', 'author_name'}.issubset(missing.data))
+
+        missing_category = client.post(
+            '/api/v1/admin/blog/',
+            {
+                'title': 'Artigo sem categoria',
+                'excerpt': 'Resumo',
+                'content': '<p>Conteúdo</p>',
+                'author_name': 'Equipa',
+            },
+            format='json',
+        )
+        self.assertEqual(missing_category.status_code, 400)
+        self.assertIn('category_id', missing_category.data)
 
         oversized = client.post(
             '/api/v1/admin/blog/',

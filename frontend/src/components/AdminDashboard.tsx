@@ -19,6 +19,7 @@ import AdminAbandonedCarts from './admin/AdminAbandonedCarts';
 import AdminAffiliates from './admin/AdminAffiliates';
 import AdminWallet from './admin/AdminWallet';
 import AdminBlogManagement from './admin/AdminBlogManagement';
+import AdminBlogCategories from './admin/AdminBlogCategories';
 
 const BACKEND_READY = true;
 
@@ -130,6 +131,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '', image: '', sort_order: '0', product_type: 'physical', parent: '' });
   const [categoryImageFile, setCategoryImageFile] = useState<File | null>(null);
+  const [categoryDashboard, setCategoryDashboard] = useState<'products' | 'blog'>('products');
 
   // Courses state
   const [courses, setCourses] = useState<any[]>([]);
@@ -830,8 +832,20 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
         {/* Categories Tab */}
         {activeTab === 'categories' && (
           <div>
+            <div role="tablist" aria-label="Tipos de categorias" className="mb-5 flex w-fit gap-1 rounded-lg border bg-white p-1">
+              <button type="button" role="tab" aria-selected={categoryDashboard === 'products'} onClick={() => setCategoryDashboard('products')}
+                className={`rounded-md px-4 py-2 text-sm font-medium ${categoryDashboard === 'products' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+                Produtos
+              </button>
+              <button type="button" role="tab" aria-selected={categoryDashboard === 'blog'} onClick={() => setCategoryDashboard('blog')}
+                className={`rounded-md px-4 py-2 text-sm font-medium ${categoryDashboard === 'blog' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+                Blog
+              </button>
+            </div>
+            {categoryDashboard === 'blog' ? <AdminBlogCategories /> : (
+            <>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Gestão de Categorias</h2>
+              <h2 className="text-lg font-bold">Categorias de produtos</h2>
               <button onClick={() => { setEditingCategory(null); setCategoryForm({ name: '', description: '', image: '', sort_order: '0', product_type: 'physical', parent: '' }); setShowCategoryForm(true); }}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground font-medium rounded-md transition-colors">
                 <Plus size={16} /> Nova Categoria
@@ -943,6 +957,8 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                   </tbody>
                 </table>
               </div>
+            )}
+            </>
             )}
           </div>
         )}
