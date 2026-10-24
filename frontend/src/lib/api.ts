@@ -870,6 +870,7 @@ export const newsletterAPI = {
 
 export const adminAPI = {
   stats: () => api.get('/admin/stats/'),
+  auditEvents: (params?: Record<string, string | number>) => api.get('/admin/audit/events/', { params }),
   pendingStores: () => api.get('/admin/stores/pending/'),
   approveStore: (id: string) => api.patch(`/admin/stores/${id}/approve/`),
   // Full store management

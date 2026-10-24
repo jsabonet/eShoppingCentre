@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Store, Filter,
   Edit, Users, LogOut, ChevronLeft, ChevronRight,
-  Menu, X, Settings, Bell, RotateCcw, ShoppingCart, LifeBuoy, TicketPercent, Clock, Gift, Wallet
+  Menu, X, Settings, Bell, RotateCcw, ShoppingCart, LifeBuoy, TicketPercent, Clock, Gift, Wallet, ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 import UserAvatar from '@/src/components/UserAvatar';
@@ -46,6 +46,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/admin?tab=users', label: 'Utilizadores', icon: Users },
       { href: '/admin?tab=blog', label: 'Blog', icon: Edit },
       { href: '/admin?tab=wallet', label: 'Saques', icon: Wallet },
+      { href: '/admin?tab=audit', label: 'Auditoria', icon: ShieldCheck },
     ],
   },
 ];

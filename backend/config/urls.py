@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from apps.core.views_admin import AdminAuditEventListView
 
 urlpatterns = [
     path('django-admin/', admin.site.urls),
@@ -23,6 +24,7 @@ urlpatterns = [
     path('api/v1/chat/', include('apps.chat.urls')),
     path('api/v1/shipping/', include('apps.shipping.urls')),
     path('api/v1/admin/', include('apps.users.urls_admin')),
+    path('api/v1/admin/audit/events/', AdminAuditEventListView.as_view(), name='admin_audit_events'),
     path('api/v1/admin/categories/', include('apps.products.urls_admin')),
     path('api/v1/admin/blog/', include('apps.blog.urls_admin')),
     path('api/v1/admin/courses/', include('apps.courses.urls_admin')),

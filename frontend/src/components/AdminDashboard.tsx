@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard, Package, ShoppingCart, LogOut, Plus, Edit, Trash2,
   TrendingUp, Users, DollarSign, Eye, X, ChevronLeft, ChevronRight,
-  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw, LifeBuoy, TicketPercent, Wallet
+  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw, LifeBuoy, TicketPercent, Wallet, ShieldCheck
 } from 'lucide-react';
 import { adminAPI, productsAPI, ordersAPI, storesAPI, type Product as APIProduct } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -20,6 +20,7 @@ import AdminAffiliates from './admin/AdminAffiliates';
 import AdminWallet from './admin/AdminWallet';
 import AdminBlogManagement from './admin/AdminBlogManagement';
 import AdminBlogCategories from './admin/AdminBlogCategories';
+import AdminAuditTrail from './admin/AdminAuditTrail';
 
 const BACKEND_READY = true;
 
@@ -29,7 +30,7 @@ const PRODUCT_TYPE_LABELS: Record<string, string> = {
   course: 'Cursos',
 };
 
-type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet';
+type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet' | 'audit';
 
 interface Product {
   id: string;
@@ -605,6 +606,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
             { id: 'categories', label: 'Categorias', icon: Filter },
             { id: 'blog', label: 'Blog', icon: Edit },
             { id: 'users', label: 'Utilizadores', icon: Users },
+            { id: 'audit', label: 'Auditoria', icon: ShieldCheck },
           ] as const).map((t) => (
             <button
               key={t.id}
@@ -1175,6 +1177,9 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
 
         {/* Wallet Tab (Admin) */}
         {activeTab === 'wallet' && <AdminWallet />}
+
+        {/* Admin audit trail */}
+        {activeTab === 'audit' && <AdminAuditTrail />}
 
         {/* Confirm Action Modal */}
         {confirmModal && (
