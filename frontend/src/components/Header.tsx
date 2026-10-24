@@ -9,7 +9,6 @@ import MobileMenu from './MobileMenu';
 import CartDrawer from './CartDrawer';
 import { categories } from '../data/marketplace';
 import { useAuth } from '@/src/hooks/useAuth';
-import UserAvatar from '@/src/components/UserAvatar';
 
 export default function Header() {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
@@ -62,10 +61,7 @@ export default function Header() {
                       {isAdmin && (
                         <Link href="/admin" className="px-3 py-2 text-sm font-medium text-white hover:bg-[#155DFC]/90 rounded transition-colors" style={{ backgroundColor: '#155DFC' }}>Admin</Link>
                       )}
-                      <Link href="/account" className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">
-                        <UserAvatar avatar={user?.avatar} name={user?.first_name || user?.username} className="h-6 w-6" fallbackClassName="bg-gray-200 text-gray-700" />
-                        Minha Conta
-                      </Link>
+                      <Link href="/account" className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded transition-colors">Minha Conta</Link>
                       <button onClick={logout} className="px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer">Sair</button>
                     </>
                   ) : (
