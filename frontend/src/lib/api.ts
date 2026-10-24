@@ -415,11 +415,14 @@ export interface BlogPost {
   author_name: string;
   category: string;
   read_time: string;
-  published_at: string;
+  published_at: string | null;
+  created_at: string;
 }
 
 export interface BlogPostDetail extends BlogPost {
   content: string;
+  is_published: boolean;
+  updated_at: string;
 }
 
 // ─── Funções da API ───
@@ -785,7 +788,7 @@ export const quizzesAPI = {
 export const blogAPI = {
   list: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<BlogPost>>('/blog/', { params }),
-  getBySlug: (slug: string) => api.get<BlogPostDetail>(`/blog/${slug}/`),
+  getBySlug: (slug: string) => api.get<BlogPostDetail>(`/blog/${encodeURIComponent(slug)}/`),
 };
 
 export const adminAPI = {
@@ -813,7 +816,8 @@ export const adminAPI = {
   updateCategory: (id: string, data: FormData | any) => api.patch(`/admin/categories/${id}/`, data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}/`),
   // Blog
-  listBlogPosts: (params?: Record<string, any>) => api.get('/admin/blog/', { params }),
+  listBlogPosts: (params?: Record<string, any>) => api.get<PaginatedResponse<BlogPostDetail>>('/admin/blog/', { params }),
+  getBlogPost: (id: string) => api.get<BlogPostDetail>(`/admin/blog/${id}/`),
   createBlogPost: (data: FormData | any) => api.post('/admin/blog/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   updateBlogPost: (id: string, data: FormData | any) => api.patch(`/admin/blog/${id}/`, data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   deleteBlogPost: (id: string) => api.delete(`/admin/blog/${id}/`),

@@ -49,11 +49,11 @@ export default function BlogBannerSlider({ posts }: BlogBannerSliderProps) {
             href={`/blog/${post.slug}`}
             className="min-w-full relative block aspect-[2.5/1] md:aspect-[3/1]"
           >
-            <img
-              src={post.image}
-              alt={post.title}
-              className="w-full h-full object-cover"
-            />
+            {post.image ? (
+              <img src={post.image} alt={post.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-600" />
+            )}
             <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/40 to-transparent flex items-center">
               <div className="px-6 md:px-16 max-w-2xl">
                 {/* Category badge */}

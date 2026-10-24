@@ -18,6 +18,7 @@ import AdminCoupons from './admin/AdminCoupons';
 import AdminAbandonedCarts from './admin/AdminAbandonedCarts';
 import AdminAffiliates from './admin/AdminAffiliates';
 import AdminWallet from './admin/AdminWallet';
+import AdminBlogManagement from './admin/AdminBlogManagement';
 
 const BACKEND_READY = true;
 
@@ -130,14 +131,6 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '', image: '', sort_order: '0', product_type: 'physical', parent: '' });
   const [categoryImageFile, setCategoryImageFile] = useState<File | null>(null);
 
-  // Blog state
-  const [blogPosts, setBlogPosts] = useState<any[]>([]);
-  const [blogLoading, setBlogLoading] = useState(false);
-  const [showBlogForm, setShowBlogForm] = useState(false);
-  const [editingBlogPost, setEditingBlogPost] = useState<any>(null);
-  const [blogForm, setBlogForm] = useState({ title: '', excerpt: '', content: '', image: '', category: '', author_name: '' });
-  const [blogImageFile, setBlogImageFile] = useState<File | null>(null);
-
   // Courses state
   const [courses, setCourses] = useState<any[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
@@ -207,7 +200,6 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
       loadDashboardStats();
       if (activeTab === 'stores') loadStores();
       if (activeTab === 'categories') loadCategories();
-      if (activeTab === 'blog') loadBlogPosts();
       if (activeTab === 'users') loadUsers();
     }
   }, [isAuthenticated, isAdmin, activeTab]);
@@ -384,53 +376,6 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
     setCategoryImageFile(null);
     setEditingCategory(null);
     setShowCategoryForm(false);
-  };
-
-  const loadBlogPosts = async () => {
-    setBlogLoading(true);
-    try {
-      const { data } = await adminAPI.listBlogPosts({ page_size: 100 });
-      setBlogPosts((data as any).results || []);
-    } catch {} finally { setBlogLoading(false); }
-  };
-
-  const handleSaveBlogPost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const formData = new FormData();
-      formData.append('title', blogForm.title);
-      formData.append('excerpt', blogForm.excerpt);
-      formData.append('content', blogForm.content);
-      formData.append('category', blogForm.category);
-      formData.append('author_name', blogForm.author_name);
-      if (blogImageFile) {
-        formData.append('image', blogImageFile);
-      }
-      if (editingBlogPost) {
-        await adminAPI.updateBlogPost(editingBlogPost.id, formData);
-      } else {
-        await adminAPI.createBlogPost(formData);
-      }
-      resetBlogForm();
-      loadBlogPosts();
-    } catch { alert('Erro ao salvar artigo.'); }
-  };
-
-  const handleDeleteBlogPost = (id: string) => {
-    setConfirmModal({
-      open: true, title: 'Eliminar Artigo', message: 'Tem certeza que deseja eliminar este artigo do blog?',
-      action: 'red', onConfirm: async () => {
-        try { await adminAPI.deleteBlogPost(id); loadBlogPosts(); } catch { alert('Erro ao eliminar.'); }
-        setConfirmModal(null);
-      },
-    });
-  };
-
-  const resetBlogForm = () => {
-    setBlogForm({ title: '', excerpt: '', content: '', image: '', category: '', author_name: '' });
-    setBlogImageFile(null);
-    setEditingBlogPost(null);
-    setShowBlogForm(false);
   };
 
   const loadCourses = async () => {
@@ -1002,96 +947,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
           </div>
         )}
 
-        {/* Blog Tab */}
-        {activeTab === 'blog' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Gestão do Blog</h2>
-              <button onClick={() => { setEditingBlogPost(null); setBlogForm({ title: '', excerpt: '', content: '', image: '', category: '', author_name: '' }); setShowBlogForm(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground font-medium rounded-md transition-colors">
-                <Plus size={16} /> Novo Artigo
-              </button>
-            </div>
-
-            {showBlogForm && (
-              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                  <div className="flex items-center justify-between p-4 border-b">
-                    <h3 className="font-bold">{editingBlogPost ? 'Editar Artigo' : 'Novo Artigo'}</h3>
-                    <button onClick={resetBlogForm} className="p-1 hover:bg-muted rounded"><X size={20} /></button>
-                  </div>
-                  <form onSubmit={handleSaveBlogPost} className="p-4 space-y-4">
-                    <div><label className="block text-sm font-medium mb-1">Título *</label>
-                      <input type="text" value={blogForm.title} onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value })} required
-                        className="w-full px-3 py-2 border rounded-md" /></div>
-                    <div><label className="block text-sm font-medium mb-1">Resumo</label>
-                      <textarea value={blogForm.excerpt} onChange={(e) => setBlogForm({ ...blogForm, excerpt: e.target.value })} rows={2}
-                        className="w-full px-3 py-2 border rounded-md" /></div>
-                    <div><label className="block text-sm font-medium mb-1">Conteúdo</label>
-                      <textarea value={blogForm.content} onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })} rows={6}
-                        className="w-full px-3 py-2 border rounded-md" /></div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-medium mb-1">Categoria</label>
-                        <input type="text" value={blogForm.category} onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })}
-                          className="w-full px-3 py-2 border rounded-md" placeholder="Ex: Tecnologia" /></div>
-                      <div><label className="block text-sm font-medium mb-1">Autor</label>
-                        <input type="text" value={blogForm.author_name} onChange={(e) => setBlogForm({ ...blogForm, author_name: e.target.value })}
-                          className="w-full px-3 py-2 border rounded-md" /></div>
-                    </div>
-                    <div><label className="block text-sm font-medium mb-1">Imagem de Capa</label>
-                      <input type="file" accept="image/*"
-                        onChange={(e) => setBlogImageFile(e.target.files?.[0] || null)}
-                        className="w-full px-3 py-2 border rounded-md text-sm" />
-                      {editingBlogPost?.image && !blogImageFile && (
-                        <div className="mt-2 flex items-center gap-3">
-                          <img src={editingBlogPost.image} alt={editingBlogPost.title} className="w-16 h-16 rounded-lg object-cover border" />
-                          <span className="text-xs text-muted-foreground">Imagem actual</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-3 pt-2">
-                      <button type="submit" className="flex-1 py-2 bg-accent text-accent-foreground font-semibold rounded-md">Salvar</button>
-                      <button type="button" onClick={resetBlogForm} className="px-6 py-2 border rounded-md">Cancelar</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
-
-            {blogLoading ? (
-              <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div></div>
-            ) : (
-              <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 border-b"><tr>
-                    <th className="text-left px-4 py-3">Título</th>
-                    <th className="text-left px-4 py-3">Categoria</th>
-                    <th className="text-left px-4 py-3">Autor</th>
-                    <th className="text-left px-4 py-3">Data</th>
-                    <th className="text-right px-4 py-3">Acções</th>
-                  </tr></thead>
-                  <tbody className="divide-y">
-                    {blogPosts.length === 0 ? (
-                      <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum artigo.</td></tr>
-                    ) : blogPosts.map((post: any) => (
-                      <tr key={post.id} className="hover:bg-muted/30">
-                        <td className="px-4 py-3 font-medium">{post.title}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{post.category || '—'}</td>
-                        <td className="px-4 py-3 text-sm">{post.author_name || '—'}</td>
-                        <td className="px-4 py-3 text-sm">{post.published_at ? new Date(post.published_at).toLocaleDateString('pt-MZ') : '—'}</td>
-                        <td className="px-4 py-3 text-right">
-                          <button onClick={() => { setEditingBlogPost(post); setBlogForm({ title: post.title, excerpt: post.excerpt || '', content: post.content || '', image: post.image || '', category: post.category || '', author_name: post.author_name || '' }); setShowBlogForm(true); }}
-                            className="p-1.5 hover:bg-muted rounded-md"><Edit size={16} className="text-muted-foreground" /></button>
-                          <button onClick={() => handleDeleteBlogPost(post.id)} className="p-1.5 hover:bg-destructive/10 rounded-md"><Trash2 size={16} className="text-destructive" /></button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+        {activeTab === 'blog' && <AdminBlogManagement />}
 
         {/* Users Tab */}
         {activeTab === 'users' && (

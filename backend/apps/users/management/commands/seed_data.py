@@ -102,6 +102,7 @@ class Command(BaseCommand):
                     'title': title, 'excerpt': excerpt,
                     'content': f'<p>{excerpt}</p><p>Conteúdo completo do artigo sobre {title.lower()}.</p>',
                     'author_name': author, 'category': cat, 'read_time': '5 min',
+                    'is_published': True,
                 }
             )
 
