@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import { Zap, Droplets, Shield } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Qualidade & Cuidados | e-Shopping Centre',
+  title: 'Qualidade e Cuidados',
   description:
     'Conheça os nossos padrões de qualidade, política de garantia e dicas para cuidar dos seus produtos comprados no e-Shopping Centre.',
+  alternates: { canonical: '/materials-care' },
 };
 
 export default function MaterialsCarePage() {

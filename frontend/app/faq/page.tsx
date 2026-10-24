@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import { ChevronDown } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Ajuda & Suporte | e-Shopping Centre',
+  title: 'Ajuda e Perguntas Frequentes',
   description:
     'Central de ajuda do e-Shopping Centre. Encontre respostas para perguntas frequentes, informações de entrega e política de devoluções.',
+  alternates: { canonical: '/faq' },
 };
 
 const faqItems = [

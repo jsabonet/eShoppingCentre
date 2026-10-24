@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/src/lib/utils";
 import { Providers } from "./providers";
+import { SITE_URL } from "@/src/lib/seo";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -17,18 +18,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(`${SITE_URL}/`),
   title: {
     default: 'e-Shopping Centre — Marketplace em Moçambique',
     template: '%s | e-Shopping Centre',
   },
   description:
-    'A sua plataforma global de e-commerce. Compre e venda produtos físicos, digitais e cursos online em Moçambique.',
+    'Compre online em Moçambique com pagamento seguro e entrega nacional. Descubra produtos físicos, digitais e cursos de vendedores locais no e-Shopping Centre.',
   keywords: [
-    'ecommerce',
-    'moçambique',
-    'marketplace',
-    'compras online',
-    'loja online',
+    'marketplace em Moçambique',
+    'compras online em Moçambique',
+    'lojas online Moçambique',
+    'vendedores moçambicanos',
+    'pagamento M-Pesa',
     'produtos digitais',
     'cursos online',
     'e-Shopping Centre',
@@ -36,20 +38,31 @@ export const metadata: Metadata = {
   authors: [{ name: 'e-Shopping Centre' }],
   creator: 'e-Shopping Centre',
   publisher: 'e-Shopping Centre',
-  robots: { index: true, follow: true },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
   openGraph: {
     type: 'website',
     locale: 'pt_MZ',
     siteName: 'e-Shopping Centre',
     title: 'e-Shopping Centre — Marketplace em Moçambique',
-    description: 'Compre e venda produtos físicos, digitais e cursos online.',
-    images: [{ url: '/icon.png', width: 512, height: 512 }],
+    description: 'Compre online em Moçambique com entrega nacional e pagamentos seguros.',
+    url: SITE_URL,
+    images: [{ url: '/web-app-manifest-512x512.png', width: 512, height: 512, alt: 'e-Shopping Centre' }],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'e-Shopping Centre',
-    description: 'Marketplace em Moçambique',
-    images: ['/icon.png'],
+    description: 'Compre online em Moçambique com entrega nacional e pagamentos seguros.',
+    images: ['/web-app-manifest-512x512.png'],
   },
   icons: {
     icon: [
@@ -69,10 +82,32 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="pt"
+      lang="pt-MZ"
       className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable)}
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify([
+              {
+                '@context': 'https://schema.org',
+                '@type': 'Organization',
+                name: 'e-Shopping Centre',
+                url: SITE_URL,
+                logo: `${SITE_URL}/icon.png`,
+                areaServed: { '@type': 'Country', name: 'Mozambique' },
+              },
+              {
+                '@context': 'https://schema.org',
+                '@type': 'WebSite',
+                name: 'e-Shopping Centre',
+                url: SITE_URL,
+                inLanguage: 'pt-MZ',
+              },
+            ]).replace(/</g, '\\u003c'),
+          }}
+        />
         <Providers>
           {children}
         </Providers>

@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Termos e Condições | e-Shopping Centre',
+  title: 'Termos e Condições',
   description:
     'Termos e Condições de Uso do e-Shopping Centre — Conheça as regras da nossa plataforma.',
+  alternates: { canonical: '/terms' },
 };
 
 export default function TermsPage() {

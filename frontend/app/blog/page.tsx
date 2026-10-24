@@ -4,8 +4,9 @@ import { ChevronRight, Calendar, User, Tag, ArrowRight } from 'lucide-react';
 import BlogBannerSlider from '@/src/components/BlogBannerSlider';
 
 export const metadata: Metadata = {
-  title: 'Blog | e-Shopping Centre',
-  description: 'Fique por dentro das novidades, dicas e tendências do mundo das compras online.',
+  title: 'Blog',
+  description: 'Guias de compras, dicas, novidades e tendências de tecnologia, moda, casa e comércio online em Moçambique.',
+  alternates: { canonical: '/blog' },
 };
 
 interface BlogPost {

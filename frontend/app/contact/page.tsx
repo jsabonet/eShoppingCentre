@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import { Mail, Phone, Clock } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Contactos | e-Shopping Centre',
+  title: 'Contactos',
   description:
     'Entre em contacto com o e-Shopping Centre. Dúvidas sobre produtos, encomendas, ou suporte — a nossa equipa está pronta para ajudar.',
+  alternates: { canonical: '/contact' },
 };
 
 export default function ContactPage() {

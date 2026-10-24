@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Termos do Programa de Afiliados | e-Shopping Centre',
+  title: 'Termos do Programa de Afiliados',
+  robots: { index: true, follow: true },
   description:
     'Termos do Programa de Afiliados do e-Shopping Centre — regras, comissões, pagamentos e obrigações dos afiliados.',
+  alternates: { canonical: '/affiliate/terms' },
 };
 
 export default function AffiliateTermsPage() {

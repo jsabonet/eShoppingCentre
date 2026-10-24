@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Política de Privacidade | e-Shopping Centre',
+  title: 'Política de Privacidade',
   description:
     'Política de Privacidade do e-Shopping Centre — Saiba como protegemos os seus dados pessoais.',
+  alternates: { canonical: '/privacy' },
 };
 
 export default function PrivacyPolicyPage() {

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { ChevronRight } from 'lucide-react';
 import ProductDetailShop from '@/src/components/ProductDetailShop';
+import { absoluteUrl, plainText } from '@/src/lib/seo';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -19,10 +20,27 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const { slug } = await params;
   try {
     const res = await fetch(`${API_URL}/products/${slug}/`, { next: { revalidate: 60 } });
-    if (!res.ok) return { title: 'Produto não encontrado | e-Shopping Centre' };
+    if (!res.ok) return { title: 'Produto não encontrado' };
     const product = await res.json();
-    return { title: `${product.name} | e-Shopping Centre`, description: product.description };
-  } catch { return { title: 'Produto | e-Shopping Centre' }; }
+    const description = plainText(product.short_description || product.description || `Compre ${product.name} no e-Shopping Centre.`);
+    const image = product.primary_image || product.images?.[0]?.image;
+    const canonicalPath = product.product_type === 'course'
+      ? `/courses/${encodeURIComponent(slug)}`
+      : `/product/${encodeURIComponent(slug)}`;
+    return {
+      title: product.name,
+      description,
+      alternates: { canonical: canonicalPath },
+      openGraph: {
+        type: 'website',
+        title: product.name,
+        description,
+        url: absoluteUrl(canonicalPath),
+        images: image ? [{ url: image, alt: product.name }] : undefined,
+      },
+      twitter: { card: 'summary_large_image', title: product.name, description, images: image ? [image] : undefined },
+    };
+  } catch { return { title: 'Produto' }; }
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
@@ -121,9 +139,43 @@ export default async function ProductPage({ params }: ProductPageProps) {
       attributes: v.attributes || {}, is_active: v.is_active,
     })),
   };
+  const canonicalPath = product.product_type === 'course'
+    ? `/courses/${encodeURIComponent(product.slug)}`
+    : `/product/${encodeURIComponent(product.slug)}`;
+  const productStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: plainText(product.short_description || product.description),
+    image: (product.images || []).map((image: any) => mediaUrl(image.image)).filter(Boolean),
+    sku: product.sku || undefined,
+    brand: product.brand ? { '@type': 'Brand', name: product.brand } : undefined,
+    offers: {
+      '@type': 'Offer',
+      url: absoluteUrl(canonicalPath),
+      priceCurrency: 'MZN',
+      price: product.price,
+      availability: product.product_type !== 'physical' || product.stock > 0 ||
+        product.variants?.some((variant: any) => variant.is_active && variant.stock > 0)
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+      itemCondition: product.condition === 'used' ? 'https://schema.org/UsedCondition' : 'https://schema.org/NewCondition',
+    },
+    aggregateRating: Number(product.review_count) > 0 && Number(product.rating) > 0 ? {
+      '@type': 'AggregateRating',
+      ratingValue: product.rating,
+      reviewCount: product.review_count,
+    } : undefined,
+  };
 
   return (
     <>
+      {product.product_type !== 'course' && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(productStructuredData).replace(/</g, '\\u003c') }}
+        />
+      )}
       <div className="bg-card border-b border-border">
         <div className="max-w-[1500px] mx-auto px-4 py-3">
           <nav className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">

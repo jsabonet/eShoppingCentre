@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { ChevronRight, Calendar, User, Tag, ArrowLeft, Facebook, Twitter, Share2 } from 'lucide-react';
+import { absoluteUrl } from '@/src/lib/seo';
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
@@ -187,10 +188,20 @@ const blogPosts = [
 export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
   const post = blogPosts.find((p) => p.slug === slug);
-  if (!post) return { title: 'Post não encontrado | e-Shopping Centre' };
+  if (!post) return { title: 'Post não encontrado' };
   return {
-    title: `${post.title} | Blog e-Shopping Centre`,
+    title: post.title,
     description: post.excerpt,
+    alternates: { canonical: `/blog/${encodeURIComponent(slug)}` },
+    openGraph: {
+      type: 'article',
+      title: post.title,
+      description: post.excerpt,
+      url: absoluteUrl(`/blog/${encodeURIComponent(slug)}`),
+      authors: [post.author],
+      images: [{ url: post.image, alt: post.title }],
+    },
+    twitter: { card: 'summary_large_image', title: post.title, description: post.excerpt, images: [post.image] },
   };
 }
 

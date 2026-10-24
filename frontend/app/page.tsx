@@ -4,8 +4,22 @@ import FeaturedStores from '@/src/components/FeaturedStores';
 import TrendingCourses from '@/src/components/TrendingCourses';
 import Link from 'next/link';
 import { Truck, Shield, CreditCard, Headphones } from 'lucide-react';
+import type { Metadata } from 'next';
+import { absoluteUrl } from '@/src/lib/seo';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+export const metadata: Metadata = {
+  title: 'Marketplace Online em Moçambique',
+  description: 'Compre e venda produtos físicos, digitais e cursos online em Moçambique. Pagamentos seguros e entrega nacional no e-Shopping Centre.',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    title: 'e-Shopping Centre — Marketplace em Moçambique',
+    description: 'Compre e venda produtos físicos, digitais e cursos online com pagamentos seguros e entrega nacional.',
+    url: absoluteUrl('/'),
+  },
+};
 
 async function fetchJSON(url: string, revalidate = 60, retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {

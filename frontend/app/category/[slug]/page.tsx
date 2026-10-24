@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { ChevronRight } from 'lucide-react';
 import CategoryProducts from '@/src/components/CategoryProducts';
 import { mapProduct } from '@/src/lib/productMapping';
+import { absoluteUrl, plainText } from '@/src/lib/seo';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -15,10 +16,22 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   const { slug } = await params;
   try {
     const res = await fetch(`${API_URL}/categories/${slug}/`, { next: { revalidate: 60 } });
-    if (!res.ok) return { title: 'Categoria não encontrada | e-Shopping Centre' };
+    if (!res.ok) return { title: 'Categoria não encontrada' };
     const cat = await res.json();
-    return { title: `${cat.name} | e-Shopping Centre`, description: cat.description };
-  } catch { return { title: 'Categoria | e-Shopping Centre' }; }
+    const description = plainText(cat.description || `Explore produtos de ${cat.name} no e-Shopping Centre.`);
+    return {
+      title: cat.name,
+      description,
+      alternates: { canonical: `/category/${encodeURIComponent(slug)}` },
+      openGraph: {
+        type: 'website',
+        title: cat.name,
+        description,
+        url: absoluteUrl(`/category/${encodeURIComponent(slug)}`),
+        images: cat.image ? [{ url: cat.image, alt: cat.name }] : undefined,
+      },
+    };
+  } catch { return { title: 'Categoria' }; }
 }
 
 export default async function CategoryPage({ params }: CategoryPageProps) {

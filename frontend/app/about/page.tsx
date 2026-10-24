@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Sobre Nós | e-Shopping Centre',
+  title: 'Sobre Nós',
   description:
-    'Conheça a história, missão e filosofia do e-Shopping Centre — o seu marketplace de confiança com milhões de produtos e frete grátis.',
+    'Conheça a missão do e-Shopping Centre, marketplace que liga compradores e vendedores locais em Moçambique.',
+  alternates: { canonical: '/about' },
 };
 
 export default function AboutPage() {

@@ -5,6 +5,7 @@ import StoreOwnerEditable from '@/src/components/StoreOwnerEditable';
 import StoreReviews from '@/src/components/StoreReviews';
 import StoreProducts from '@/src/components/StoreProducts';
 import { mapProduct } from '@/src/lib/productMapping';
+import { absoluteUrl, plainText } from '@/src/lib/seo';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -16,10 +17,22 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
   const { slug } = await params;
   try {
     const res = await fetch(`${API_URL}/stores/${slug}/`, { next: { revalidate: 60 } });
-    if (!res.ok) return { title: 'Loja indisponível | e-Shopping Centre' };
+    if (!res.ok) return { title: 'Loja indisponível' };
     const store = await res.json();
-    return { title: `${store.name} | e-Shopping Centre`, description: store.description };
-  } catch { return { title: 'Loja | e-Shopping Centre' }; }
+    const description = plainText(store.description || store.tagline || `Conheça a loja ${store.name} no e-Shopping Centre.`);
+    return {
+      title: store.name,
+      description,
+      alternates: { canonical: `/store/${encodeURIComponent(slug)}` },
+      openGraph: {
+        type: 'website',
+        title: store.name,
+        description,
+        url: absoluteUrl(`/store/${encodeURIComponent(slug)}`),
+        images: store.banner || store.logo ? [{ url: store.banner || store.logo, alt: store.name }] : undefined,
+      },
+    };
+  } catch { return { title: 'Loja' }; }
 }
 
 function StoreUnavailable() {

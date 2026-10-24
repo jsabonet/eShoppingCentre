@@ -5,7 +5,10 @@ import SearchClient from '@/src/components/SearchClient';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-export const metadata: Metadata = { title: 'Pesquisa | e-Shopping Centre' };
+export const metadata: Metadata = {
+  title: 'Pesquisa',
+  robots: { index: false, follow: true },
+};
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const params = await searchParams;

@@ -3,7 +3,11 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import StoresClient from '@/src/components/StoresClient';
 
-export const metadata: Metadata = { title: 'Lojas | e-Shopping Centre' };
+export const metadata: Metadata = {
+  title: 'Lojas',
+  description: 'Explore lojas e vendedores locais no e-Shopping Centre. Descubra produtos, compare ofertas e compre online em Moçambique.',
+  alternates: { canonical: '/stores' },
+};
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
