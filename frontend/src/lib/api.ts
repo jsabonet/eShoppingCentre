@@ -5,6 +5,15 @@ import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+export function getMediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  try {
+    return new URL(path, `${API_URL.replace(/\/api\/v1\/?$/, '')}/`).toString();
+  } catch {
+    return path;
+  }
+}
+
 const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
@@ -52,6 +61,7 @@ export interface User {
   first_name: string;
   last_name: string;
   avatar: string | null;
+  bio?: string;
   roles: string[];
   is_verified: boolean;
 }
@@ -660,7 +670,9 @@ export interface StoreAffiliate {
 
 export const usersAPI = {
   me: () => api.get<User>('/users/me/'),
-  updateMe: (data: any) => api.patch<User>('/users/me/', data),
+  updateMe: (data: Partial<User> | FormData) => api.patch<User>('/users/me/', data, {
+    headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+  }),
   myAddresses: () => api.get('/users/me/addresses/'),
   addAddress: (data: any) => api.post('/users/me/addresses/', data),
   myDownloads: () => api.get('/users/me/downloads/'),

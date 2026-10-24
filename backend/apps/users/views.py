@@ -19,7 +19,7 @@ from apps.products.serializers import WishlistItemSerializer
 User = get_user_model()
 
 
-def _user_payload(user):
+def _user_payload(user, request):
     return {
         'id': str(user.id),
         'email': user.email,
@@ -27,7 +27,7 @@ def _user_payload(user):
         'phone': user.phone,
         'first_name': user.first_name,
         'last_name': user.last_name,
-        'avatar': user.avatar.url if user.avatar else None,
+        'avatar': request.build_absolute_uri(user.avatar.url) if user.avatar else None,
         'roles': user.roles,
         'is_verified': user.is_verified,
     }
@@ -47,7 +47,7 @@ class RegisterView(generics.CreateAPIView):
         response = Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
-            'user': _user_payload(user),
+            'user': _user_payload(user, request),
         }, status=status.HTTP_201_CREATED)
         set_refresh_cookie(response, str(refresh))
 
@@ -295,7 +295,7 @@ class FirebaseTokenObtainPairView(APIView):
                 'phone': user.phone,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
-                'avatar': user.avatar.url if user.avatar else None,
+                'avatar': request.build_absolute_uri(user.avatar.url) if user.avatar else None,
                 'roles': user.roles,
                 'is_verified': user.is_verified,
             },
@@ -444,7 +444,7 @@ class VerifyEmailView(ThrottledPTMixin, APIView):
             except Exception as exc:
                 logger.warning(f'Falha ao enviar email de boas-vindas para {user.email}: {exc}')
 
-        return Response({'detail': 'Email verificado com sucesso.', 'user': _user_payload(user)})
+        return Response({'detail': 'Email verificado com sucesso.', 'user': _user_payload(user, request)})
 
 
 class ResendVerificationView(ThrottledPTMixin, APIView):

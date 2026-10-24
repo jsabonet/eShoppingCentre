@@ -2,15 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, User, Mail, Phone, Lock, Save } from 'lucide-react';
+import axios from 'axios';
+import { Loader2, User, Mail, Phone, Lock, Save, Camera, X } from 'lucide-react';
 import AccountLayout from '@/src/components/AccountLayout';
+import UserAvatar from '@/src/components/UserAvatar';
 import { useAuth } from '@/src/hooks/useAuth';
 import { usersAPI, authAPI } from '@/src/lib/api';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [form, setForm] = useState({ first_name: '', last_name: '', phone: '', bio: '' });
   const [passwordForm, setPasswordForm] = useState({ old_password: '', new_password: '', confirm: '' });
@@ -32,12 +36,47 @@ export default function ProfilePage() {
     }
   }, [user, isAuthenticated, authLoading]);
 
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview(user?.avatar || null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(avatarFile);
+    setAvatarPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [avatarFile, user?.avatar]);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('error', 'Seleccione um ficheiro de imagem válido.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('error', 'A imagem não pode ultrapassar 5 MB.');
+      return;
+    }
+    setAvatarFile(file);
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
     try {
-      await usersAPI.updateMe(form);
+      const payload = new FormData();
+      Object.entries(form).forEach(([key, value]) => payload.append(key, value));
+      if (avatarFile) payload.append('avatar', avatarFile);
+      await usersAPI.updateMe(payload);
+      await refreshUser();
+      setAvatarFile(null);
       showToast('success', 'Perfil actualizado com sucesso!');
-    } catch { showToast('error', 'Erro ao actualizar perfil.'); }
+    } catch (error) {
+      const avatarError = axios.isAxiosError<{ avatar?: string[] }>(error)
+        ? error.response?.data?.avatar?.[0]
+        : undefined;
+      showToast('error', avatarError || 'Erro ao actualizar perfil.');
+    }
     finally { setSaving(false); }
   };
 
@@ -57,7 +96,7 @@ export default function ProfilePage() {
     return <AccountLayout><div className="flex items-center justify-center min-h-[40vh]"><Loader2 size={28} className="animate-spin text-accent" /></div></AccountLayout>;
   }
 
-  const initials = ((user?.first_name?.[0] || '') + (user?.last_name?.[0] || user?.username?.[0] || '?')).toUpperCase();
+  const displayName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username || user?.email || 'Utilizador';
   const inputBase = 'w-full h-11 px-4 rounded-xl border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground transition-all duration-200 hover:border-accent/30 focus:border-accent focus:ring-4 focus:ring-ring/20 focus:outline-none';
   const labelBase = 'block text-[13px] font-semibold text-foreground/80 mb-1.5';
 
@@ -80,10 +119,23 @@ export default function ProfilePage() {
           </div>
           <div className="p-6">
             <div className="flex items-center gap-4 mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-xl font-bold text-primary shadow-sm">{initials}</div>
+              <UserAvatar avatar={avatarPreview} name={displayName} className="h-16 w-16" fallbackClassName="bg-primary/10 text-primary shadow-sm" />
               <div>
-                <p className="font-semibold text-foreground">{user?.first_name} {user?.last_name}</p>
+                <p className="font-semibold text-foreground">{displayName}</p>
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+                    <Camera size={15} />
+                    {avatarPreview ? 'Alterar foto' : 'Adicionar foto'}
+                    <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarChange} />
+                  </label>
+                  {avatarFile && (
+                    <button type="button" onClick={() => setAvatarFile(null)} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+                      <X size={14} /> Cancelar
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Imagem até 5 MB. A alteração é guardada ao salvar o perfil.</p>
               </div>
             </div>
 

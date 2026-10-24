@@ -45,6 +45,19 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    def validate_avatar(self, avatar):
+        max_size = 5 * 1024 * 1024
+        if avatar.size > max_size:
+            raise serializers.ValidationError('A imagem não pode ultrapassar 5 MB.')
+        return avatar
+
+    def update(self, instance, validated_data):
+        old_avatar = instance.avatar
+        user = super().update(instance, validated_data)
+        if old_avatar and 'avatar' in validated_data and old_avatar.name != user.avatar.name:
+            old_avatar.delete(save=False)
+        return user
+
     class Meta:
         model = User
         fields = ('id', 'email', 'username', 'phone', 'first_name', 'last_name',

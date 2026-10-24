@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { adminAPI, productsAPI, ordersAPI, storesAPI, type Product as APIProduct } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
+import UserAvatar from '@/src/components/UserAvatar';
 import AdminReturns from './admin/AdminReturns';
 import AdminOrders from './admin/AdminOrders';
 import AdminTickets from './admin/AdminTickets';
@@ -1240,9 +1241,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                         <tr key={u.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-sm font-medium text-accent">
-                                {u.first_name?.[0] || u.email?.[0]?.toUpperCase() || '?'}
-                              </div>
+                              <UserAvatar avatar={u.avatar} name={u.first_name ? `${u.first_name} ${u.last_name || ''}` : u.username || u.email} className="h-8 w-8" fallbackClassName="bg-accent/10 text-accent" />
                               <span className="font-medium text-sm">
                                 {u.first_name ? `${u.first_name} ${u.last_name || ''}` : u.username || u.email}
                               </span>

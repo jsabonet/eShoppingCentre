@@ -2,6 +2,7 @@
 import { Menu, X, ChevronRight, Home, Store, BookOpen, ShoppingCart, User, LogIn, UserPlus, Headphones, Gift, DollarSign, Store as StoreIcon, Info, HelpCircle, FileText, Shield, LayoutDashboard, LogOut, GraduationCap } from 'lucide-react';
 import type { Category } from '../data/marketplace';
 import { useAuth } from '@/src/hooks/useAuth';
+import UserAvatar from '@/src/components/UserAvatar';
 
 interface MobileMenuProps {
   categories: Category[];
@@ -53,9 +54,9 @@ export default function MobileMenu({ categories }: MobileMenuProps) {
             {/* User Actions */}
             <div className="p-4 bg-muted/30 border-b border-border">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-                  <User size={20} className="text-accent" />
-                </div>
+                {isAuthenticated
+                  ? <UserAvatar avatar={user?.avatar} name={user?.first_name || user?.username} className="h-10 w-10" fallbackClassName="bg-accent/10 text-accent" />
+                  : <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center"><User size={20} className="text-accent" /></div>}
                 <div>
                   <p className="text-sm font-medium">{isAuthenticated ? `Olá, ${user?.first_name || user?.username || 'Utilizador'}` : 'Olá, Visitante'}</p>
                   <p className="text-xs text-muted-foreground">{isAuthenticated ? user?.email : 'Aceda à sua conta'}</p>

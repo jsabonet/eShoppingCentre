@@ -9,6 +9,7 @@ import {
   Menu, X, Settings, Bell, RotateCcw, ShoppingCart, LifeBuoy, TicketPercent, Clock, Gift, Wallet
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
+import UserAvatar from '@/src/components/UserAvatar';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -148,9 +149,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 Ver Site
               </Link>
               <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
-                <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                  {(user?.first_name?.[0] || user?.username?.[0] || 'A').toUpperCase()}
-                </div>
+                <UserAvatar avatar={user?.avatar} name={user?.first_name || user?.username || 'Admin'} className="h-7 w-7" fallbackClassName="bg-indigo-600 text-white" />
                 <span className="text-sm text-slate-700 hidden sm:block">{user?.first_name || user?.username || 'Admin'}</span>
               </div>
             </div>
@@ -255,9 +254,7 @@ function AdminSidebarContent({ collapsed, onClose, onLogout, user, pathname, bad
       {/* Bottom */}
       <div className="border-t border-slate-700 px-3 py-3">
         <div className={`flex items-center gap-2.5 px-2 mb-2 ${collapsed ? 'justify-center' : ''}`}>
-          <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-            {(user?.first_name?.[0] || user?.username?.[0] || 'A').toUpperCase()}
-          </div>
+          <UserAvatar avatar={user?.avatar} name={user?.first_name || user?.username || 'Admin'} className="h-7 w-7" fallbackClassName="bg-indigo-500 text-white" />
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm text-slate-200 truncate">{user?.first_name || user?.username}</p>
