@@ -167,6 +167,7 @@ REST_FRAMEWORK = {
         'otp_verify': '10/min',
         'otp_resend': '5/hour',
         'otp_reset': '5/hour',
+        'newsletter': '10/hour',
     },
 }
 

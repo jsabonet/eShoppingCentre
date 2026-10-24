@@ -332,6 +332,7 @@ Este guia descreve um sistema React/Vite e Django com domínio de blog mais ampl
 ### 11.1 Editor enriquecido e imagens locais
 
 - `src/components/admin/BlogRichTextEditor.tsx` oferece formatação (negrito, itálico, sublinhado, riscado, código), títulos, alinhamento, listas, citações, blocos de código, tabelas, cores, ligações, desfazer/refazer e edição de HTML, com tela cheia e modo de foco.
+- A imagem de capa aceita tanto upload local como URL pública HTTP/HTTPS. O backend guarda URLs em `BlogPost.image_url`, e os serializers públicos expõem a imagem selecionada na listagem e no detalhe; uma imagem carregada localmente tem prioridade sobre a URL.
 - As imagens do corpo podem ser carregadas do computador: `POST /api/v1/admin/blog/images/` (`IsAdminUser`, multipart, 5 MB, JPG/PNG/WebP/GIF) devolve URL absoluta e o editor insere `<figure><img><figcaption>`.
 - O HTML é sanitizado no cliente (antes de enviar) e novamente no servidor em `src/lib/blog-content.ts`; a página do artigo aplica estilos tipográficos próprios (`blog-article-content`).
 

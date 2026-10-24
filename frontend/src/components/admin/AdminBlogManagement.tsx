@@ -4,13 +4,16 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import Link from 'next/link';
 import {
   ArrowDownUp, Check, ChevronLeft, ChevronRight, Copy,
-  Download, Edit3, Eye, FileText, FolderOpen, LoaderCircle, Plus, Search,
+  Download, Edit3, Eye, FileText, FolderOpen, LoaderCircle, Mail, MessageSquare, Plus, Search,
   Trash2, X,
 } from 'lucide-react';
 import { adminAPI, getMediaUrl, type BlogPostDetail } from '@/src/lib/api';
+import AdminBlogComments from './AdminBlogComments';
+import AdminNewsletterSubscribers from './AdminNewsletterSubscribers';
 
 type StatusFilter = 'all' | 'published' | 'draft';
 type SortOrder = 'newest' | 'oldest' | 'title';
+type BlogPanel = 'posts' | 'comments' | 'newsletter';
 
 function formatDate(value: string | null) {
   if (!value) return 'Sem data de publicação';
@@ -18,6 +21,7 @@ function formatDate(value: string | null) {
 }
 
 export default function AdminBlogManagement() {
+  const [activePanel, setActivePanel] = useState<BlogPanel>('posts');
   const [posts, setPosts] = useState<BlogPostDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -151,16 +155,41 @@ export default function AdminBlogManagement() {
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Gestão do blog</h1>
           <p className="mt-1 text-sm text-slate-500">Crie, organize e publique artigos para os seus leitores.</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button type="button" onClick={exportCsv} disabled={!filteredPosts.length} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
-            <Download size={16} /> Exportar
-          </button>
-          <Link href="/admin/blog/editor" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">
-            <Plus size={17} /> Novo artigo
-          </Link>
-        </div>
+        {activePanel === 'posts' && (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button type="button" onClick={exportCsv} disabled={!filteredPosts.length} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+              <Download size={16} /> Exportar
+            </button>
+            <Link href="/admin/blog/editor" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+              <Plus size={17} /> Novo artigo
+            </Link>
+          </div>
+        )}
       </header>
 
+      <div role="tablist" aria-label="Gestão do blog" className="flex w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-fit">
+        {([
+          { id: 'posts', label: 'Artigos', icon: FileText },
+          { id: 'comments', label: 'Comentários', icon: MessageSquare },
+          { id: 'newsletter', label: 'Newsletter', icon: Mail },
+        ] as const).map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={activePanel === id}
+            onClick={() => setActivePanel(id)}
+            className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition sm:px-4 ${
+              activePanel === id ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Icon size={16} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {activePanel === 'comments' ? <AdminBlogComments /> : activePanel === 'newsletter' ? <AdminNewsletterSubscribers /> : (
+      <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Total de artigos" value={posts.length} icon={<FileText size={18} />} tone="indigo" />
         <MetricCard label="Publicados" value={publishedCount} icon={<Check size={18} />} tone="green" />
@@ -324,6 +353,8 @@ export default function AdminBlogManagement() {
             </div>
           </section>
         </div>
+      )}
+      </>
       )}
     </section>
   );

@@ -412,6 +412,7 @@ export interface BlogPost {
   title: string;
   excerpt: string;
   image: string | null;
+  image_url?: string;
   author_name: string;
   category: string;
   read_time: string;
@@ -446,7 +447,33 @@ export interface BlogPostDetail extends BlogPost {
   image_caption: string;
   image_credit: string;
   image_source_url: string;
+  likes_count: number;
+  liked_by_me: boolean;
   seo: BlogSeoMeta;
+}
+
+export type BlogCommentStatus = 'pending' | 'approved' | 'rejected';
+
+export interface BlogComment {
+  id: string;
+  content: string;
+  author_name: string;
+  status: BlogCommentStatus;
+  created_at: string;
+}
+
+export interface BlogCommentAdmin extends BlogComment {
+  post: string;
+  post_title: string;
+  post_slug: string;
+}
+
+export interface NewsletterSubscription {
+  id: string;
+  email: string;
+  is_active: boolean;
+  source: string;
+  created_at: string;
 }
 
 // ─── Funções da API ───
@@ -813,6 +840,21 @@ export const blogAPI = {
   list: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<BlogPost>>('/blog/', { params }),
   getBySlug: (slug: string) => api.get<BlogPostDetail>(`/blog/${encodeURIComponent(slug)}/`),
+  listComments: (slug: string, params?: Record<string, any>) =>
+    api.get<PaginatedResponse<BlogComment>>(`/blog/${encodeURIComponent(slug)}/comments/`, { params }),
+  createComment: (slug: string, content: string) =>
+    api.post<BlogComment>(`/blog/${encodeURIComponent(slug)}/comments/`, { content }),
+  getLikeStatus: (slug: string) =>
+    api.get<{ liked: boolean; likes_count: number }>(`/blog/${encodeURIComponent(slug)}/like/`),
+  toggleLike: (slug: string) =>
+    api.post<{ liked: boolean; likes_count: number }>(`/blog/${encodeURIComponent(slug)}/like/`),
+};
+
+export const newsletterAPI = {
+  subscribe: (email: string, source?: string) =>
+    api.post<{ detail: string }>('/newsletter/subscribe/', { email, source, consent: true }),
+  unsubscribe: (token: string) =>
+    api.post<{ detail: string }>('/newsletter/unsubscribe/', { token }),
 };
 
 export const adminAPI = {
@@ -854,6 +896,18 @@ export const adminAPI = {
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
   },
+  listBlogComments: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<BlogCommentAdmin>>('/admin/blog/comments/', { params }),
+  updateBlogComment: (id: string, data: { status: BlogCommentStatus }) =>
+    api.patch<BlogCommentAdmin>(`/admin/blog/comments/${id}/`, data),
+  deleteBlogComment: (id: string) =>
+    api.delete(`/admin/blog/comments/${id}/`),
+  bulkBlogComments: (action: 'approve' | 'reject' | 'delete', ids: string[]) =>
+    api.post<{ updated: number; action: string }>('/admin/blog/comments/bulk/', { action, ids }),
+  listNewsletterSubscribers: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<NewsletterSubscription>>('/admin/blog/newsletter/', { params }),
+  deleteNewsletterSubscriber: (id: string) =>
+    api.delete(`/admin/blog/newsletter/${id}/`),
   // Courses
   listCourses: (params?: Record<string, any>) => api.get('/admin/courses/', { params }),
   createCourse: (data: any) => api.post('/admin/courses/', data),

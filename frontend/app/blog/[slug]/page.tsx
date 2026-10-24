@@ -6,6 +6,9 @@ import { ChevronRight, Calendar, User, ArrowLeft, Facebook, Twitter, MessageCirc
 import { absoluteUrl } from '@/src/lib/seo';
 import { blogAPI, getMediaUrl, type BlogPostDetail } from '@/src/lib/api';
 import { sanitizeBlogContent } from '@/src/lib/blog-content';
+import BlogLikeButton from '@/src/components/blog/BlogLikeButton';
+import BlogComments from '@/src/components/blog/BlogComments';
+import NewsletterForm from '@/src/components/blog/NewsletterForm';
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
@@ -166,7 +169,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             />
 
             <div className="mt-10 pt-8 border-t border-border">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <BlogLikeButton slug={slug} initialLikes={post.likes_count ?? 0} initialLiked={post.liked_by_me ?? false} />
                 <span className="text-sm font-semibold">Partilhar:</span>
                 <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`} target="_blank" rel="noreferrer" aria-label="Partilhar no Facebook" className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors">
                   <Facebook size={16} />
@@ -179,6 +183,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 </a>
               </div>
             </div>
+
+            <BlogComments slug={slug} />
           </article>
 
           <aside className="lg:col-span-1">
@@ -199,6 +205,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   ))}
                   {recentPosts.length === 0 && <p className="text-sm text-muted-foreground">Ainda não há outros artigos publicados.</p>}
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-muted/40 p-5">
+                <NewsletterForm source="blog_post" />
               </div>
             </div>
           </aside>

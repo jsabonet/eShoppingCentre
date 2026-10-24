@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/v1/wallet/', include('apps.wallet.urls')),
     path('api/v1/courses/', include('apps.courses.urls')),
     path('api/v1/blog/', include('apps.blog.urls')),
+    path('api/v1/newsletter/', include('apps.blog.urls_newsletter')),
     path('api/v1/reviews/', include('apps.reviews.urls')),
     path('api/v1/chat/', include('apps.chat.urls')),
     path('api/v1/shipping/', include('apps.shipping.urls')),

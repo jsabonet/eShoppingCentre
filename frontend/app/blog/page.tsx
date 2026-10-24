@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronRight, Calendar, User, Tag, ArrowRight, Search } from 'lucide-react';
 import BlogBannerSlider from '@/src/components/BlogBannerSlider';
+import NewsletterForm from '@/src/components/blog/NewsletterForm';
 import { blogAPI, getMediaUrl } from '@/src/lib/api';
 
 export const metadata: Metadata = {
@@ -186,6 +187,11 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
                     </Link>
                   ))}
                 </div>
+              </div>
+
+              {/* Newsletter */}
+              <div className="rounded-xl border border-border bg-muted/40 p-5">
+                <NewsletterForm source="blog_list" />
               </div>
             </div>
           </aside>

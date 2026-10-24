@@ -9,7 +9,14 @@ from rest_framework.test import APIClient
 
 from apps.users.models import User
 
-from .models import META_DESCRIPTION_MAX, BlogInlineImage, BlogPost
+from .models import (
+    META_DESCRIPTION_MAX,
+    BlogComment,
+    BlogInlineImage,
+    BlogLike,
+    BlogPost,
+    NewsletterSubscription,
+)
 
 
 class PublicBlogApiTests(TestCase):
@@ -179,6 +186,273 @@ class BlogSeoFieldTests(TestCase):
         self.assertEqual(post.image_credit, 'Fotografia de Ana Silva')
         self.assertEqual(response.data['seo']['robots'], 'noindex,nofollow')
         self.assertEqual(response.data['seo']['title'], 'Artigo com SEO otimizado')
+
+    def test_admin_can_store_cover_image_url_and_public_api_uses_it(self):
+        admin = User.objects.create_superuser(
+            email='cover-url-admin@test.local', username='coverurladmin', password='TestPass123!'
+        )
+        client = APIClient()
+        client.force_authenticate(user=admin)
+        image_url = 'https://images.example.test/blog/capa.jpg'
+
+        response = client.post(
+            '/api/v1/admin/blog/',
+            {
+                'title': 'Artigo com capa remota',
+                'excerpt': 'Resumo',
+                'content': '<p>Conteúdo</p>',
+                'category': 'Tecnologia',
+                'author_name': 'Equipa',
+                'is_published': True,
+                'image_url': image_url,
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['image_url'], image_url)
+        self.assertEqual(response.data['image'], image_url)
+
+        public_response = self.client.get(f"/api/v1/blog/{response.data['slug']}/")
+        self.assertEqual(public_response.status_code, 200)
+        self.assertEqual(public_response.data['image'], image_url)
+
+    def test_cover_image_url_requires_http_or_https_without_credentials(self):
+        admin = User.objects.create_superuser(
+            email='cover-url-validation@test.local', username='coverurlvalidation', password='TestPass123!'
+        )
+        client = APIClient()
+        client.force_authenticate(user=admin)
+        payload = {
+            'title': 'Artigo com URL inválida',
+            'excerpt': 'Resumo',
+            'content': '<p>Conteúdo</p>',
+            'category': 'Tecnologia',
+            'author_name': 'Equipa',
+            'image_url': 'javascript:alert(1)',
+        }
+
+        response = client.post('/api/v1/admin/blog/', payload, format='multipart')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('image_url', response.data)
+
+
+class BlogEngagementTests(TestCase):
+    """Comentários, gostos e newsletter."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_superuser(
+            email='engagement-admin@test.local', username='engagementadmin', password='TestPass123!'
+        )
+        self.buyer = User.objects.create_user(
+            email='engagement-buyer@test.local', username='engagementbuyer', password='TestPass123!'
+        )
+        self.post = BlogPost.objects.create(
+            slug='artigo-engajamento',
+            title='Artigo de engajamento',
+            excerpt='Resumo',
+            content='<p>Conteúdo do artigo.</p>',
+            author_name='Equipa',
+            category='Tecnologia',
+            is_published=True,
+        )
+
+    def test_anonymous_can_list_approved_comments(self):
+        BlogComment.objects.create(
+            post=self.post, author=self.buyer, author_name='buyer', content='Primeiro', status='approved'
+        )
+        BlogComment.objects.create(
+            post=self.post, author=self.buyer, author_name='buyer', content='Pendente', status='pending'
+        )
+
+        response = self.client.get(f'/api/v1/blog/{self.post.slug}/comments/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['content'], 'Primeiro')
+
+    def test_authenticated_user_creates_pending_comment(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            f'/api/v1/blog/{self.post.slug}/comments/', {'content': 'Comentário novo'}, format='json'
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['status'], 'pending')
+        comment = BlogComment.objects.get(id=response.data['id'])
+        self.assertEqual(comment.author, self.buyer)
+        self.assertEqual(comment.author_name, 'engagementbuyer')
+
+    def test_anonymous_cannot_create_comment(self):
+        response = self.client.post(
+            f'/api/v1/blog/{self.post.slug}/comments/', {'content': 'Sem sessão'}, format='json'
+        )
+
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_like_toggle(self):
+        self.client.force_authenticate(user=self.buyer)
+
+        initial = self.client.get(f'/api/v1/blog/{self.post.slug}/like/')
+        self.assertEqual(initial.status_code, 200)
+        self.assertFalse(initial.data['liked'])
+        self.assertEqual(initial.data['likes_count'], 0)
+
+        first = self.client.post(f'/api/v1/blog/{self.post.slug}/like/')
+        self.assertEqual(first.status_code, 200)
+        self.assertTrue(first.data['liked'])
+        self.assertEqual(first.data['likes_count'], 1)
+
+        current = self.client.get(f'/api/v1/blog/{self.post.slug}/like/')
+        self.assertTrue(current.data['liked'])
+
+        second = self.client.post(f'/api/v1/blog/{self.post.slug}/like/')
+        self.assertEqual(second.status_code, 200)
+        self.assertFalse(second.data['liked'])
+        self.assertEqual(second.data['likes_count'], 0)
+
+    def test_anonymous_can_read_like_count_but_not_user_state(self):
+        BlogLike.objects.create(post=self.post, user=self.buyer)
+
+        response = self.client.get(f'/api/v1/blog/{self.post.slug}/like/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {'liked': False, 'likes_count': 1})
+
+    def test_anonymous_cannot_like(self):
+        response = self.client.post(f'/api/v1/blog/{self.post.slug}/like/')
+
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_admin_moderates_comment(self):
+        comment = BlogComment.objects.create(
+            post=self.post, author=self.buyer, author_name='buyer', content='A moderar', status='pending'
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        approve = self.client.patch(f'/api/v1/admin/blog/comments/{comment.id}/', {'status': 'approved'}, format='json')
+        self.assertEqual(approve.status_code, 200)
+        comment.refresh_from_db()
+        self.assertEqual(comment.status, 'approved')
+
+    def test_admin_bulk_rejects_comments(self):
+        BlogComment.objects.create(post=self.post, author=self.buyer, content='A', status='pending')
+        BlogComment.objects.create(post=self.post, author=self.buyer, content='B', status='pending')
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            '/api/v1/admin/blog/comments/bulk/',
+            {'action': 'reject', 'ids': list(BlogComment.objects.values_list('id', flat=True))},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['updated'], 2)
+        self.assertEqual(BlogComment.objects.filter(status='rejected').count(), 2)
+
+    @patch('apps.notifications.email_service.dispatch')
+    def test_newsletter_subscribe_and_unsubscribe(self, dispatch):
+        subscribe = self.client.post(
+            '/api/v1/newsletter/subscribe/',
+            {'email': 'Leitor@Exemplo.com', 'consent': True, 'source': 'blog'},
+            format='json',
+        )
+        self.assertEqual(subscribe.status_code, 200, subscribe.data)
+        self.assertIn('detail', subscribe.data)
+        self.assertEqual(dispatch.call_count, 1)
+        subscription = NewsletterSubscription.objects.get()
+        self.assertEqual(subscription.email, 'leitor@exemplo.com')
+        self.assertIsNotNone(subscription.consented_at)
+        self.assertTrue(subscription.unsubscribe_token)
+
+        resubscribe = self.client.post(
+            '/api/v1/newsletter/subscribe/',
+            {'email': 'leitor@exemplo.com', 'consent': True},
+            format='json',
+        )
+        self.assertEqual(resubscribe.status_code, 200)
+        self.assertEqual(NewsletterSubscription.objects.count(), 1)
+        self.assertEqual(dispatch.call_count, 1)
+
+        unsubscribe = self.client.post(
+            '/api/v1/newsletter/unsubscribe/',
+            {'token': str(subscription.unsubscribe_token)},
+            format='json',
+        )
+        self.assertEqual(unsubscribe.status_code, 200)
+        self.assertFalse(subscription.__class__.objects.get().is_active)
+
+    def test_newsletter_requires_explicit_consent(self):
+        response = self.client.post(
+            '/api/v1/newsletter/subscribe/',
+            {'email': 'leitor@exemplo.com'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('consent', response.data)
+        self.assertFalse(NewsletterSubscription.objects.exists())
+
+    def test_newsletter_rejects_non_string_email(self):
+        response = self.client.post(
+            '/api/v1/newsletter/subscribe/',
+            {'email': ['reader@example.com'], 'consent': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('email', response.data)
+
+    @patch('apps.notifications.email_service.dispatch')
+    def test_resubscribing_after_unsubscribe_rotates_token_and_records_consent(self, dispatch):
+        subscription = NewsletterSubscription.objects.create(
+            email='retorno@exemplo.com',
+            is_active=False,
+        )
+        previous_token = subscription.unsubscribe_token
+
+        response = self.client.post(
+            '/api/v1/newsletter/subscribe/',
+            {'email': subscription.email, 'consent': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        subscription.refresh_from_db()
+        self.assertTrue(subscription.is_active)
+        self.assertNotEqual(subscription.unsubscribe_token, previous_token)
+        self.assertIsNotNone(subscription.consented_at)
+        dispatch.assert_called_once()
+
+    def test_invalid_unsubscribe_token_does_not_cancel_subscription(self):
+        subscription = NewsletterSubscription.objects.create(email='ativo@exemplo.com')
+
+        response = self.client.post(
+            '/api/v1/newsletter/unsubscribe/',
+            {'token': 'token-inválido'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        subscription.refresh_from_db()
+        self.assertTrue(subscription.is_active)
+
+    def test_newsletter_admin_list_is_restricted_and_can_delete_subscriber(self):
+        subscription = NewsletterSubscription.objects.create(email='admin-list@example.com')
+
+        anonymous = self.client.get('/api/v1/admin/blog/newsletter/')
+        self.assertIn(anonymous.status_code, (401, 403))
+
+        self.client.force_authenticate(user=self.admin)
+        listing = self.client.get('/api/v1/admin/blog/newsletter/')
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(listing.data['results'][0]['email'], subscription.email)
+
+        deletion = self.client.delete(f'/api/v1/admin/blog/newsletter/{subscription.id}/')
+        self.assertEqual(deletion.status_code, 204)
+        self.assertFalse(NewsletterSubscription.objects.filter(id=subscription.id).exists())
 
 
 class AdminBlogImageUploadTests(TestCase):

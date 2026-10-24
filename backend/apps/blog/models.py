@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -18,6 +20,7 @@ class BlogPost(BaseModel):
     excerpt = models.TextField()
     content = models.TextField()
     image = models.ImageField(upload_to='blog/', blank=True)
+    image_url = models.URLField(max_length=1000, blank=True)
     author_name = models.CharField(max_length=255)
     category = models.CharField(max_length=100)
     read_time = models.CharField(max_length=20, blank=True)
@@ -98,3 +101,59 @@ class BlogInlineImage(BaseModel):
 
     def __str__(self):
         return self.original_name or self.image.name
+
+
+class BlogComment(BaseModel):
+    """Comentário de um leitor num artigo do blog, sujeito a moderação."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pendente'
+        APPROVED = 'approved', 'Aprovado'
+        REJECTED = 'rejected', 'Rejeitado'
+
+    post = models.ForeignKey(BlogPost, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='blog_comments',
+    )
+    author_name = models.CharField(max_length=255, blank=True)
+    content = models.TextField()
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+
+    def __str__(self):
+        return f'{self.author_name or "Anónimo"}: {self.content[:40]}'
+
+
+class BlogLike(BaseModel):
+    """Gosto de um leitor num artigo do blog."""
+    post = models.ForeignKey(BlogPost, on_delete=models.CASCADE, related_name='likes')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='blog_likes',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=('post', 'user'), name='unique_blog_like'),
+        ]
+
+    def __str__(self):
+        return f'{self.user} gostou de {self.post.slug}'
+
+
+class NewsletterSubscription(BaseModel):
+    """Subscrição da newsletter."""
+    email = models.EmailField(unique=True, db_index=True)
+    is_active = models.BooleanField(default=True)
+    source = models.CharField(max_length=40, blank=True)
+    consented_at = models.DateTimeField(null=True, blank=True)
+    unsubscribe_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+
+    def __str__(self):
+        return self.email

@@ -987,6 +987,34 @@ def send_review_reply_email(email, first_name, item_name, link) -> None:
     )
 
 
+@shared_task
+def send_newsletter_subscription_email(subscription_id: str) -> None:
+    """Envia a confirmação da subscrição e uma ligação de remoção."""
+    from apps.blog.models import NewsletterSubscription
+
+    subscription = NewsletterSubscription.objects.filter(
+        id=subscription_id,
+        is_active=True,
+    ).first()
+    if not subscription:
+        return
+
+    unsubscribe_url = (
+        f'{settings.SITE_URL.rstrip("/")}/newsletter/unsubscribe'
+        f'?token={subscription.unsubscribe_token}'
+    )
+    send_templated(
+        subject=f'Subscrição da newsletter — {SITE_NAME}',
+        template_name='newsletter_subscription.html',
+        recipient=subscription.email,
+        text_message=(
+            f'A subscrição da newsletter do {SITE_NAME} foi registada. '
+            f'Para cancelar, acede a: {unsubscribe_url}'
+        ),
+        context=base_context(unsubscribe_url=unsubscribe_url),
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # Cursos
 # ─────────────────────────────────────────────────────────────

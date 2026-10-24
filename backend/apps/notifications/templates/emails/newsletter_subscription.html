@@ -1,0 +1,7 @@
+{% extends 'emails/base_email.html' %}
+{% block preheader %}A tua subscrição da newsletter foi registada.{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:22px;color:#111827;">Subscrição confirmada</h1>
+  <p style="margin:0 0 20px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#374151;">Obrigado por te inscreveres na newsletter do e-Shopping Centre. Enviaremos novidades e conteúdos relevantes para este endereço.</p>
+  <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#6b7280;">Se já não quiseres receber estes emails, podes <a href="{{ unsubscribe_url }}" style="color:#2563eb;text-decoration:underline;">cancelar a subscrição aqui</a>.</p>
+{% endblock %}

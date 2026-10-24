@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, Check, Eye, FileImage, FileText, LoaderCircle, Save, Send,
-  Upload, X,
+  Link2, Upload, X,
 } from 'lucide-react';
 import { adminAPI, getMediaUrl, type BlogPostDetail } from '@/src/lib/api';
 import { absoluteUrl } from '@/src/lib/seo';
@@ -18,6 +18,7 @@ interface BlogForm extends BlogSeoValues {
   title: string;
   excerpt: string;
   content: string;
+  image_url: string;
   category: string;
   author_name: string;
   is_published: boolean;
@@ -27,6 +28,7 @@ const EMPTY_FORM: BlogForm = {
   title: '',
   excerpt: '',
   content: '',
+  image_url: '',
   category: '',
   author_name: '',
   is_published: false,
@@ -83,6 +85,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<BlogForm>;
         setForm({ ...EMPTY_FORM, ...parsed, is_published: false });
+        setImagePreview(parsed.image_url ? getMediaUrl(parsed.image_url) : null);
         setNotice('Rascunho local restaurado.');
       }
     } catch (draftError) {
@@ -110,6 +113,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
         title: data.title,
         excerpt: data.excerpt,
         content: data.content,
+        image_url: data.image_url || '',
         category: data.category,
         author_name: data.author_name,
         is_published: data.is_published,
@@ -193,6 +197,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
     payload.append('category', form.category.trim());
     payload.append('author_name', form.author_name.trim());
     payload.append('is_published', String(publish));
+    payload.append('image_url', form.image_url.trim());
     payload.append('meta_title', form.meta_title.trim());
     payload.append('meta_description', form.meta_description.trim());
     payload.append('canonical_url', form.canonical_url.trim());
@@ -233,7 +238,19 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
       setError('A imagem deve ter no máximo 10 MB.');
       return;
     }
+    setForm((current) => ({ ...current, image_url: '' }));
     setImageFile(file);
+  };
+
+  const handleImageUrl = (value: string) => {
+    setImageFile(null);
+    setForm((current) => ({ ...current, image_url: value }));
+    const normalizedUrl = value.trim();
+    setImagePreview(normalizedUrl
+      ? getMediaUrl(normalizedUrl)
+      : post?.image_url
+        ? null
+        : getMediaUrl(post?.image));
   };
 
   const validateAndSave = (publish: boolean) => {
@@ -373,13 +390,34 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
 
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex items-center gap-2"><Upload size={18} className="text-indigo-600" /><h2 className="font-semibold text-slate-900">Imagem de capa</h2></div>
-              <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center transition hover:border-indigo-400 hover:bg-indigo-50/40">
-                {imagePreview ? <img src={imagePreview} alt="Pré-visualização da imagem de capa" className="mb-3 max-h-40 w-full rounded-md object-cover" /> : <Upload size={22} className="mb-2 text-slate-400" />}
-                <span className="text-sm font-semibold text-slate-700">{imageFile ? 'Alterar imagem' : imagePreview ? 'Substituir imagem' : 'Selecionar imagem'}</span>
-                <span className="mt-1 text-xs text-slate-500">PNG, JPG ou WebP · até 10 MB</span>
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => handleImage(event.target.files?.[0])} className="sr-only" />
+              {imagePreview
+                ? <img src={imagePreview} alt="Pré-visualização da imagem de capa" className="mb-3 max-h-40 w-full rounded-md object-cover" />
+                : <div className="mb-3 flex min-h-20 items-center justify-center rounded-lg bg-slate-50 text-slate-400"><Upload size={22} /></div>}
+              <label htmlFor="blog-cover-upload" className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-indigo-400 hover:bg-indigo-50/40">
+                <Upload size={16} />
+                {imageFile ? 'Alterar ficheiro de imagem' : 'Carregar imagem do dispositivo'}
               </label>
-              {imageFile && <button type="button" onClick={() => { setImageFile(null); setImagePreview(getMediaUrl(post?.image)); }} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"><X size={13} /> Remover nova imagem</button>}
+              <input id="blog-cover-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => handleImage(event.target.files?.[0])} className="sr-only" />
+              <p className="mt-1 text-center text-xs text-slate-500">PNG, JPG, WebP ou GIF · até 10 MB</p>
+              <div className="my-4 flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <span className="h-px flex-1 bg-slate-200" />
+                ou
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+              <label htmlFor="blog-cover-url" className="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-800">
+                <Link2 size={15} className="text-slate-500" /> Adicionar por ligação
+              </label>
+              <input
+                id="blog-cover-url"
+                type="url"
+                value={form.image_url}
+                onChange={(event) => handleImageUrl(event.target.value)}
+                maxLength={1000}
+                placeholder="https://exemplo.com/imagem.jpg"
+                className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              />
+              <p className="mt-1 text-xs leading-5 text-slate-500">Use um endereço público e direto para o ficheiro de imagem. A ligação ficará armazenada como fornecida.</p>
+              {imageFile && <button type="button" onClick={() => { setImageFile(null); setImagePreview(getMediaUrl(post?.image)); }} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"><X size={13} /> Remover novo ficheiro</button>}
               <BlogImageCreditFields values={form} onChange={patchSeo} imageUrl={imagePreview} />
             </section>
           </aside>
