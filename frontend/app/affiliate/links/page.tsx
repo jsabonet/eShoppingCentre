@@ -20,9 +20,13 @@ export default function AffiliateLinksPage() {
         affiliatesAPI.myLinks(),
         productsAPI.list({ page_size: 100, affiliate_enabled: true }),
       ]);
-      setLinks(linksRes.data || []);
-      setProducts(prodRes.data.results || []);
-    } catch { setLinks([]); setProducts([]); }
+      setLinks(Array.isArray(linksRes.data.results) ? linksRes.data.results : []);
+      setProducts(Array.isArray(prodRes.data.results) ? prodRes.data.results : []);
+    } catch (error) {
+      console.error('Falha ao carregar links e produtos de afiliado:', error);
+      setLinks([]);
+      setProducts([]);
+    }
     finally { setLoading(false); }
   }, []);
 

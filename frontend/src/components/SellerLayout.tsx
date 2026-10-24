@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { storesAPI } from '@/src/lib/api';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import { useAuth } from '@/src/hooks/useAuth';
 
 // Module-level cache — persists across page navigations within the seller area.
 // Invalidated when auth token changes (user switch).
@@ -46,7 +47,7 @@ interface SellerNavGroup {
   items: SellerNavItem[];
 }
 
-function getNavGroups(productType: string): SellerNavGroup[] {
+function getNavGroups(productType: string, isAffiliate: boolean): SellerNavGroup[] {
   const groups: SellerNavGroup[] = [
     { label: '', items: [{ href: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
     {
@@ -98,12 +99,22 @@ function getNavGroups(productType: string): SellerNavGroup[] {
     });
   }
 
+  if (isAffiliate) {
+    groups.splice(groups.length - 1, 0, {
+      label: 'Afiliado',
+      items: [
+        { href: '/affiliate/dashboard', label: 'Área de Afiliado', icon: Gift },
+      ],
+    });
+  }
+
   return groups;
 }
 
 export default function SellerLayout({ children }: SellerLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { isAffiliate } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [storeName, setStoreName] = useState<string | null>(cachedStore?.name ?? null);
@@ -113,7 +124,7 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
   const [checking, setChecking] = useState(!cacheChecked);
   const [badges, setBadges] = useState<{ orders: number; returns: number; tickets: number }>({ orders: 0, returns: 0, tickets: 0 });
 
-  const navGroups = getNavGroups(productType);
+  const navGroups = getNavGroups(productType, isAffiliate);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');

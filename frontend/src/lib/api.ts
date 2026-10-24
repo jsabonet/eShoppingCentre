@@ -602,7 +602,7 @@ export const affiliatesAPI = {
   createLink: (productId: string) =>
     api.post<AffiliateLink>('/affiliates/links/', { product_id: productId }),
 
-  myLinks: () => api.get<AffiliateLink[]>('/affiliates/me/links/'),
+  myLinks: () => api.get<PaginatedResponse<AffiliateLink>>('/affiliates/me/links/'),
 
   myCommissions: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<any>>('/affiliates/me/commissions/', { params }),
