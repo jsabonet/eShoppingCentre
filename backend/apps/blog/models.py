@@ -1,7 +1,15 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.html import strip_tags
 from apps.core.models import BaseModel
+
+META_TITLE_MAX = 60
+META_DESCRIPTION_MAX = 160
+TWITTER_CARD_CHOICES = (
+    ('summary_large_image', 'Imagem grande'),
+    ('summary', 'Resumo'),
+)
 
 
 class BlogPost(BaseModel):
@@ -16,6 +24,24 @@ class BlogPost(BaseModel):
     is_published = models.BooleanField(default=False)
     published_at = models.DateTimeField(null=True, blank=True)
 
+    # SEO
+    meta_title = models.CharField(max_length=255, blank=True)
+    meta_description = models.TextField(blank=True)
+    canonical_url = models.URLField(max_length=500, blank=True)
+    focus_keyword = models.CharField(max_length=120, blank=True)
+    noindex = models.BooleanField(default=False)
+    nofollow = models.BooleanField(default=False)
+    og_title = models.CharField(max_length=255, blank=True)
+    og_description = models.TextField(blank=True)
+    twitter_card = models.CharField(
+        max_length=20, choices=TWITTER_CARD_CHOICES, default='summary_large_image'
+    )
+
+    # Créditos da imagem de destaque
+    image_caption = models.CharField(max_length=255, blank=True)
+    image_credit = models.CharField(max_length=255, blank=True)
+    image_source_url = models.URLField(max_length=500, blank=True)
+
     def save(self, *args, **kwargs):
         word_count = len(strip_tags(self.content).split())
         self.read_time = f'{max(1, (word_count + 199) // 200)} min'
@@ -29,3 +55,46 @@ class BlogPost(BaseModel):
 
     def __str__(self):
         return self.title
+
+    # ── Resolvers SEO (fallback em cascata) ──
+
+    @property
+    def seo_title(self):
+        return (self.meta_title or self.title or '').strip()[:META_TITLE_MAX]
+
+    @property
+    def seo_description(self):
+        source = self.meta_description or self.excerpt or strip_tags(self.content)
+        return ' '.join(strip_tags(source or '').split())[:META_DESCRIPTION_MAX]
+
+    @property
+    def seo_og_title(self):
+        return (self.og_title or self.meta_title or self.title or '').strip()[:255]
+
+    @property
+    def seo_og_description(self):
+        return ' '.join(strip_tags(self.og_description or self.excerpt or self.content or '').split())[:META_DESCRIPTION_MAX]
+
+    @property
+    def seo_robots(self):
+        directives = [
+            'noindex' if self.noindex else 'index',
+            'nofollow' if self.nofollow else 'follow',
+        ]
+        return ','.join(directives) + ('' if self.is_published else ',noarchive')
+
+
+class BlogInlineImage(BaseModel):
+    """Imagem carregada para o corpo de um artigo do blog."""
+    image = models.ImageField(upload_to='blog/inline/%Y/%m/')
+    original_name = models.CharField(max_length=255, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='blog_inline_images',
+    )
+
+    def __str__(self):
+        return self.original_name or self.image.name

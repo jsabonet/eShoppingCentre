@@ -9,9 +9,12 @@ import {
   Upload, X,
 } from 'lucide-react';
 import { adminAPI, getMediaUrl, type BlogPostDetail } from '@/src/lib/api';
+import { absoluteUrl } from '@/src/lib/seo';
 import { useAuth } from '@/src/hooks/useAuth';
+import BlogRichTextEditor, { sanitizeEditorHtml } from './BlogRichTextEditor';
+import BlogSeoPanel, { BlogImageCreditFields, type BlogSeoValues, type TwitterCard } from './BlogSeoPanel';
 
-interface BlogForm {
+interface BlogForm extends BlogSeoValues {
   title: string;
   excerpt: string;
   content: string;
@@ -27,6 +30,18 @@ const EMPTY_FORM: BlogForm = {
   category: '',
   author_name: '',
   is_published: false,
+  meta_title: '',
+  meta_description: '',
+  canonical_url: '',
+  focus_keyword: '',
+  noindex: false,
+  nofollow: false,
+  og_title: '',
+  og_description: '',
+  twitter_card: 'summary_large_image',
+  image_caption: '',
+  image_credit: '',
+  image_source_url: '',
 };
 const DRAFT_STORAGE_KEY = 'admin-blog-editor-draft-v1';
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
@@ -98,6 +113,18 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
         category: data.category,
         author_name: data.author_name,
         is_published: data.is_published,
+        meta_title: data.meta_title || '',
+        meta_description: data.meta_description || '',
+        canonical_url: data.canonical_url || '',
+        focus_keyword: data.focus_keyword || '',
+        noindex: Boolean(data.noindex),
+        nofollow: Boolean(data.nofollow),
+        og_title: data.og_title || '',
+        og_description: data.og_description || '',
+        twitter_card: (data.twitter_card || 'summary_large_image') as TwitterCard,
+        image_caption: data.image_caption || '',
+        image_credit: data.image_credit || '',
+        image_source_url: data.image_source_url || '',
       });
       setImagePreview(getMediaUrl(data.image));
     }).catch((loadError) => {
@@ -137,6 +164,23 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
     return `${Math.max(1, Math.ceil(words / 200))} min`;
   }, [form.content]);
 
+  const permalink = useMemo(() => {
+    const slug = post?.slug
+      || form.title
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80)
+      || 'artigo';
+    return absoluteUrl(`/blog/${slug}`);
+  }, [post?.slug, form.title]);
+
+  const patchSeo = useCallback((patch: Partial<BlogSeoValues>) => {
+    setForm((current) => ({ ...current, ...patch }));
+  }, []);
+
   const save = useCallback(async (event: FormEvent<HTMLFormElement> | undefined, publish: boolean) => {
     event?.preventDefault();
     setSaving(true);
@@ -145,10 +189,22 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
     const payload = new FormData();
     payload.append('title', form.title.trim());
     payload.append('excerpt', form.excerpt.trim());
-    payload.append('content', form.content);
+    payload.append('content', sanitizeEditorHtml(form.content));
     payload.append('category', form.category.trim());
     payload.append('author_name', form.author_name.trim());
     payload.append('is_published', String(publish));
+    payload.append('meta_title', form.meta_title.trim());
+    payload.append('meta_description', form.meta_description.trim());
+    payload.append('canonical_url', form.canonical_url.trim());
+    payload.append('focus_keyword', form.focus_keyword.trim());
+    payload.append('noindex', String(form.noindex));
+    payload.append('nofollow', String(form.nofollow));
+    payload.append('og_title', form.og_title.trim());
+    payload.append('og_description', form.og_description.trim());
+    payload.append('twitter_card', form.twitter_card);
+    payload.append('image_caption', form.image_caption.trim());
+    payload.append('image_credit', form.image_credit.trim());
+    payload.append('image_source_url', form.image_source_url.trim());
     if (imageFile) payload.append('image', imageFile);
 
     try {
@@ -181,13 +237,14 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
   };
 
   const validateAndSave = (publish: boolean) => {
-    const formElement = document.getElementById('blog-editor-form') as HTMLFormElement | null;
-    if (formElement && !formElement.reportValidity()) return;
-    if (!formElement && (!form.title.trim() || !form.excerpt.trim() || !form.content.trim() || !form.category.trim() || !form.author_name.trim())) {
+    const hasContent = form.content.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').trim();
+    if (!form.title.trim() || !form.excerpt.trim() || !hasContent || !form.category.trim() || !form.author_name.trim()) {
       setError('Preencha o título, resumo, conteúdo, categoria e autor antes de guardar.');
       setPreview(false);
       return;
     }
+    const formElement = document.getElementById('blog-editor-form') as HTMLFormElement | null;
+    if (formElement && !formElement.reportValidity()) return;
     void save(undefined, publish);
   };
 
@@ -235,7 +292,17 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
 
       {preview ? (
         <article className="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-10">
-          {imagePreview && <img src={imagePreview} alt="" className="mb-8 max-h-[420px] w-full rounded-xl object-cover" />}
+          {imagePreview && (
+            <figure className="mb-8">
+              <img src={imagePreview} alt={form.image_caption || ''} className="max-h-[420px] w-full rounded-xl object-cover" />
+              {(form.image_caption || form.image_credit) && (
+                <figcaption className="mt-2 text-xs leading-5 text-slate-500">
+                  {form.image_caption}
+                  {form.image_credit && <span className="block">Crédito: {form.image_credit}</span>}
+                </figcaption>
+              )}
+            </figure>
+          )}
           <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-slate-500">
             {form.category && <span className="rounded-full bg-indigo-50 px-3 py-1 font-medium text-indigo-700">{form.category}</span>}
             <span>{form.author_name || 'Autor'}</span>
@@ -245,26 +312,33 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
           <h2 className="text-3xl font-bold leading-tight text-slate-900 sm:text-4xl">{form.title || 'Título do artigo'}</h2>
           <p className="mt-4 text-lg leading-7 text-slate-600">{form.excerpt || 'O resumo do artigo será apresentado aqui.'}</p>
           <div className="my-8 border-t border-slate-100" />
-          <iframe title="Pré-visualização do conteúdo do artigo" sandbox="" srcDoc={`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:16px/1.8 system-ui,sans-serif;color:#475569;margin:0}h1,h2,h3{color:#0f172a;line-height:1.3}img{max-width:100%;height:auto;border-radius:12px}a{color:#4f46e5}</style></head><body>${form.content || '<p>O conteúdo do artigo será apresentado aqui.</p>'}</body></html>`} className="min-h-[380px] w-full rounded-lg border-0" />
+          <div className="blog-article-content" dangerouslySetInnerHTML={{ __html: sanitizeEditorHtml(form.content || '<p>O conteúdo do artigo será apresentado aqui.</p>') }} />
         </article>
       ) : (
-        <form id="blog-editor-form" onSubmit={(event) => { void save(event, form.is_published); }} className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <form id="blog-editor-form" onSubmit={(event) => { event.preventDefault(); validateAndSave(form.is_published); }} className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-5">
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <div className="mb-5 flex items-center gap-2"><FileText size={18} className="text-indigo-600" /><h2 className="font-semibold text-slate-900">Conteúdo do artigo</h2></div>
               <div className="space-y-5">
-                <Field label="Título" required hint={`${form.title.length}/200`}>
-                  <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} maxLength={200} required placeholder="Escreva um título claro e descritivo" className="h-12 w-full rounded-lg border border-slate-200 px-3 text-base outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                <Field label="Título" required htmlFor="blog-title" hint={`${form.title.length}/200`}>
+                  <input id="blog-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} maxLength={200} required placeholder="Escreva um título claro e descritivo" className="h-12 w-full rounded-lg border border-slate-200 px-3 text-base outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                 </Field>
-                <Field label="Resumo" required hint={`${form.excerpt.length}/500`}>
-                  <textarea value={form.excerpt} onChange={(event) => setForm({ ...form, excerpt: event.target.value })} maxLength={500} required rows={3} placeholder="Apresente o tema do artigo em poucas frases" className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-6 outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                <Field label="Resumo" required htmlFor="blog-excerpt" hint={`${form.excerpt.length}/500`}>
+                  <textarea id="blog-excerpt" value={form.excerpt} onChange={(event) => setForm({ ...form, excerpt: event.target.value })} maxLength={500} required rows={3} placeholder="Apresente o tema do artigo em poucas frases" className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-6 outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                 </Field>
                 <Field label="Corpo do artigo" required hint={`${readingTime} de leitura`}>
-                  <textarea value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} required rows={18} placeholder="Escreva o artigo. Pode usar HTML básico para títulos, parágrafos, listas e ligações." className="w-full resize-y rounded-lg border border-slate-200 px-3 py-3 font-mono text-sm leading-6 outline-none placeholder:font-sans placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-                  <p className="mt-2 text-xs text-slate-500">O conteúdo aceita HTML básico (por exemplo, &lt;p&gt;, &lt;h2&gt;, &lt;ul&gt; e &lt;a&gt;). Pré-visualize antes de publicar.</p>
+                  <BlogRichTextEditor value={form.content} onChange={(content) => setForm((current) => ({ ...current, content }))} />
+                  <p className="mt-2 text-xs text-slate-500">Use a barra de ferramentas para formatar texto, inserir ligações e adicionar imagens por endereço URL.</p>
                 </Field>
               </div>
             </section>
+            <BlogSeoPanel
+              values={form}
+              onChange={patchSeo}
+              article={{ title: form.title, excerpt: form.excerpt, content: form.content }}
+              permalink={permalink}
+              imageUrl={imagePreview}
+            />
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2"><Eye size={18} className="text-indigo-600" /><h2 className="font-semibold text-slate-900">Pré-visualização</h2></div>
@@ -288,11 +362,11 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex items-center gap-2"><FileImage size={18} className="text-indigo-600" /><h2 className="font-semibold text-slate-900">Detalhes do artigo</h2></div>
               <div className="space-y-4">
-                <Field label="Categoria" required>
-                  <input value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} required maxLength={100} placeholder="Ex.: Tecnologia" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                <Field label="Categoria" required htmlFor="blog-category">
+                  <input id="blog-category" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} required maxLength={100} placeholder="Ex.: Tecnologia" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                 </Field>
-                <Field label="Autor" required>
-                  <input value={form.author_name} onChange={(event) => setForm({ ...form, author_name: event.target.value })} required maxLength={255} placeholder="Nome apresentado ao leitor" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                <Field label="Autor" required htmlFor="blog-author">
+                  <input id="blog-author" value={form.author_name} onChange={(event) => setForm({ ...form, author_name: event.target.value })} required maxLength={255} placeholder="Nome apresentado ao leitor" className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                 </Field>
               </div>
             </section>
@@ -306,6 +380,7 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
                 <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => handleImage(event.target.files?.[0])} className="sr-only" />
               </label>
               {imageFile && <button type="button" onClick={() => { setImageFile(null); setImagePreview(getMediaUrl(post?.image)); }} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"><X size={13} /> Remover nova imagem</button>}
+              <BlogImageCreditFields values={form} onChange={patchSeo} imageUrl={imagePreview} />
             </section>
           </aside>
         </form>
@@ -314,14 +389,15 @@ export default function AdminBlogEditor({ postId }: { postId: string | null }) {
   );
 }
 
-function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+function Field({ label, required, hint, htmlFor, children }: { label: string; required?: boolean; hint?: string; htmlFor?: string; children: React.ReactNode }) {
+  const labelText = <>{label}{required && <span className="ml-1 text-red-600" aria-hidden="true">*</span>}</>;
   return (
-    <label className="block">
-      <span className="mb-1.5 flex items-center justify-between gap-3 text-sm font-medium text-slate-800">
-        <span>{label}{required && <span className="ml-1 text-red-600" aria-hidden="true">*</span>}</span>
+    <div className="block">
+      <div className="mb-1.5 flex items-center justify-between gap-3 text-sm font-medium text-slate-800">
+        {htmlFor ? <label htmlFor={htmlFor}>{labelText}</label> : <span>{labelText}</span>}
         {hint && <span className="text-xs font-normal text-slate-500">{hint}</span>}
-      </span>
+      </div>
       {children}
-    </label>
+    </div>
   );
 }

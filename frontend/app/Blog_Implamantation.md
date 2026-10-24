@@ -324,10 +324,40 @@ Este guia descreve um sistema React/Vite e Django com domínio de blog mais ampl
 - A API mantém o modelo existente `BlogPost`, com `is_published` como estado simples de publicação, slug, categoria textual e imagem armazenada pelo Django. Os endpoints estão em `/api/v1/blog/` e `/api/v1/admin/blog/`.
 - A listagem pública filtra busca/categoria e paginação na API; artigos não publicados ficam inacessíveis pela lista e pelo detalhe públicos. No painel `/admin?tab=blog`, a criação inicia como rascunho e a publicação é uma ação explícita.
 - O tempo de leitura e a data de publicação são gerados no backend. O administrador mantém o CRUD e upload multipart já existentes; não foi introduzida uma nova biblioteca de editor ou upload.
-- Newsletter, comentários, likes, moderação, tags, categorias relacionais, score SEO e campos SEO configuráveis foram omitidos: o backend atual não oferece esses contratos. Os controles de newsletter que eram apenas visuais também foram removidos para não sugerir uma inscrição que não era persistida.
+- Newsletter, comentários, likes, moderação, tags e categorias relacionais foram omitidos: o backend atual não oferece esses contratos. Os controles de newsletter que eram apenas visuais também foram removidos para não sugerir uma inscrição que não era persistida. Os campos SEO configuráveis foram implementados (ver 11.2); a pontuação SEO persistida no backend foi substituída por análise orientativa no formulário.
 - A gestão administrativa usa lista responsiva com métricas disponíveis (artigos, publicados, rascunhos e categorias utilizadas), pesquisa, filtros, ordenação, paginação, exportação CSV e ações de editar, duplicar como rascunho, pré-visualizar e eliminar com confirmação. A duplicação copia texto e categoria, mas não a imagem de capa. O editor dedicado em `/admin/blog/editor` suporta rascunho local automático, pré-visualização isolada, upload de capa e alternância de publicação; a mesma interface adapta tabela/cartões e ações para mobile.
 - Meta/canonical/Schema e sitemap refletem apenas o artigo publicado solicitado.
 - Dashboard funciona sem depender de `is_published` não gravável nem de dados pessoais expostos.
+
+### 11.1 Editor enriquecido e imagens locais
+
+- `src/components/admin/BlogRichTextEditor.tsx` oferece formatação (negrito, itálico, sublinhado, riscado, código), títulos, alinhamento, listas, citações, blocos de código, tabelas, cores, ligações, desfazer/refazer e edição de HTML, com tela cheia e modo de foco.
+- As imagens do corpo podem ser carregadas do computador: `POST /api/v1/admin/blog/images/` (`IsAdminUser`, multipart, 5 MB, JPG/PNG/WebP/GIF) devolve URL absoluta e o editor insere `<figure><img><figcaption>`.
+- O HTML é sanitizado no cliente (antes de enviar) e novamente no servidor em `src/lib/blog-content.ts`; a página do artigo aplica estilos tipográficos próprios (`blog-article-content`).
+
+### 11.2 SEO, partilha e créditos de imagem
+
+Campos acrescentados ao `BlogPost` (migration `0004`), editáveis no painel `BlogSeoPanel` dentro do editor:
+
+| Campo | Uso |
+| --- | --- |
+| `meta_title` | título nos resultados de busca; fallback para `title` |
+| `meta_description` | descrição nos resultados; fallback para `excerpt` |
+| `canonical_url` | URL canónica quando o artigo também existe noutro endereço |
+| `focus_keyword` | palavra-chave usada na análise de conteúdo do formulário |
+| `og_title`, `og_description` | texto nas prévias de partilha |
+| `twitter_card` | `summary_large_image` (padrão) ou `summary` |
+| `noindex`, `nofollow` | controlo real de indexação |
+| `image_caption` | legenda e texto alternativo da capa |
+| `image_credit` | autoria exibida sob a imagem |
+| `image_source_url` | ligação para a fonte/licença |
+
+- O modelo expõe `seo_title`, `seo_description`, `seo_og_title`, `seo_og_description` e `seo_robots`; o serializer devolve um objeto `seo` para o frontend.
+- `generateMetadata` em `app/blog/[slug]/page.tsx` produz `<title>`, `description`, `robots`, `link rel=canonical`, Open Graph e Twitter a partir desses campos. O título SEO tem prioridade sobre o título do artigo e `noindex`/`nofollow` são respeitados.
+- A página injeta JSON-LD `BlogPosting` (headline, descrição, datas, autor, publisher, `mainEntityOfPage`) e exibe legenda/crédito sob a capa, com `rel="nofollow"` na ligação à fonte.
+- Tudo é gerado no servidor: os metadados e o JSON-LD aparecem no HTML entregue, sem depender de JavaScript.
+- A análise de palavra-chave no painel é orientativa (presença em título, meta descrição, subtítulos e corpo, além de densidade); não garante posicionamento.
+- O crédito documenta autoria, mas não substitui uma licença ou autorização de uso da imagem.
 
 ## 11. Referências principais
 

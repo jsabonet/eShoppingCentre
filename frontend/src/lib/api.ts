@@ -419,10 +419,34 @@ export interface BlogPost {
   created_at: string;
 }
 
+export interface BlogSeoMeta {
+  title: string;
+  description: string;
+  og_title: string;
+  og_description: string;
+  robots: string;
+  twitter_card: 'summary' | 'summary_large_image';
+  canonical_url: string;
+  focus_keyword: string;
+}
+
 export interface BlogPostDetail extends BlogPost {
   content: string;
   is_published: boolean;
   updated_at: string;
+  meta_title: string;
+  meta_description: string;
+  canonical_url: string;
+  focus_keyword: string;
+  noindex: boolean;
+  nofollow: boolean;
+  og_title: string;
+  og_description: string;
+  twitter_card: 'summary' | 'summary_large_image';
+  image_caption: string;
+  image_credit: string;
+  image_source_url: string;
+  seo: BlogSeoMeta;
 }
 
 // ─── Funções da API ───
@@ -821,6 +845,15 @@ export const adminAPI = {
   createBlogPost: (data: FormData | any) => api.post('/admin/blog/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   updateBlogPost: (id: string, data: FormData | any) => api.patch(`/admin/blog/${id}/`, data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   deleteBlogPost: (id: string) => api.delete(`/admin/blog/${id}/`),
+  uploadBlogImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.post<{ id: string; url: string; name: string; size: number | null }>(
+      '/admin/blog/images/',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+  },
   // Courses
   listCourses: (params?: Record<string, any>) => api.get('/admin/courses/', { params }),
   createCourse: (data: any) => api.post('/admin/courses/', data),

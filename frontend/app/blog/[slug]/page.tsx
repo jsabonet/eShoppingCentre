@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import { ChevronRight, Calendar, User, ArrowLeft, Facebook, Twitter, MessageCircle } from 'lucide-react';
 import { absoluteUrl } from '@/src/lib/seo';
 import { blogAPI, getMediaUrl, type BlogPostDetail } from '@/src/lib/api';
+import { sanitizeBlogContent } from '@/src/lib/blog-content';
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
@@ -31,24 +32,59 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
   const { slug } = await params;
   const post = await getPost(slug);
   const image = getMediaUrl(post.image);
+  const canonical = post.canonical_url || absoluteUrl(`/blog/${encodeURIComponent(slug)}`);
+  const title = post.seo?.title || post.meta_title || post.title;
+  const description = post.seo?.description || post.meta_description || post.excerpt;
+  const ogTitle = post.og_title || post.seo?.og_title || title;
+  const ogDescription = post.og_description || post.seo?.og_description || description;
+
   return {
-    title: post.title,
-    description: post.excerpt,
-    alternates: { canonical: `/blog/${encodeURIComponent(slug)}` },
+    title,
+    description,
+    alternates: { canonical },
+    robots: { index: !post.noindex, follow: !post.nofollow },
     openGraph: {
       type: 'article',
-      title: post.title,
-      description: post.excerpt,
-      url: absoluteUrl(`/blog/${encodeURIComponent(slug)}`),
+      title: ogTitle,
+      description: ogDescription,
+      url: canonical,
+      siteName: 'e-Shopping Centre',
+      locale: 'pt_MZ',
       authors: [post.author_name],
-      ...(image ? { images: [{ url: image, alt: post.title }] } : {}),
+      publishedTime: post.published_at || undefined,
+      modifiedTime: post.updated_at || undefined,
+      section: post.category,
+      ...(image ? { images: [{ url: image, alt: post.image_caption || post.title }] } : {}),
     },
     twitter: {
-      card: image ? 'summary_large_image' : 'summary',
-      title: post.title,
-      description: post.excerpt,
+      card: post.twitter_card || (image ? 'summary_large_image' : 'summary'),
+      title: ogTitle,
+      description: ogDescription,
       ...(image ? { images: [image] } : {}),
     },
+  };
+}
+
+function buildArticleSchema(post: BlogPostDetail, url: string) {
+  const image = getMediaUrl(post.image);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.seo?.title || post.title,
+    description: post.seo?.description || post.excerpt,
+    ...(image ? { image: [image] } : {}),
+    datePublished: post.published_at || post.created_at,
+    dateModified: post.updated_at || post.published_at || post.created_at,
+    articleSection: post.category,
+    ...(post.focus_keyword ? { keywords: post.focus_keyword } : {}),
+    author: { '@type': 'Person', name: post.author_name },
+    publisher: {
+      '@type': 'Organization',
+      name: 'e-Shopping Centre',
+      url: absoluteUrl('/'),
+    },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    url,
   };
 }
 
@@ -60,10 +96,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   ]);
   const recentPosts = recentResponse.data.results.filter((item) => item.slug !== slug).slice(0, 3);
   const image = getMediaUrl(post.image);
-  const articleUrl = absoluteUrl(`/blog/${encodeURIComponent(slug)}`);
+  const articleUrl = post.canonical_url || absoluteUrl(`/blog/${encodeURIComponent(slug)}`);
+  const articleSchema = buildArticleSchema(post, articleUrl);
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema).replace(/</g, '\\u003c') }}
+      />
       <div className="bg-card border-b border-border">
         <div className="max-w-[1500px] mx-auto px-4 py-3">
           <nav className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
@@ -78,31 +120,49 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
       <div className="max-w-[1500px] mx-auto px-4 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
-          <article className="lg:col-span-3">
+          <article className="min-w-0 lg:col-span-3">
             <Link href="/blog" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
               <ArrowLeft size={16} />
               Voltar ao Blog
             </Link>
 
             {image && (
-              <div className="h-80 md:h-96 rounded-xl overflow-hidden mb-8 bg-muted">
-                <img src={image} alt={post.title} className="w-full h-full object-cover" />
-              </div>
+              <figure className="mb-8">
+                <div className="aspect-[16/9] overflow-hidden rounded-xl bg-muted">
+                  <img
+                    src={image}
+                    alt={post.image_caption || post.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                {(post.image_caption || post.image_credit) && (
+                  <figcaption className="mt-2 text-xs leading-5 text-muted-foreground">
+                    {post.image_caption}
+                    {post.image_credit && (
+                      <span className="block">
+                        Crédito: {post.image_source_url
+                          ? <a href={post.image_source_url} target="_blank" rel="noreferrer noopener nofollow" className="underline hover:text-foreground">{post.image_credit}</a>
+                          : post.image_credit}
+                      </span>
+                    )}
+                  </figcaption>
+                )}
+              </figure>
             )}
 
-            <div className="flex items-center gap-3 text-sm text-muted-foreground mb-4 flex-wrap">
+            <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               {post.category && <span className="px-3 py-1 bg-accent/10 text-accent rounded-full font-medium text-xs">{post.category}</span>}
-              <span className="flex items-center gap-1"><Calendar size={14} />{formatDate(post.published_at)}</span>
+              <time dateTime={post.published_at || undefined} className="flex items-center gap-1"><Calendar size={14} />{formatDate(post.published_at)}</time>
               <span className="flex items-center gap-1"><User size={14} />{post.author_name}</span>
               <span>{post.read_time} de leitura</span>
             </div>
 
-            <h1 className="text-3xl md:text-4xl font-bold mb-6">{post.title}</h1>
-            {post.excerpt && <p className="text-lg text-muted-foreground mb-8">{post.excerpt}</p>}
+            <h1 className="mb-6 max-w-3xl text-3xl font-bold leading-tight md:text-4xl">{post.title}</h1>
+            {post.excerpt && <p className="mb-8 max-w-3xl text-lg leading-8 text-muted-foreground md:text-xl">{post.excerpt}</p>}
 
             <div
-              className="prose prose-lg max-w-none prose-headings:text-foreground prose-p:text-muted-foreground prose-a:text-accent prose-img:rounded-xl"
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              className="blog-article-content"
+              dangerouslySetInnerHTML={{ __html: sanitizeBlogContent(post.content) }}
             />
 
             <div className="mt-10 pt-8 border-t border-border">
