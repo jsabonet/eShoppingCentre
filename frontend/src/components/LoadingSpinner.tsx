@@ -8,10 +8,12 @@ interface LoadingSpinnerProps {
   className?: string;
   /** Use a minimal inline spinner (just the icon) */
   inline?: boolean;
+  /** Cover the viewport for blocking application-level loading states */
+  fullScreen?: boolean;
 }
 
 /**
- * Reusable loading spinner.
+ * Shared loading indicator for inline, page-level, and full-screen states.
  *
  * - `inline`: just the icon, for buttons / inline use
  * - default: centered icon + optional message below
@@ -21,16 +23,23 @@ export default function LoadingSpinner({
   message,
   className = '',
   inline = false,
+  fullScreen = false,
 }: LoadingSpinnerProps) {
   if (inline) {
-    return <Loader2 size={size} className={`animate-spin text-muted-foreground ${className}`} />;
+    return <Loader2 size={size} aria-hidden="true" className={`animate-spin text-accent ${className}`} />;
   }
 
   return (
-    <div className={`flex flex-col items-center justify-center gap-3 py-8 ${className}`}>
-      <Loader2 size={size} className="animate-spin text-primary" />
-      {message && (
-        <p className="text-sm text-muted-foreground animate-pulse">{message}</p>
+    <div
+      role="status"
+      aria-live="polite"
+      className={`${fullScreen ? 'fixed inset-0 z-50 bg-background' : 'py-12'} flex flex-col items-center justify-center gap-3 ${className}`}
+    >
+      <Loader2 size={size} aria-hidden="true" className="animate-spin text-accent" />
+      {message ? (
+        <p className="text-sm text-muted-foreground">{message}</p>
+      ) : (
+        <span className="sr-only">A carregar...</span>
       )}
     </div>
   );
