@@ -13,10 +13,10 @@ O projeto já regista encomendas, pagamentos, saldos, comissões e saques, mas e
 | **Dados fiscais de vendedores e compradores** | A loja permite carregar um documento fiscal, mas não foram encontrados dados estruturados como NUIT, nome fiscal ou endereço fiscal. O perfil do comprador também não apresenta esses campos. Referências: `backend/apps/stores/models.py` e `backend/apps/users/models.py`. | Definir que dados fiscais são necessários, de quem são recolhidos e como são validados. Sem esses dados, os documentos podem sair incompletos ou conter informação que não pode ser corrigida de forma adequada depois da emissão. |
 | **Faturas e recibos de encomenda** | A encomenda guarda totais, desconto, frete e linhas com nome, quantidade e preço, mas não foi encontrado um modelo de fatura ou recibo, nem número ou cópia fiscal do documento. Referência: `backend/apps/orders/models.py`. | Definir quais documentos serão emitidos, quem os emite e em que momento. Um email de confirmação ou registo do gateway não substitui automaticamente uma fatura fiscal. |
 | **Pagamentos, cancelamentos e reembolsos** | Existem registos de transações da VPay, confirmação idempotente de pagamentos, estados de encomenda, devoluções e movimentos da carteira. Referências: `backend/apps/payments/models.py`, `backend/apps/payments/services/completion.py` e `backend/apps/wallet/services.py`. | Os relatórios devem distinguir valor encomendado, efetivamente pago, reembolsado e ainda pendente. Se uma fatura já tiver sido emitida, o reembolso deve ter o tratamento documental correspondente; não basta alterar o estado da encomenda. |
-| **Relatórios do vendedor** | As métricas de vendas/receita agora usam encomendas pagas, deduzem reembolsos registados e usam os valores históricos das linhas. A receita por produto permanece bruta quando não é possível ligar um reembolso parcial à linha devolvida. Ainda não há relatório detalhado exportável por período. Referências: `backend/apps/stores/views_earnings.py` e `frontend/app/seller/earnings/page.tsx`. | Implementar filtros de datas, exportação e, se for necessário um valor líquido rigoroso por produto, guardar a alocação de descontos e reembolsos às linhas. |
+| **Relatórios do vendedor** | A página de ganhos permite filtrar por período e descarregar um CSV detalhado de encomendas e itens. O relatório inclui vendas, reembolsos registados e uma estimativa da receita líquida do vendedor. Os valores por produto continuam brutos quando não há alocação de desconto/reembolso à linha. Referências: `backend/apps/stores/views_earnings.py` e `frontend/app/seller/earnings/page.tsx`. | Se for necessário um valor líquido rigoroso por produto, guardar a alocação de descontos e reembolsos às linhas. O relatório atual é operacional e não fiscal. |
 | **Reconciliação financeira da plataforma** | A reconciliação filtra pagamentos concluídos, evita duplicar o saldo reservado e inclui saques de afiliados. Também apresenta separadamente os totais pagos via gateway, carteira e pagamento de teste simulado. Referências: `backend/apps/wallet/views.py` e `frontend/src/components/admin/AdminWallet.tsx`. | Continuar a tratar os totais como reconciliação operacional, não como contabilidade fiscal: pagamentos e reembolsos externos ainda exigem conciliação com os extratos do gateway. |
 | **Checkout dividido entre lojas** | O checkout pode gerar encomendas separadas por loja, enquanto a confirmação do pagamento pode tratar várias encomendas associadas ao mesmo pagamento. Referências: `backend/apps/payments/views.py` e `backend/apps/orders/serializers.py`. | Definir se cada vendedor emite o documento da respetiva venda e como o pagamento agregado se liga às faturas. O relatório deve evitar contar o pagamento agregado mais de uma vez ou perder a associação a alguma encomenda. |
-| **Pesquisa, exportação e auditoria** | Não foram encontradas funcionalidades de exportação financeira em CSV, Excel ou PDF nas áreas pesquisadas. Existem registos de operações e alterações de estado, mas isso não substitui um relatório filtrável. | Incluir exportação com filtros, permissões e trilha de auditoria: quem gerou o documento ou relatório, período, critérios usados e totais. Isso facilita a conferência e reduz divergências. |
+| **Pesquisa, exportação e auditoria** | O relatório financeiro do vendedor é exportável em CSV e cada geração guarda loja, utilizador, período, critérios e totais, com consulta no Django Admin. | Excel/PDF e outros relatórios ainda não estão implementados. A auditoria atual cobre a exportação do vendedor, não todas as consultas ou relatórios administrativos. |
 
 ## Sequência recomendada
 
@@ -52,7 +52,7 @@ Testar checkout dividido entre lojas, pagamentos pendentes ou tardios, cancelame
 
 1. Corrigir a reconciliação administrativa e as métricas de vendas.
 2. Definir os dados fiscais necessários e a responsabilidade pela emissão de documentos.
-3. Implementar a emissão documental e os relatórios sobre uma base financeira consistente.
+3. Implementar a emissão documental e expandir os relatórios sobre uma base financeira consistente.
 
 ## Implementação técnica da prioridade 1
 
@@ -65,6 +65,9 @@ Foi corrigida a reconciliação e a origem das métricas existentes:
 - As métricas da loja contam apenas encomendas pagas nas vendas do dia e na receita. A receita desconta reembolsos efetivamente creditados na carteira.
 - Os produtos mais vendidos e a receita por produto são calculados a partir das quantidades e dos valores históricos das linhas de encomenda pagas, em vez de usar o preço atual e o contador acumulado do produto.
 - A receita total e mensal apresentada no detalhe administrativo da loja usa a mesma regra de encomendas pagas menos reembolsos creditados.
+- A página de ganhos permite descarregar CSV por data inicial/final (máximo 366 dias e 50.000 linhas), com resumo agregado e detalhe por encomenda/linha. A data do filtro é `Order.created_at`; apenas encomendas pagas e não canceladas são incluídas.
+- O CSV distingue vendas brutas, reembolsos registados, vendas líquidas, comissão/taxa da plataforma e receita líquida estimada do vendedor. Os totais da encomenda são impressos uma única vez, na primeira linha de item, para não duplicar somas ao abrir no Excel.
+- Cada exportação grava loja, identidade do utilizador, IP, agente do utilizador, período, critérios e totais em `StoreReportExport`; o registo é somente leitura no Django Admin. O CSV inclui a referência do registo de auditoria e neutraliza valores textuais que poderiam ser interpretados como fórmulas de folha de cálculo.
 
 Os reembolsos considerados nestes cálculos são créditos registados na carteira do comprador, não devoluções externas processadas pelo gateway. As vendas por produto mostram os valores pagos das linhas; como o reembolso não regista a linha específica devolvida, não é possível atribuir com rigor um reembolso parcial a um produto específico.
 
@@ -83,7 +86,9 @@ Os testes de regressão cobrem os valores financeiros por fonte, métricas da lo
 - Não há emissão de faturas/recibos fiscais, identificação fiscal estruturada, numeração documental imutável nem validação de regras fiscais locais.
 - A reconciliação não substitui a importação/conferência dos extratos do gateway, nem modela estornos externos como movimentos de gateway separados.
 - A receita por produto é calculada com o valor bruto histórico das linhas pagas. Como o modelo não associa reembolsos parciais a linhas específicas, não se deve interpretar esse indicador como receita líquida fiscal por produto.
-- Continua por implementar relatórios financeiros detalhados por período e exportação auditável.
+- Não há exportação financeira para Excel/PDF nem emissão de documentos fiscais. O CSV do vendedor é operacional, não fiscal.
+- O relatório seleciona encomendas pela data de criação, mas deduz reembolsos já registados para essas encomendas até ao momento da exportação; um relatório de um período antigo pode, por isso, refletir reembolsos lançados posteriormente.
+- O valor histórico da linha não aloca o desconto da encomenda. A parcela de estorno do vendedor é proporcional e arredondada por reembolso, mas o relatório não substitui um ledger contabilístico nem prova um estorno externo no gateway.
 
 ## Auditoria adicional: estados do gateway e encomendas pendentes
 

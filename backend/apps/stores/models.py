@@ -120,6 +120,48 @@ class StoreModerationLog(BaseModel):
         return f'{self.store.name} — {self.get_action_display()} por {self.admin} em {self.created_at:%d/%m/%Y}'
 
 
+class StoreReportExport(BaseModel):
+    """Immutable audit record for a seller financial report export."""
+    store = models.ForeignKey(
+        Store,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='report_exports',
+    )
+    store_name = models.CharField(max_length=255, blank=True, default='')
+    generated_by = models.ForeignKey(
+        'users.User',
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='store_report_exports',
+    )
+    generated_by_email = models.EmailField()
+    date_from = models.DateField()
+    date_to = models.DateField()
+    criteria = models.JSONField(default=dict)
+    order_count = models.PositiveIntegerField(default=0)
+    item_count = models.PositiveIntegerField(default=0)
+    gross_sales = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    refunds = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    net_sales = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    seller_gross = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    seller_refunds = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    seller_net = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['store', '-created_at']),
+            models.Index(fields=['date_from', 'date_to']),
+        ]
+
+    def __str__(self):
+        return f'{self.store_name} — {self.date_from} a {self.date_to}'
+
+
 class StoreFollower(BaseModel):
     """Utilizador segue uma loja para receber notificacoes de novos produtos."""
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='followed_stores')

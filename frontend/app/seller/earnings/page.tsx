@@ -1,17 +1,32 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, TrendingDown, RefreshCw, X, Loader2 } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, RefreshCw, X, Loader2, Download } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
-import { walletAPI } from '@/src/lib/api';
+import { storesAPI, walletAPI } from '@/src/lib/api';
 import type { WalletInfo, WalletTransaction } from '@/src/lib/api';
+
+function localDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export default function SellerEarningsPage() {
   const [wallet, setWallet] = useState<WalletInfo | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportDateFrom, setReportDateFrom] = useState(() => {
+    const today = new Date();
+    return localDateString(new Date(today.getFullYear(), today.getMonth(), 1));
+  });
+  const [reportDateTo, setReportDateTo] = useState(() => localDateString(new Date()));
+  const [reportFormat, setReportFormat] = useState<'csv' | 'excel' | 'pdf'>('csv');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -62,6 +77,43 @@ export default function SellerEarningsPage() {
     } finally { setSubmitting(false); }
   };
 
+  const downloadReport = async () => {
+    setReportLoading(true);
+    setReportError('');
+    try {
+      const response = await storesAPI.exportEarningsReport({
+        date_from: reportDateFrom,
+        date_to: reportDateTo,
+        format: reportFormat,
+      });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio-vendas-${reportDateFrom}-${reportDateTo}.${reportFormat}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err: any) {
+      let message = 'Não foi possível exportar o relatório. Tente novamente.';
+      const data = err?.response?.data;
+      if (data instanceof Blob) {
+        try {
+          const body = JSON.parse(await data.text());
+          message = body?.date?.[0] || body?.date_to?.[0]
+            || body?.detail || body?.format?.[0] || message;
+        } catch {
+          message = 'Não foi possível ler a resposta do relatório.';
+        }
+      } else {
+        message = data?.detail || data?.format?.[0] || message;
+      }
+      setReportError(message);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <SellerLayout>
@@ -104,6 +156,57 @@ export default function SellerEarningsPage() {
             <p className="text-2xl font-bold">{transactions.length}</p>
           </div>
         </div>
+
+        <section className="bg-card border border-border rounded-xl p-5 mb-6">
+          <div className="mb-4">
+            <h2 className="font-bold">Relatório de vendas</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Exporta encomendas pagas pela data de criação, com linhas de produtos,
+              reembolsos e totais. O período máximo é de 366 dias e 50.000 linhas.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              Data inicial
+              <input
+                type="date"
+                value={reportDateFrom}
+                max={reportDateTo}
+                onChange={(event) => setReportDateFrom(event.target.value)}
+                className="rounded-md border border-border bg-background px-3 py-2"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              Data final
+              <input
+                type="date"
+                value={reportDateTo}
+                min={reportDateFrom}
+                max={localDateString(new Date())}
+                onChange={(event) => setReportDateTo(event.target.value)}
+                className="rounded-md border border-border bg-background px-3 py-2"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={downloadReport}
+              disabled={reportLoading || !reportDateFrom || !reportDateTo || reportDateFrom > reportDateTo}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {reportLoading
+                ? <Loader2 size={16} className="animate-spin" />
+                : <Download size={16} />}
+              {reportLoading ? 'A gerar...' : 'Exportar CSV'}
+            </button>
+          </div>
+          {reportError && (
+            <p role="alert" className="mt-3 text-sm text-red-600">{reportError}</p>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            O relatório não distribui descontos por produto; o desconto e os totais
+            da encomenda aparecem uma única vez por encomenda.
+          </p>
+        </section>
 
         <div className="bg-card border border-border rounded-xl">
           <div className="p-4 border-b border-border">

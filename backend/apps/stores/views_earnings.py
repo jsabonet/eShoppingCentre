@@ -1,11 +1,30 @@
-from rest_framework import permissions
+import csv
+from datetime import datetime, time, timedelta
+from decimal import Decimal
+from io import BytesIO, StringIO
+
+from openpyxl import Workbook
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from rest_framework import permissions, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
+from django.http import HttpResponse
+from django.utils.dateparse import parse_date
 from django.utils import timezone
-from apps.orders.models import Order
-from apps.orders.serializers import OrderSerializer
+from apps.orders.models import Order, OrderItem
 from .financials import paid_order_revenue
+from .models import StoreReportExport
+
+
+REPORTABLE_ORDER_STATUSES = (
+    'confirmed', 'processing', 'shipped', 'ready_for_pickup', 'delivered', 'refunded',
+)
 
 
 class StoreStatsView(APIView):
@@ -30,8 +49,14 @@ class StoreStatsView(APIView):
 
         orders = store.orders.all()
         today_orders = orders.filter(created_at__gte=today_start)
-        completed_orders = orders.filter(payment_status='completed')
-        today_paid_orders = today_orders.filter(payment_status='completed')
+        completed_orders = orders.filter(
+            payment_status='completed',
+            status__in=REPORTABLE_ORDER_STATUSES,
+        )
+        today_paid_orders = today_orders.filter(
+            payment_status='completed',
+            status__in=REPORTABLE_ORDER_STATUSES,
+        )
 
         total_revenue = float(paid_order_revenue(completed_orders))
         today_revenue = float(paid_order_revenue(today_paid_orders))
@@ -57,11 +82,17 @@ class StoreStatsView(APIView):
         top = Product.objects.filter(store=store, status='active').annotate(
             paid_sales=Sum(
                 'order_items__quantity',
-                filter=Q(order_items__order__payment_status='completed'),
+                filter=Q(
+                    order_items__order__payment_status='completed',
+                    order_items__order__status__in=REPORTABLE_ORDER_STATUSES,
+                ),
             ),
             paid_revenue=Sum(
                 'order_items__total_price',
-                filter=Q(order_items__order__payment_status='completed'),
+                filter=Q(
+                    order_items__order__payment_status='completed',
+                    order_items__order__status__in=REPORTABLE_ORDER_STATUSES,
+                ),
             ),
         ).order_by('-paid_sales', '-paid_revenue')[:5].prefetch_related('images')
         top_data = []
@@ -159,3 +190,349 @@ class StoreEarningsView(APIView):
         transactions = wallet.transactions.filter(type='sale').order_by('-created_at')[:50]
         serializer = WalletTransactionSerializer(transactions, many=True)
         return Response({'transactions': serializer.data})
+
+
+def _csv_safe(value):
+    value = '' if value is None else str(value)
+    if value.lstrip(' \t\r\n\x00').startswith(('=', '+', '-', '@')):
+        return f"'{value}"
+    return value
+
+
+def _format_money(value):
+    return f'{value:.2f}'
+
+
+def _serialize_report_summary_rows(summary_data):
+    return [
+        ['Encomendas pagas incluídas', summary_data['order_count']],
+        ['Itens', summary_data['item_count']],
+        ['Vendas brutas', _format_money(summary_data['gross_sales'])],
+        ['Reembolsos registados', _format_money(summary_data['refunds'])],
+        ['Vendas líquidas após reembolsos', _format_money(summary_data['net_sales'])],
+        ['Receita bruta do vendedor antes de reembolsos', _format_money(summary_data['seller_gross'])],
+        ['Parcela do vendedor revertida por reembolsos', _format_money(summary_data['seller_refunds'])],
+        ['Receita líquida estimada do vendedor', _format_money(summary_data['seller_net'])],
+    ]
+
+
+def _build_excel_report(rows, summary_data, title, period_label, generated_by, generated_at, audit_id):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = 'Relatorio'
+    sheet.append(['Relatório financeiro do vendedor'])
+    sheet.append(['Loja', title])
+    sheet.append(['Período', period_label])
+    sheet.append(['Gerado por', generated_by])
+    sheet.append(['Gerado em', generated_at])
+    sheet.append(['Referência de auditoria', audit_id])
+    sheet.append([])
+    for row in _serialize_report_summary_rows(summary_data):
+        sheet.append([row[0], row[1]])
+    sheet.append([])
+    for row in rows:
+        sheet.append(row)
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def _build_pdf_report(rows, summary_data, title, period_label, generated_by, generated_at, audit_id):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, title='Relatório financeiro do vendedor')
+    styles = getSampleStyleSheet()
+    story = []
+    story.append(Paragraph('Relatório financeiro do vendedor', styles['Title']))
+    story.append(Paragraph(f'Loja: {title}', styles['BodyText']))
+    story.append(Paragraph(f'Período: {period_label}', styles['BodyText']))
+    story.append(Paragraph(f'Gerado por: {generated_by}', styles['BodyText']))
+    story.append(Paragraph(f'Gerado em: {generated_at}', styles['BodyText']))
+    story.append(Paragraph(f'Referência de auditoria: {audit_id}', styles['BodyText']))
+    story.append(Spacer(1, 8 * mm))
+    summary_rows = _serialize_report_summary_rows(summary_data)
+    summary_table = Table(summary_rows, colWidths=[120 * mm, 40 * mm])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.whitesmoke),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 8 * mm))
+    data_rows = rows[:80]
+    if data_rows:
+        table = Table(data_rows, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ]))
+        story.append(table)
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+class StoreEarningsReportView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    max_period_days = 366
+    max_detail_rows = 50000
+
+    def get(self, request):
+        store = getattr(request.user, 'store', None)
+        if store is None:
+            return Response(
+                {'detail': 'Apenas vendedores com uma loja podem exportar relatórios.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        unsupported = set(request.query_params) - {'date_from', 'date_to', 'format'}
+        if unsupported:
+            raise ValidationError({
+                'query_params': (
+                    'Filtros não suportados: '
+                    + ', '.join(sorted(unsupported))
+                ),
+            })
+
+        export_format = (request.query_params.get('format') or 'csv').lower()
+        if export_format not in {'csv', 'excel', 'pdf'}:
+            raise ValidationError({
+                'format': 'Formato inválido. Use csv, excel ou pdf.',
+            })
+
+        date_from = self._parse_date(request.query_params.get('date_from'), 'date_from')
+        date_to = self._parse_date(request.query_params.get('date_to'), 'date_to')
+        if date_from is None or date_to is None:
+            raise ValidationError({
+                'date': 'Indique date_from e date_to no formato AAAA-MM-DD.',
+            })
+        if date_from > date_to:
+            raise ValidationError({
+                'date_to': 'A data final deve ser igual ou posterior à data inicial.',
+            })
+        if (date_to - date_from).days + 1 > self.max_period_days:
+            raise ValidationError({
+                'date_to': f'O período máximo do relatório é {self.max_period_days} dias.',
+            })
+
+        start = timezone.make_aware(datetime.combine(date_from, time.min))
+        end = timezone.make_aware(datetime.combine(date_to + timedelta(days=1), time.min))
+        orders_query = Order.objects.filter(
+            store=store,
+            payment_status='completed',
+            status__in=REPORTABLE_ORDER_STATUSES,
+            created_at__gte=start,
+            created_at__lt=end,
+        )
+        item_count = OrderItem.objects.filter(order__in=orders_query).count()
+        empty_order_count = orders_query.annotate(
+            report_item_count=Count('items'),
+        ).filter(report_item_count=0).count()
+        if item_count + empty_order_count > self.max_detail_rows:
+            raise ValidationError({
+                'date': (
+                    'O relatório excede 50.000 linhas. Reduza o período e tente novamente.'
+                ),
+            })
+
+        orders = list(
+            orders_query
+            .select_related('buyer', 'store')
+            .prefetch_related('items')
+            .order_by('created_at', 'order_number')
+        )
+        order_ids = [order.id for order in orders]
+
+        from apps.wallet.models import WalletTransaction
+        refund_rows = WalletTransaction.objects.filter(
+            type='refund',
+            status='completed',
+            reference_type='order',
+            reference_id__in=order_ids,
+            amount__gt=0,
+        ).values('reference_id', 'amount')
+        refunds_by_order = {}
+        for refund in refund_rows:
+            refunds_by_order.setdefault(refund['reference_id'], []).append(
+                Decimal(refund['amount'])
+            )
+
+        gross_sales = Decimal('0.00')
+        refunds = Decimal('0.00')
+        seller_gross = Decimal('0.00')
+        seller_refunds = Decimal('0.00')
+        order_values = {}
+        for order in orders:
+            items = list(order.items.all())
+            order_refunds = refunds_by_order.get(order.id, [])
+            order_refund_total = sum(order_refunds, Decimal('0.00'))
+            order_seller_gross = max(
+                order.total - (order.platform_fee or 0)
+                - (order.affiliate_commission or 0),
+                Decimal('0.00'),
+            )
+            order_seller_refunds = sum(
+                (
+                    (order_seller_gross * refund / order.total).quantize(
+                        Decimal('0.01')
+                    )
+                    for refund in order_refunds
+                ),
+                Decimal('0.00'),
+            ) if order.total else Decimal('0.00')
+            order_values[order.id] = (
+                items,
+                order_refund_total,
+                order_seller_gross,
+                order_seller_refunds,
+            )
+            gross_sales += order.total
+            refunds += order_refund_total
+            seller_gross += order_seller_gross
+            seller_refunds += order_seller_refunds
+
+        net_sales = gross_sales - refunds
+        seller_net = seller_gross - seller_refunds
+        criteria = {
+            'date_basis': 'order.created_at',
+            'payment_status': 'completed',
+            'excluded_order_statuses': ['pending', 'cancelled', 'failed'],
+            'refund_basis': 'completed buyer-wallet refund credits for selected orders, through export time',
+            'line_amount_basis': 'historical order item total_price before order-level discount allocation',
+            'period_inclusive': True,
+        }
+        audit = StoreReportExport.objects.create(
+            store=store,
+            store_name=store.name,
+            generated_by=request.user,
+            generated_by_email=request.user.email,
+            date_from=date_from,
+            date_to=date_to,
+            criteria=criteria,
+            order_count=len(orders),
+            item_count=item_count,
+            gross_sales=gross_sales,
+            refunds=refunds,
+            net_sales=net_sales,
+            seller_gross=seller_gross,
+            seller_refunds=seller_refunds,
+            seller_net=seller_net,
+            ip_address=request.META.get('REMOTE_ADDR') or None,
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+        )
+
+        summary = {
+            'order_count': len(orders),
+            'item_count': item_count,
+            'gross_sales': gross_sales,
+            'refunds': refunds,
+            'net_sales': net_sales,
+            'seller_gross': seller_gross,
+            'seller_refunds': seller_refunds,
+            'seller_net': seller_net,
+        }
+        period_label = f'{date_from.isoformat()} até {date_to.isoformat()}'
+        header = [
+            'Encomenda', 'Data da encomenda', 'Cliente', 'Estado', 'Pagamento',
+            'Produto', 'ID do produto', 'Quantidade', 'Preço unitário MZN',
+            'Valor histórico da linha MZN', 'Desconto da encomenda MZN',
+            'Frete da encomenda MZN', 'Total da encomenda MZN',
+            'Reembolsos da encomenda MZN', 'Receita líquida estimada do vendedor MZN',
+        ]
+        rows = [header]
+
+        for order in orders:
+            items, order_refunds, order_seller_gross, order_seller_refunds = order_values[order.id]
+            order_row_values = [
+                _csv_safe(order.order_number),
+                timezone.localtime(order.created_at).isoformat(),
+                _csv_safe(order.buyer.get_full_name() or order.buyer.email),
+                _csv_safe(order.get_status_display()),
+                _csv_safe(order.payment_method),
+            ]
+            if not items:
+                rows.append(order_row_values + [
+                    '', '', '', '', '', _format_money(order.discount or 0),
+                    _format_money(order.shipping_cost or 0), _format_money(order.total),
+                    _format_money(order_refunds), _format_money(order_seller_gross - order_seller_refunds),
+                ])
+                continue
+            for index, item in enumerate(items):
+                order_totals = (
+                    [
+                        _format_money(order.discount or 0),
+                        _format_money(order.shipping_cost or 0),
+                        _format_money(order.total),
+                        _format_money(order_refunds),
+                        _format_money(order_seller_gross - order_seller_refunds),
+                    ]
+                    if index == 0
+                    else ['', '', '', '', '']
+                )
+                rows.append(order_row_values + [
+                    _csv_safe(item.product_name),
+                    str(item.product_id or ''),
+                    item.quantity,
+                    _format_money(item.unit_price),
+                    _format_money(item.total_price),
+                    *order_totals,
+                ])
+
+        if export_format == 'csv':
+            output = StringIO(newline='')
+            writer = csv.writer(output, lineterminator='\r\n')
+            writer.writerow(['Relatório de vendas do vendedor'])
+            writer.writerow(['Loja', _csv_safe(store.name)])
+            writer.writerow(['Período por data da encomenda', date_from.isoformat(), date_to.isoformat()])
+            writer.writerow(['Critérios', _csv_safe(' '.join(f'{key}={value}' for key, value in criteria.items()))])
+            writer.writerow(['Gerado por', _csv_safe(request.user.email)])
+            writer.writerow(['Gerado em', timezone.localtime(audit.created_at).isoformat()])
+            writer.writerow(['Referência de auditoria', str(audit.id)])
+            writer.writerow([])
+            writer.writerow(['Resumo', 'Valor MZN'])
+            for label, value in _serialize_report_summary_rows(summary):
+                writer.writerow([label, value])
+            writer.writerow([])
+            writer.writerow(header)
+            for row in rows[1:]:
+                writer.writerow(row)
+            response = HttpResponse('\ufeff' + output.getvalue(), content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = f'attachment; filename="relatorio-vendas-{date_from}-{date_to}.csv"'
+            response['X-Report-Audit-Id'] = str(audit.id)
+            response['Cache-Control'] = 'private, no-store'
+            response['X-Content-Type-Options'] = 'nosniff'
+            return response
+
+        generated_at = timezone.localtime(audit.created_at).strftime('%Y-%m-%d %H:%M:%S')
+        if export_format == 'excel':
+            buffer = _build_excel_report(rows, summary, store.name, period_label, request.user.email, generated_at, str(audit.id))
+            response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = f'attachment; filename="relatorio-vendas-{date_from}-{date_to}.xlsx"'
+            response['X-Report-Audit-Id'] = str(audit.id)
+            response['Cache-Control'] = 'private, no-store'
+            response['X-Content-Type-Options'] = 'nosniff'
+            return response
+
+        pdf_buffer = _build_pdf_report(rows, summary, store.name, period_label, request.user.email, generated_at, str(audit.id))
+        response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="relatorio-vendas-{date_from}-{date_to}.pdf"'
+        response['X-Report-Audit-Id'] = str(audit.id)
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+    @staticmethod
+    def _parse_date(value, field):
+        if not value:
+            return None
+        parsed = parse_date(value)
+        if parsed is None:
+            raise ValidationError({
+                field: 'Use uma data válida no formato AAAA-MM-DD.',
+            })
+        return parsed

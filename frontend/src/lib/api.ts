@@ -600,6 +600,12 @@ export const storesAPI = {
 
   myEarnings: (params?: Record<string, any>) =>
     api.get<{ transactions: WalletTransaction[] }>('/stores/me/earnings/', { params }),
+
+  exportEarningsReport: (params: { date_from: string; date_to: string; format?: 'csv' | 'excel' | 'pdf' }) =>
+    api.get<Blob>('/stores/me/earnings/report/', {
+      params,
+      responseType: 'blob',
+    }),
 };
 
 export interface DashboardOrder {
