@@ -159,18 +159,83 @@ def reverse_escrow(order):
     return False
 
 
-def process_refund(order, seller, buyer, refund_amount, description):
+@transaction.atomic
+def process_refund(order, seller, buyer, refund_amount, description, *, refund_id):
     """
     Reembolso: reverte o escrow se ainda retido; senão debita o vendedor;
     e credita o comprador. Deve ser chamado dentro de transaction.atomic().
     """
-    if not reverse_escrow(order) and seller:
-        debit(get_wallet(seller), refund_amount, kind='payout',
-              ref_type='order', ref_id=order.id, description=description, txn_type='refund',
-              idempotency_key=f'order:{order.id}:refund:debit')
-    credit(get_wallet(buyer), refund_amount, kind='buyer',
-           ref_type='order', ref_id=order.id, description=description, txn_type='refund',
-           idempotency_key=f'order:{order.id}:refund:credit')
+    from django.db.models import Sum
+    from apps.orders.models import Order
+
+    order = Order.objects.select_for_update().get(pk=order.pk)
+    refund_amount = Decimal(str(refund_amount))
+    if order.payment_status != 'completed':
+        raise ValueError('Só é possível reembolsar encomendas pagas.')
+    if refund_amount <= 0:
+        raise ValueError('O valor do reembolso deve ser positivo.')
+
+    credit_key = f'order:{order.id}:refund:{refund_id}:credit'
+    if WalletTransaction.objects.filter(idempotency_key=credit_key).exists():
+        return WalletTransaction.objects.get(idempotency_key=credit_key)
+
+    refunded_before = WalletTransaction.objects.filter(
+        type='refund',
+        reference_type='order',
+        reference_id=order.id,
+        amount__gt=0,
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    remaining = max(order.total - refunded_before, Decimal('0.00'))
+    if refund_amount > remaining:
+        raise ValueError(
+            f'O reembolso excede o valor ainda reembolsável ({remaining} MZN).'
+        )
+
+    seller_net = max(
+        order.total - (order.platform_fee or 0) - (order.affiliate_commission or 0),
+        Decimal('0.00'),
+    )
+    seller_share = (
+        (seller_net * refund_amount / order.total).quantize(Decimal('0.01'))
+        if order.total else Decimal('0.00')
+    )
+    escrow = EscrowHolding.objects.select_for_update().filter(order=order).first()
+    if escrow and escrow.status == 'held':
+        escrow_reversal = min(seller_share, escrow.amount)
+        escrow.amount -= escrow_reversal
+        if escrow.amount == 0:
+            escrow.status = 'reversed'
+            escrow.save(update_fields=['amount', 'status'])
+        else:
+            escrow.save(update_fields=['amount'])
+    elif seller and seller_share > 0:
+        debit(
+            get_wallet(seller), seller_share, kind='payout',
+            ref_type='order', ref_id=order.id, description=description, txn_type='refund',
+            idempotency_key=f'order:{order.id}:refund:{refund_id}:debit',
+        )
+
+    refund_txn = credit(
+        get_wallet(buyer), refund_amount, kind='buyer',
+        ref_type='order', ref_id=order.id, description=description, txn_type='refund',
+        idempotency_key=credit_key,
+    )
+    if refunded_before + refund_amount >= order.total:
+        order.status = 'refunded'
+        order.save(update_fields=['status', 'updated_at'])
+    return refund_txn
+
+
+def get_refundable_amount(order):
+    from django.db.models import Sum
+
+    refunded = WalletTransaction.objects.filter(
+        type='refund',
+        reference_type='order',
+        reference_id=order.id,
+        amount__gt=0,
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    return max(order.total - refunded, Decimal('0.00'))
 
 
 # ─── Payouts manuais (W3/W4) ───
@@ -183,11 +248,11 @@ def get_available_balance(wallet):
 def request_payout(user, *, role, amount, method, account_details):
     """Cria um pedido de saque e reserva o valor no saldo de saque."""
     from .models import PayoutRequest
-    wallet = get_wallet(user)
     amount = Decimal(str(amount))
     if amount <= 0:
         raise ValueError('Valor de saque inválido.')
 
+    wallet = Wallet.objects.select_for_update().get(pk=get_wallet(user).pk)
     available = get_available_balance(wallet)
     if amount > available:
         raise InsufficientFunds(
@@ -198,7 +263,6 @@ def request_payout(user, *, role, amount, method, account_details):
         user=user, role=role, amount=amount, method=method,
         account_details=account_details or {},
     )
-    wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
     wallet.reserved_balance += amount
     wallet.save(update_fields=['reserved_balance'])
 
@@ -214,6 +278,8 @@ def request_payout(user, *, role, amount, method, account_details):
 
 @transaction.atomic
 def approve_payout(payout, admin):
+    from .models import PayoutRequest
+    payout = PayoutRequest.objects.select_for_update().get(pk=payout.pk)
     if payout.status != 'pending':
         return payout
     payout.status = 'approved'
@@ -230,6 +296,8 @@ def pay_payout(payout, admin, reference=''):
     Exige aprovação prévia (status == 'approved'): o pagamento manual não pode
     saltar o passo de aprovação.
     """
+    from .models import PayoutRequest
+    payout = PayoutRequest.objects.select_for_update().get(pk=payout.pk)
     if payout.status != 'approved':
         raise ValueError('O saque deve ser aprovado antes de ser marcado como pago.')
 
@@ -275,6 +343,8 @@ def pay_payout(payout, admin, reference=''):
 
 @transaction.atomic
 def reject_payout(payout, admin, reason=''):
+    from .models import PayoutRequest
+    payout = PayoutRequest.objects.select_for_update().get(pk=payout.pk)
     if payout.status not in ('pending', 'approved'):
         return payout
 

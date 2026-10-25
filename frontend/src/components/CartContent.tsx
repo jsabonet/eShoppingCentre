@@ -121,6 +121,11 @@ export default function CartContent() {
                       </Link>
                       <p className="text-lg font-bold mt-2">MZN {formatPrice(item.product.price)}</p>
                       <p className="text-xs text-muted-foreground">{(item.product as any).storeName || ''}</p>
+                      {!isInfo && (item.product.minOrderQuantity || 1) > 1 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Compra mínima: {item.product.minOrderQuantity} unidades
+                        </p>
+                      )}
                       <div className="flex items-center gap-3 mt-3">
                         {isInfo ? (
                           <span className="flex items-center gap-1.5 text-sm text-muted-foreground">

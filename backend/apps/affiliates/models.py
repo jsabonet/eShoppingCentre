@@ -51,12 +51,19 @@ class AffiliateCommission(BaseModel):
     ]
 
     affiliate = models.ForeignKey(AffiliateProfile, on_delete=models.CASCADE, related_name='commissions')
+    affiliate_link = models.ForeignKey(
+        AffiliateLink, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='commissions',
+    )
     order = models.ForeignKey('orders.Order', on_delete=models.CASCADE)
     product = models.ForeignKey('products.Product', on_delete=models.SET_NULL, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    reversed_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    unrecovered_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     rejection_reason = models.CharField(max_length=255, blank=True)
+    conversion_recorded = models.BooleanField(default=False)
 
     def __str__(self):
         return f'{self.affiliate.user.email} - {self.amount} MZN'

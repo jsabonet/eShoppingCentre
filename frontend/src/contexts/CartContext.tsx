@@ -39,8 +39,15 @@ const STORAGE_KEY = 'eshoppingcentre-cart-v1';
 // estimativa de frete — a secção de envio desaparece em silêncio.
 const normalizeItem = (item: CartItem): CartItem => ({
   ...item,
-  product: { ...item.product, productType: item.product.productType || 'physical' },
+  product: {
+    ...item.product,
+    productType: item.product.productType || 'physical',
+    minOrderQuantity: Math.max(1, Number(item.product.minOrderQuantity) || 1),
+  },
 });
+
+const getMinimumQuantity = (product: CartProduct) =>
+  isInfoProduct(product.productType) ? 1 : Math.max(1, Number(product.minOrderQuantity) || 1);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -96,7 +103,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addToCart = useCallback((product: CartProduct, quantity = 1) => {
     // Infoprodutos (digital/course) são sempre vendidos em unidade única.
-    const effectiveQuantity = isInfoProduct(product.productType) ? 1 : quantity;
+    const effectiveQuantity = Math.max(getMinimumQuantity(product), quantity);
     const normalized = normalizeItem({ product, quantity: effectiveQuantity });
     setItems((prev) => {
       const existing = prev.find((i) => i.product.id === normalized.product.id);
@@ -123,7 +130,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           if (i.product.id !== productId) return i;
           // Infoprodutos têm quantidade fixa em 1 — ignoramos qualquer alteração.
           if (isInfoProduct(i.product.productType)) return i;
-          return quantity <= 0 ? null : { ...i, quantity };
+          return quantity <= 0
+            ? null
+            : { ...i, quantity: Math.max(getMinimumQuantity(i.product), quantity) };
         })
         .filter((i): i is CartItem => i !== null)
     );

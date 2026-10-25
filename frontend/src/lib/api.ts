@@ -92,6 +92,7 @@ export interface Product {
   sales_count: number;
   is_on_sale: boolean;
   stock: number;
+  min_order_quantity: number;
   affiliate_commission: number;
   affiliate_enabled: boolean;
   affiliate_cookie_days: number | null;

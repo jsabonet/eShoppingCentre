@@ -119,6 +119,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     storeId: product.store?.id || '',
     storeOwnerId: product.store?.owner_id || '',
     productType: product.product_type || 'physical',
+    minOrderQuantity: Number(product.min_order_quantity) || 1,
     isPurchased: product.is_purchased === true,
     digitalFormat: product.digital_format || '',
     digitalVersion: product.digital_version || '',

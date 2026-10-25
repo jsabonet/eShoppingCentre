@@ -57,7 +57,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'slug', 'price', 'compare_price',
                   'discount_percentage', 'primary_image', 'product_type',
                   'rating', 'review_count', 'sales_count', 'is_on_sale',
-                  'stock', 'store_name', 'store_slug', 'store_owner_id', 'created_at',
+                  'stock', 'min_order_quantity', 'store_name', 'store_slug', 'store_owner_id', 'created_at',
                   'affiliate_enabled', 'affiliate_commission', 'affiliate_cookie_days')
 
     def get_primary_image(self, obj):

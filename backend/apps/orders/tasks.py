@@ -1,6 +1,7 @@
 from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
+import logging
 
 # Dias sem confirmação do comprador até a entrega ser confirmada automaticamente
 AUTO_DELIVERY_DAYS = 7
@@ -10,6 +11,7 @@ ABANDONED_CART_HOURS = 24
 
 # Dias após entrega até o escrow ser libertado ao vendedor
 ESCROW_RELEASE_DAYS = 7
+logger = logging.getLogger(__name__)
 
 
 @shared_task
@@ -31,7 +33,8 @@ def auto_refund_unprocessed_returns():
 
     count = 0
     for return_req in pending:
-        refund_amount = return_req.refund_amount or return_req.order.total
+        from apps.wallet.services import get_refundable_amount
+        refund_amount = return_req.refund_amount or get_refundable_amount(return_req.order)
         seller = return_req.store.owner if return_req.store else None
 
         try:
@@ -39,6 +42,11 @@ def auto_refund_unprocessed_returns():
                 process_refund(
                     return_req.order, seller, return_req.buyer, refund_amount,
                     f'Reembolso automático da devolução #{return_req.rma_number}',
+                    refund_id=return_req.id,
+                )
+                from apps.affiliates.services import reverse_commissions_for_refund
+                reverse_commissions_for_refund(
+                    return_req.order, refund_amount, refund_id=return_req.id,
                 )
                 return_req.status = 'refunded'
                 return_req.admin_notes = f'Reembolsado automaticamente pelo sistema em {timezone.now().date()}'
@@ -49,11 +57,13 @@ def auto_refund_unprocessed_returns():
             return_req.status = 'disputed'
             return_req.save()
             continue
+        except ValueError as exc:
+            return_req.admin_notes = f'Reembolso automático requer revisão: {exc}'
+            return_req.status = 'disputed'
+            return_req.save()
+            continue
 
         # Reverter comissão de afiliado (se existir)
-        from apps.affiliates.services import reject_commissions_for_order
-        reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada automaticamente')
-
         Notification.objects.create(
             user=return_req.buyer,
             title='Reembolso processado',
@@ -183,6 +193,9 @@ def auto_release_unpaid_orders():
     from apps.orders.services import cancel_order
     from apps.notifications.models import Notification
     from apps.notifications import email_service
+    from apps.payments.models import PaymentTransaction
+    from apps.payments.services.vpay import VPayClient
+    from apps.payments.views import _amount_matches, _confirm_payment, _mark_attempt_failed
 
     now = timezone.now()
     expired = Order.objects.filter(
@@ -193,6 +206,65 @@ def auto_release_unpaid_orders():
 
     count = 0
     for order in expired:
+        order.refresh_from_db()
+        if order.payment_status != 'pending' or order.status != 'pending':
+            continue
+
+        active_attempt = order.payment_attempts.filter(
+            status__in=['pending', 'processing'],
+        ).order_by('-created_at').first()
+        gateway_order_id = order.payment_id
+        if active_attempt and not active_attempt.gateway_order_id:
+            logger.warning(
+                'Expired order %s has a VPay creation outcome requiring manual reconciliation (%s).',
+                order.order_number,
+                active_attempt.source_id,
+            )
+            continue
+        if gateway_order_id:
+            attempt = active_attempt or PaymentTransaction.objects.filter(
+                provider='vpay',
+                gateway_order_id=gateway_order_id,
+            ).first()
+            if attempt and attempt.status in ('completed', 'refund_pending', 'refunded'):
+                continue
+            result = VPayClient().get_order_status(gateway_order_id)
+            if not result['ok']:
+                logger.warning(
+                    'Could not reconcile expired VPay order %s; retaining stock reservation.',
+                    gateway_order_id,
+                )
+                continue
+            data = result['data']
+            if data.get('orderId') != gateway_order_id:
+                logger.error('VPay returned a mismatched order id for %s.', gateway_order_id)
+                continue
+            if data.get('status') == 'paid':
+                orders = list(attempt.orders.all()) if attempt else [order]
+                total = sum((item.total for item in orders), Decimal('0.00'))
+                if (
+                    data.get('currency') != 'MZN'
+                    or not _amount_matches(data.get('amount'), total)
+                ):
+                    logger.error('VPay amount/currency mismatch for expired order %s.', gateway_order_id)
+                    continue
+                _confirm_payment(
+                    gateway_order_id,
+                    data,
+                    delivery_id='reservation-expiry-reconciliation',
+                )
+                continue
+            if data.get('status') in ('failed', 'cancelled'):
+                _mark_attempt_failed(gateway_order_id, data['status'])
+                count += 1
+                continue
+            logger.info(
+                'VPay order %s is still %s; retaining the stock reservation.',
+                gateway_order_id,
+                data.get('status', 'unknown'),
+            )
+            continue
+
         buyer = order.buyer
 
         items = [
@@ -203,9 +275,17 @@ def auto_release_unpaid_orders():
         ]
 
         with transaction.atomic():
-            previous_status = order.status
+            locked_order = Order.objects.select_for_update().get(pk=order.pk)
+            if (
+                locked_order.payment_status != 'pending'
+                or locked_order.status != 'pending'
+                or not locked_order.reserved_until
+                or locked_order.reserved_until > timezone.now()
+            ):
+                continue
+            previous_status = locked_order.status
             cancelled = cancel_order(
-                order,
+                locked_order,
                 changed_by=None,
                 notes='Reserva de stock expirada (pagamento não confirmado)',
                 stock_change_type='reserve_release',
@@ -213,7 +293,7 @@ def auto_release_unpaid_orders():
             if not cancelled:
                 continue
             OrderStatusHistory.objects.create(
-                order=order,
+                order=locked_order,
                 previous_status=previous_status,
                 new_status='cancelled',
                 changed_by=None,

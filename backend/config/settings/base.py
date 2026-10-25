@@ -249,6 +249,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.orders.tasks.auto_release_unpaid_orders',
         'schedule': 300.0,  # a cada 5 minutos
     },
+    'reconcile-vpay-pending-payments': {
+        'task': 'apps.payments.tasks.reconcile_vpay_pending_payments',
+        'schedule': 300.0,  # a cada 5 minutos
+    },
     'delete-stale-unverified-users': {
         'task': 'apps.users.tasks.delete_stale_unverified_users',
         'schedule': crontab(hour=2, minute=30),  # diariamente às 02:30

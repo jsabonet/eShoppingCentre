@@ -81,14 +81,26 @@ export default function AdminWallet() {
       </div>
 
       {recon && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-6">
           {[
-            { label: 'Cobrado (admin)', value: recon.collected_total, color: 'text-green-700' },
-            { label: 'Taxas da plataforma', value: recon.platform_fees, color: 'text-purple-700' },
-            { label: 'Comissões afiliados', value: recon.affiliate_commissions, color: 'text-amber-700' },
-            { label: 'Pago em saques', value: recon.payouts_paid, color: 'text-red-700' },
+            { label: 'Pagamentos confirmados', value: recon.collected_total, color: 'text-green-700' },
+            { label: 'Recebido por gateway', value: recon.gateway_collected_total, color: 'text-green-700' },
+            { label: 'Pago com saldo da carteira', value: recon.wallet_funded_total, color: 'text-blue-700' },
+            { label: 'Pagamentos de teste (simulados)', value: recon.simulated_test_total, color: 'text-muted-foreground' },
+            { label: `Pagamentos gateway em aberto (${recon.gateway_open_count || 0})`, value: recon.gateway_open_total, color: 'text-orange-700' },
+            { label: `Pagamentos recebidos a reembolsar (${recon.gateway_refunds_pending_count || 0})`, value: recon.gateway_refunds_pending_total, color: 'text-red-700' },
+            { label: `Tentativas falhadas (${recon.gateway_failed_count || 0})`, value: recon.gateway_failed_total, color: 'text-muted-foreground' },
+            { label: 'Reembolsos na carteira', value: recon.refunds_total, color: 'text-red-700' },
+            { label: 'Cobrado após reembolsos', value: recon.net_collected, color: 'text-green-700' },
+            { label: 'Taxas em encomendas pagas', value: recon.platform_fees, color: 'text-purple-700' },
+            { label: 'Comissões aprovadas/pagas', value: recon.affiliate_commissions, color: 'text-amber-700' },
+            { label: 'Comissões pendentes', value: recon.affiliate_commissions_pending, color: 'text-amber-700' },
+            { label: 'Comissões ainda não creditadas', value: recon.affiliate_commissions_uncredited, color: 'text-orange-700' },
+            { label: 'Saques pagos', value: recon.payouts_paid, color: 'text-red-700' },
+            { label: 'Saques pendentes', value: recon.payouts_pending, color: 'text-orange-700' },
             { label: 'Escrow retido', value: recon.escrow_held, color: 'text-blue-700' },
-            { label: 'A pagar (passivo)', value: recon.liabilities, color: 'text-accent' },
+            { label: 'Saldo comprador', value: recon.wallets_buyer_balance, color: 'text-blue-700' },
+            { label: 'Passivo total estimado', value: recon.liabilities, color: 'text-accent' },
           ].map((k) => (
             <div key={k.label} className="bg-white border border-border rounded-lg p-3">
               <p className="text-[11px] text-muted-foreground">{k.label}</p>

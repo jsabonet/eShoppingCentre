@@ -96,9 +96,8 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             self.fields['product_type'].read_only = True
 
     def get_total_revenue(self, obj):
-        from django.db.models import Sum
-        result = obj.orders.filter(payment_status='completed').aggregate(total=Sum('total'))
-        return float(result['total'] or 0)
+        from .financials import paid_order_revenue
+        return float(paid_order_revenue(obj.orders.filter(payment_status='completed')))
 
     def get_total_orders(self, obj):
         return obj.orders.count()
@@ -169,9 +168,9 @@ class StoreDetailSerializer(serializers.ModelSerializer):
 
     def get_monthly_sales(self, obj):
         """Vendas mensais dos últimos 6 meses para gráfico."""
-        from django.db.models import Sum
         from django.utils import timezone
         from datetime import timedelta
+        from .financials import paid_order_revenue
 
         today = timezone.now().date()
         result = []
@@ -188,22 +187,19 @@ class StoreDetailSerializer(serializers.ModelSerializer):
                 else:
                     month_end = month_start.replace(month=month_start.month + 1, day=1) - timedelta(days=1)
 
-            total = obj.orders.filter(
+            monthly_orders = obj.orders.filter(
                 payment_status='completed',
                 created_at__date__gte=month_start,
                 created_at__date__lte=month_end,
-            ).aggregate(total=Sum('total'))['total'] or 0
+            )
+            total = paid_order_revenue(monthly_orders)
 
             months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
             result.append({
                 'month': months[month_start.month - 1],
                 'year': month_start.year,
                 'total': float(total),
-                'orders': obj.orders.filter(
-                    payment_status='completed',
-                    created_at__date__gte=month_start,
-                    created_at__date__lte=month_end,
-                ).count(),
+                'orders': monthly_orders.count(),
             })
         return result
 

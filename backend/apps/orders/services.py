@@ -30,10 +30,12 @@ def set_reservation(order, minutes=None):
 def restore_order_stock(order, *, changed_by=None, change_type='reserve_release',
                         notes='Stock libertado por reserva expirada'):
     """Repõe o stock dos itens físicos de uma encomenda (uma única vez por cancelamento)."""
-    from apps.products.models import StockLog
+    from apps.products.models import Product, StockLog
 
     for item in order.items.all():
-        product = item.product
+        if not item.product_id:
+            continue
+        product = Product.objects.select_for_update().filter(pk=item.product_id).first()
         if not product or product.product_type != 'physical':
             continue
         old_stock = product.stock
@@ -63,8 +65,9 @@ def cancel_order(order, *, changed_by=None, notes='Encomenda cancelada',
 
     Idempotente: devolve False se a encomenda já não puder ser cancelada.
     """
-    from apps.affiliates.services import reject_commissions_for_order
-    from apps.wallet.services import reverse_escrow, get_wallet, credit
+    from apps.orders.models import Order
+
+    order = Order.objects.select_for_update().get(pk=order.pk)
 
     if order.status not in ('pending', 'confirmed'):
         return False
@@ -75,23 +78,47 @@ def cancel_order(order, *, changed_by=None, notes='Encomenda cancelada',
 
     restore_order_stock(order, changed_by=changed_by, change_type=stock_change_type, notes=notes)
 
-    # W2 Escrow: reverter retenção do vendedor (se ainda retida)
-    reverse_escrow(order)
-
-    # W1 Carteira: reembolsar o comprador (apenas encomendas já pagas)
+    # Reconcile the seller share, escrow and affiliate commission on paid cancellations.
     if order.payment_status == 'completed' and order.total > 0:
-        credit(
-            get_wallet(order.buyer), order.total, kind='buyer',
-            ref_type='order', ref_id=order.id,
-            description=f'Reembolso por cancelamento {order.order_number}',
-            txn_type='refund',
-            idempotency_key=f'order:{order.id}:cancel_refund',
-        )
-
-    # Reverter comissão de afiliado
-    reject_commissions_for_order(order, notes)
+        from apps.affiliates.services import reverse_commissions_for_refund
+        from apps.wallet.services import get_refundable_amount, process_refund
+        seller = order.store.owner if order.store else None
+        refund_id = f'cancel-{order.id}'
+        refund_amount = get_refundable_amount(order)
+        if refund_amount > 0:
+            process_refund(
+                order,
+                seller,
+                order.buyer,
+                refund_amount,
+                f'Reembolso por cancelamento {order.order_number}',
+                refund_id=refund_id,
+            )
+            reverse_commissions_for_refund(
+                order,
+                refund_amount,
+                refund_id=refund_id,
+            )
+        revoke_order_delivery(order)
+        order.status = 'cancelled'
+        order.save(update_fields=['status', 'updated_at'])
+    else:
+        from apps.wallet.services import reverse_escrow
+        from apps.affiliates.services import reject_commissions_for_order
+        reverse_escrow(order)
+        reject_commissions_for_order(order, notes)
 
     return True
+
+
+def revoke_order_delivery(order):
+    """Expire digital access granted by an order after its full refund."""
+    now = timezone.now()
+    from apps.products.models_digital import DigitalDownload
+    from apps.courses.models import Enrollment
+
+    DigitalDownload.objects.filter(order=order).update(expires_at=now)
+    Enrollment.objects.filter(order=order).update(access_expires_at=now)
 
 
 def process_delivery(order):

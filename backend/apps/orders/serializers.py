@@ -77,6 +77,16 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
         validated_data['buyer'] = self.context['request'].user
         return super().create(validated_data)
 
+    def validate_order(self, order):
+        user = self.context['request'].user
+        if order.buyer_id != user.id:
+            raise serializers.ValidationError('A encomenda não pertence à sua conta.')
+        if order.payment_status != 'completed':
+            raise serializers.ValidationError('Só é possível devolver encomendas pagas.')
+        if order.status in ('cancelled', 'refunded'):
+            raise serializers.ValidationError('Esta encomenda já foi cancelada ou reembolsada.')
+        return order
+
 
 class ReturnResolveSerializer(serializers.Serializer):
     """Usado pelo seller para aprovar/rejeitar uma devolução."""
@@ -174,22 +184,18 @@ class CreateOrderSerializer(serializers.Serializer):
 
     def validate_items(self, items):
         user = self.context['request'].user
+        products = {}
+        quantities = {}
         for item in items:
             try:
                 product = Product.objects.get(id=item['product_id'], status='active')
+                product_id = product.id
+                products[product_id] = product
+                quantities[product_id] = quantities.get(product_id, 0) + item['quantity']
                 # Impedir compra dos próprios produtos
                 if product.store.owner_id == user.id:
                     raise serializers.ValidationError(
                         f'Não pode comprar o seu próprio produto "{product.name}".'
-                    )
-                # Infoprodutos (digitais e cursos) são vendidos em unidade única.
-                if product.product_type in ('digital', 'course') and item['quantity'] > 1:
-                    raise serializers.ValidationError(
-                        f'O produto "{product.name}" só pode ser adquirido em quantidade única.'
-                    )
-                if product.product_type == 'physical' and not product.allow_backorder and item['quantity'] > product.stock:
-                    raise serializers.ValidationError(
-                        f'Stock insuficiente para {product.name}. Disponível: {product.stock}'
                     )
                 # Impedir compra duplicada de cursos
                 if product.product_type == 'course' and hasattr(product, 'course'):
@@ -200,6 +206,24 @@ class CreateOrderSerializer(serializers.Serializer):
                         )
             except Product.DoesNotExist:
                 raise serializers.ValidationError(f'Produto {item["product_id"]} não encontrado.')
+
+        for product_id, quantity in quantities.items():
+            product = products[product_id]
+            if product.product_type in ('digital', 'course') and quantity > 1:
+                raise serializers.ValidationError(
+                    f'O produto "{product.name}" só pode ser adquirido em quantidade única.'
+                )
+            if product.product_type != 'physical':
+                continue
+            if quantity < product.min_order_quantity:
+                raise serializers.ValidationError(
+                    f'O produto "{product.name}" exige uma quantidade mínima de '
+                    f'{product.min_order_quantity} unidade(s) por encomenda.'
+                )
+            if not product.allow_backorder and quantity > product.stock:
+                raise serializers.ValidationError(
+                    f'Stock insuficiente para {product.name}. Disponível: {product.stock}'
+                )
         return items
 
     @transaction.atomic
@@ -237,12 +261,13 @@ class CreateOrderSerializer(serializers.Serializer):
             store_orders[store.id]['store_total'] += item_total
             subtotal += item_total
 
-        # Comissão de afiliado (total, repartida proporcionalmente depois)
+        # A comissão é calculada depois de aplicar os descontos e separar as lojas.
         affiliate = None
         affiliate_profile = None
         affiliate_link = None
         affiliate_commission = 0
-        effective_rate = None
+        store_commission_rates = {}
+        multiplier = Decimal('1')
         if affiliate_code:
             from apps.affiliates.models import AffiliateLink, AffiliateSettings
             from apps.affiliates.services import get_tier_multiplier
@@ -255,21 +280,6 @@ class CreateOrderSerializer(serializers.Serializer):
                 affiliate_profile = link.affiliate
                 affiliate_link = link
                 multiplier = get_tier_multiplier(link.affiliate)
-                effective_rate = link.product.affiliate_commission * multiplier
-                for store_data in store_orders.values():
-                    for item in store_data['items']:
-                        # Bloquear comissão sobre produtos da própria loja do afiliado
-                        if item['product'].store.owner_id == link.affiliate.user_id:
-                            continue
-                        # Só produtos com afiliação habilitada geram comissão
-                        if not getattr(item['product'], 'affiliate_enabled', True):
-                            continue
-                        affiliate_commission += (item['total_price'] * item['product'].affiliate_commission * multiplier) / 100
-                # Se nenhum item for elegível, não atribuir comissão
-                if affiliate_commission <= 0:
-                    affiliate = None
-                    affiliate_profile = None
-                    affiliate_link = None
 
         # Frete por loja
         store_shipping = {}  # store_id -> {'cost', 'method_name', 'is_pickup'}
@@ -374,6 +384,60 @@ class CreateOrderSerializer(serializers.Serializer):
                 discounts[sid] = (discount_total * e_total / eligible_total) if eligible_total else 0
             applied_coupon = coupon
 
+        store_commissions = {}
+        if affiliate_profile and affiliate_link:
+            for store_id, store_data in store_orders.items():
+                items = store_data['items']
+                coupon_eligible_total = sum(
+                    (
+                        item['total_price']
+                        for item in items
+                        if applied_coupon
+                        and (not applied_coupon.product or item['product'].id == applied_coupon.product_id)
+                        and (not applied_coupon.category or item['product'].category_id == applied_coupon.category_id)
+                    ),
+                    Decimal('0.00'),
+                )
+                store_commission = Decimal('0.00')
+                commission_basis_total = Decimal('0.00')
+                for item in items:
+                    product = item['product']
+                    if (
+                        product.store.owner_id == affiliate_profile.user_id
+                        or not product.affiliate_enabled
+                    ):
+                        continue
+                    item_discount = Decimal('0.00')
+                    coupon_matches_item = (
+                        applied_coupon
+                        and (not applied_coupon.store_id or applied_coupon.store_id == store_id)
+                        and (not applied_coupon.product_id or applied_coupon.product_id == product.id)
+                        and (not applied_coupon.category_id or applied_coupon.category_id == product.category_id)
+                    )
+                    if coupon_matches_item and coupon_eligible_total:
+                        item_discount = (
+                            discounts.get(store_id, Decimal('0.00'))
+                            * item['total_price'] / coupon_eligible_total
+                        )
+                    commission_basis = max(item['total_price'] - item_discount, Decimal('0.00'))
+                    commission_basis_total += commission_basis
+                    store_commission += (
+                        commission_basis * product.affiliate_commission * multiplier / 100
+                    )
+                store_commission = store_commission.quantize(Decimal('0.01'))
+                store_commissions[store_id] = store_commission
+                store_commission_rates[store_id] = (
+                    (store_commission * 100 / commission_basis_total).quantize(Decimal('0.01'))
+                    if commission_basis_total else Decimal('0.00')
+                )
+                affiliate_commission += store_commission
+
+            if affiliate_commission <= 0:
+                affiliate = None
+                affiliate_profile = None
+                affiliate_link = None
+                store_commissions = {}
+
         payment_method = validated_data['payment_method']
         is_instant = payment_method in ('test', 'wallet')
         payment_status = 'completed' if is_instant else 'pending'
@@ -394,7 +458,7 @@ class CreateOrderSerializer(serializers.Serializer):
             store_total = store_data['store_total']
             order_discount = discounts.get(store_id, 0)
             platform_fee = (store_total * 8) / 100
-            store_affiliate_commission = (affiliate_commission * store_total / subtotal) if subtotal else 0
+            store_affiliate_commission = store_commissions.get(store_id, Decimal('0.00'))
 
             order = Order.objects.create(
                 buyer=user,
@@ -406,7 +470,7 @@ class CreateOrderSerializer(serializers.Serializer):
                 total=store_total + ship['cost'] - order_discount,
                 platform_fee=platform_fee,
                 affiliate=affiliate,
-                affiliate_commission=round(store_affiliate_commission, 2),
+                affiliate_commission=store_affiliate_commission,
                 payment_method=validated_data['payment_method'],
                 payment_status=payment_status,
                 status=order_status,
@@ -491,26 +555,23 @@ class CreateOrderSerializer(serializers.Serializer):
                         discount_applied=order.discount,
                     )
 
-        # Registar comissão de afiliado + incrementar conversões
+        # Registar comissões; as conversões só são contadas depois de o pagamento estar concluído.
         if affiliate_profile and affiliate_link:
-            from django.db.models import F
-            from apps.affiliates.models import AffiliateCommission, AffiliateProfile
-            from apps.affiliates.services import update_tier
+            from apps.affiliates.models import AffiliateCommission
+            from apps.affiliates.services import record_order_conversions
             for order in orders:
                 if order.affiliate_commission > 0:
                     AffiliateCommission.objects.create(
                         affiliate=affiliate_profile,
+                        affiliate_link=affiliate_link,
                         order=order,
                         product=affiliate_link.product,
                         amount=order.affiliate_commission,
-                        commission_rate=round(effective_rate or affiliate_link.product.affiliate_commission, 2),
+                        commission_rate=store_commission_rates.get(order.store_id, Decimal('0.00')),
                         status='pending',
                     )
-            AffiliateLink.objects.filter(pk=affiliate_link.pk).update(conversions=F('conversions') + len(orders))
-            AffiliateProfile.objects.filter(pk=affiliate_profile.pk).update(total_sales=F('total_sales') + len(orders))
-            # Recalcular tier com base no novo volume de vendas
-            fresh_profile = AffiliateProfile.objects.get(pk=affiliate_profile.pk)
-            update_tier(fresh_profile)
+                    if order.payment_status == 'completed':
+                        record_order_conversions(order)
 
         # ─── W2 Escrow: liquidar pagamento (crédito imediato ou retenção) ───
         from apps.wallet.services import settle_payment

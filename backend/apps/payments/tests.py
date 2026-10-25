@@ -154,10 +154,10 @@ def test_initiate_creates_vpay_order(digital_order, buyer):
     digital_order.refresh_from_db()
     assert digital_order.payment_id == 'vpay_order_123'
     transaction_record = PaymentTransaction.objects.get(
-        idempotency_key='vpay:vpay_order_123'
+        gateway_order_id='vpay_order_123'
     )
     assert transaction_record.provider == 'vpay'
-    assert transaction_record.provider_transaction_id == 'vpay_order_123'
+    assert transaction_record.provider_transaction_id == ''
     assert transaction_record.status == 'pending'
 
 
@@ -189,6 +189,150 @@ def test_initiate_prefers_gateway_checkout_url(digital_order, buyer):
 
     assert response.status_code == 200
     assert response.data['checkout_url'] == 'https://checkout.vpay.co.mz/vpay_order_456'
+
+
+@pytest.mark.django_db
+@override_settings(
+    VPAY_CLIENT_ID='client-test',
+    VPAY_CLIENT_SECRET='secret-test',
+    VPAY_WEBHOOK_SECRET=WEBHOOK_SECRET,
+)
+def test_repeated_initiation_reuses_active_attempt(digital_order, buyer):
+    attempt = PaymentTransaction.objects.create(
+        order=digital_order,
+        provider='vpay',
+        gateway_order_id='vpay_order_existing',
+        source_id='source-existing',
+        amount=digital_order.total,
+        currency='MZN',
+        status='pending',
+        provider_response={'checkout': 'https://checkout.vpay.co.mz/existing'},
+    )
+    attempt.orders.add(digital_order)
+    digital_order.payment_id = attempt.gateway_order_id
+    digital_order.save(update_fields=['payment_id'])
+    client = APIClient()
+    client.force_authenticate(user=buyer)
+
+    with mock.patch.object(VPayClient, 'create_order') as create_order:
+        response = client.post(
+            reverse('payments_initiate'),
+            {'order_ids': [str(digital_order.id)]},
+            format='json',
+        )
+
+    assert response.status_code == 200
+    assert response.data['reference'] == attempt.gateway_order_id
+    create_order.assert_not_called()
+    assert PaymentTransaction.objects.filter(provider='vpay').count() == 1
+
+
+@pytest.mark.django_db
+@override_settings(
+    VPAY_CLIENT_ID='client-test',
+    VPAY_CLIENT_SECRET='secret-test',
+)
+def test_partial_retry_cannot_split_an_open_checkout(digital_order, buyer, store):
+    second_order = Order.objects.create(
+        buyer=buyer,
+        store=store,
+        subtotal=Decimal('100.00'),
+        total=Decimal('100.00'),
+        platform_fee=Decimal('0.00'),
+        affiliate_commission=Decimal('0.00'),
+        payment_method='vpay',
+        payment_status='pending',
+        shipping_address={},
+    )
+    attempt = PaymentTransaction.objects.create(
+        order=digital_order,
+        provider='vpay',
+        gateway_order_id='vpay_split_open',
+        amount=Decimal('200.00'),
+        currency='MZN',
+        status='pending',
+    )
+    attempt.orders.add(digital_order, second_order)
+    for order in (digital_order, second_order):
+        order.payment_id = attempt.gateway_order_id
+        order.save(update_fields=['payment_id'])
+    client = APIClient()
+    client.force_authenticate(user=buyer)
+
+    with mock.patch.object(VPayClient, 'create_order') as create_order:
+        response = client.post(
+            reverse('payments_initiate'),
+            {'order_ids': [str(digital_order.id)]},
+            format='json',
+        )
+
+    assert response.status_code == 409
+    assert response.data['reference'] == attempt.gateway_order_id
+    create_order.assert_not_called()
+    assert PaymentTransaction.objects.filter(provider='vpay').count() == 1
+    digital_order.refresh_from_db()
+    second_order.refresh_from_db()
+    assert digital_order.payment_id == second_order.payment_id == attempt.gateway_order_id
+
+
+@pytest.mark.django_db
+@override_settings(VPAY_CLIENT_ID='client-test', VPAY_CLIENT_SECRET='secret-test')
+def test_initiation_rejects_cancelled_order(digital_order, buyer):
+    digital_order.status = 'cancelled'
+    digital_order.save(update_fields=['status'])
+    client = APIClient()
+    client.force_authenticate(user=buyer)
+
+    with mock.patch.object(VPayClient, 'create_order') as create_order:
+        response = client.post(
+            reverse('payments_initiate'),
+            {'order_ids': [str(digital_order.id)]},
+            format='json',
+        )
+
+    assert response.status_code == 409
+    create_order.assert_not_called()
+    assert not PaymentTransaction.objects.filter(provider='vpay').exists()
+
+
+@pytest.mark.django_db
+@override_settings(
+    VPAY_CLIENT_ID='client-test',
+    VPAY_CLIENT_SECRET='secret-test',
+)
+def test_ambiguous_creation_is_not_retried_automatically(digital_order, buyer):
+    ambiguous_result = {
+        'ok': False,
+        'data': None,
+        'message': 'Gateway timeout',
+        'http_status': 504,
+        'outcome_unknown': True,
+    }
+    client = APIClient()
+    client.force_authenticate(user=buyer)
+
+    with mock.patch.object(
+            VPayClient, 'create_order', return_value=ambiguous_result) as create_order:
+        first = client.post(
+            reverse('payments_initiate'),
+            {'order_ids': [str(digital_order.id)]},
+            format='json',
+        )
+        second = client.post(
+            reverse('payments_initiate'),
+            {'order_ids': [str(digital_order.id)]},
+            format='json',
+        )
+
+    assert first.status_code == 409
+    assert second.status_code == 409
+    assert first.data['reference'] == second.data['reference']
+    create_order.assert_called_once()
+    assert PaymentTransaction.objects.filter(
+        provider='vpay',
+        status='processing',
+        source_id=first.data['reference'],
+    ).count() == 1
 
 
 def test_friendly_error_does_not_expose_gateway_details():
@@ -332,6 +476,7 @@ def test_status_polling_confirms_only_when_vpay_reports_paid(digital_order, buye
             'orderId': 'vpay_order_123',
             'status': 'paid',
             'amount': 100,
+            'currency': 'MZN',
             'transactionId': 'txn_from_poll',
         },
         'message': None,
@@ -349,6 +494,193 @@ def test_status_polling_confirms_only_when_vpay_reports_paid(digital_order, buye
     digital_order.refresh_from_db()
     assert digital_order.payment_status == 'completed'
     assert get_wallet(digital_order.store.owner).payout_balance == Decimal('100.00')
+
+
+@pytest.mark.django_db
+def test_server_reconciliation_confirms_open_payment(digital_order, store):
+    attempt = PaymentTransaction.objects.create(
+        order=digital_order,
+        provider='vpay',
+        gateway_order_id='vpay_server_reconciled',
+        amount=digital_order.total,
+        currency='MZN',
+        status='pending',
+    )
+    attempt.orders.add(digital_order)
+    digital_order.payment_id = attempt.gateway_order_id
+    digital_order.save(update_fields=['payment_id'])
+    paid_result = {
+        'ok': True,
+        'data': {
+            'orderId': attempt.gateway_order_id,
+            'status': 'paid',
+            'amount': '100.00',
+            'currency': 'MZN',
+            'transactionId': 'txn_server_reconciled',
+        },
+        'message': None,
+        'http_status': 200,
+    }
+
+    with mock.patch.object(
+            VPayClient, 'get_order_status', return_value=paid_result) as get_status:
+        from apps.payments.tasks import reconcile_vpay_pending_payments
+        result = reconcile_vpay_pending_payments()
+
+    assert '1 tentativa' in result
+    get_status.assert_called_once_with(attempt.gateway_order_id)
+    digital_order.refresh_from_db()
+    attempt.refresh_from_db()
+    assert digital_order.payment_status == 'completed'
+    assert attempt.status == 'completed'
+    assert get_wallet(store.owner).payout_balance == Decimal('100.00')
+
+
+@pytest.mark.django_db
+def test_terminal_gateway_failure_cancels_order(digital_order, buyer):
+    attempt = PaymentTransaction.objects.create(
+        order=digital_order,
+        provider='vpay',
+        gateway_order_id='vpay_order_failed',
+        amount=digital_order.total,
+        currency='MZN',
+        status='pending',
+    )
+    attempt.orders.add(digital_order)
+    digital_order.payment_id = attempt.gateway_order_id
+    digital_order.save(update_fields=['payment_id'])
+    client = APIClient()
+    client.force_authenticate(user=buyer)
+    result = {
+        'ok': True,
+        'data': {'orderId': attempt.gateway_order_id, 'status': 'failed'},
+        'message': None,
+        'http_status': 200,
+    }
+
+    with mock.patch.object(VPayClient, 'get_order_status', return_value=result):
+        response = client.get(
+            reverse('payments_status'),
+            {'reference': attempt.gateway_order_id},
+        )
+
+    assert response.status_code == 200
+    assert response.data['status'] == 'failed'
+    digital_order.refresh_from_db()
+    attempt.refresh_from_db()
+    assert digital_order.status == 'cancelled'
+    assert digital_order.payment_status == 'failed'
+    assert attempt.status == 'failed'
+
+
+@pytest.mark.django_db
+def test_late_payment_for_cancelled_order_is_flagged_for_refund(digital_order):
+    attempt = PaymentTransaction.objects.create(
+        order=digital_order,
+        provider='vpay',
+        gateway_order_id='vpay_order_late',
+        amount=digital_order.total,
+        currency='MZN',
+        status='pending',
+    )
+    attempt.orders.add(digital_order)
+    digital_order.payment_id = attempt.gateway_order_id
+    digital_order.status = 'cancelled'
+    digital_order.save(update_fields=['payment_id', 'status'])
+
+    from apps.payments.views import _confirm_payment
+    _confirm_payment(attempt.gateway_order_id, _confirmed_event(attempt.gateway_order_id))
+
+    digital_order.refresh_from_db()
+    attempt.refresh_from_db()
+    assert digital_order.payment_status == 'completed'
+    assert digital_order.status == 'cancelled'
+    assert attempt.status == 'refund_pending'
+    assert get_wallet(digital_order.store.owner).payout_balance == Decimal('0.00')
+
+
+@pytest.mark.django_db
+def test_split_checkout_attempt_confirms_every_linked_order(digital_order, buyer, store):
+    second_order = Order.objects.create(
+        buyer=buyer,
+        store=store,
+        subtotal=Decimal('100.00'),
+        total=Decimal('100.00'),
+        platform_fee=Decimal('0.00'),
+        affiliate_commission=Decimal('0.00'),
+        payment_method='vpay',
+        payment_status='pending',
+        shipping_address={},
+    )
+    attempt = PaymentTransaction.objects.create(
+        order=digital_order,
+        provider='vpay',
+        gateway_order_id='vpay_split_checkout',
+        amount=Decimal('200.00'),
+        currency='MZN',
+        status='pending',
+    )
+    attempt.orders.add(digital_order, second_order)
+    for order in (digital_order, second_order):
+        order.payment_id = attempt.gateway_order_id
+        order.save(update_fields=['payment_id'])
+
+    from apps.payments.views import _confirm_payment
+    orders, created = _confirm_payment(
+        attempt.gateway_order_id,
+        _confirmed_event(attempt.gateway_order_id, amount='200.00'),
+    )
+
+    assert created is True
+    assert len(orders) == 2
+    assert all(order.payment_status == 'completed' for order in orders)
+    assert get_wallet(store.owner).payout_balance == Decimal('200.00')
+
+
+@pytest.mark.django_db
+def test_polling_terminal_response_does_not_overwrite_webhook_success(digital_order, buyer):
+    attempt = PaymentTransaction.objects.create(
+        order=digital_order,
+        provider='vpay',
+        gateway_order_id='vpay_order_race',
+        amount=digital_order.total,
+        currency='MZN',
+        status='pending',
+    )
+    attempt.orders.add(digital_order)
+    digital_order.payment_id = attempt.gateway_order_id
+    digital_order.save(update_fields=['payment_id'])
+    client = APIClient()
+    client.force_authenticate(user=buyer)
+    failure = {
+        'ok': True,
+        'data': {'orderId': attempt.gateway_order_id, 'status': 'failed'},
+        'message': None,
+        'http_status': 200,
+    }
+
+    def confirm_then_report_failed(_):
+        from apps.payments.views import _confirm_payment
+        _confirm_payment(
+            attempt.gateway_order_id,
+            _confirmed_event(attempt.gateway_order_id),
+        )
+        return failure
+
+    with mock.patch.object(
+            VPayClient, 'get_order_status', side_effect=confirm_then_report_failed):
+        response = client.get(
+            reverse('payments_status'),
+            {'reference': attempt.gateway_order_id},
+        )
+
+    assert response.status_code == 200
+    assert response.data['status'] == 'completed'
+    digital_order.refresh_from_db()
+    attempt.refresh_from_db()
+    assert digital_order.payment_status == 'completed'
+    assert digital_order.status == 'confirmed'
+    assert attempt.status == 'completed'
 
 
 @pytest.mark.django_db

@@ -216,6 +216,8 @@ class CancelOrderView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
+        from apps.wallet.services import InsufficientFunds
+
         try:
             order = Order.objects.get(id=pk, buyer=request.user)
             cancelled = cancel_order(
@@ -231,6 +233,11 @@ class CancelOrderView(APIView):
         except Order.DoesNotExist:
             return Response({'detail': 'Encomenda não encontrada.'},
                           status=status.HTTP_404_NOT_FOUND)
+        except InsufficientFunds:
+            return Response(
+                {'detail': 'O reembolso requer revisão manual; a encomenda não foi cancelada.'},
+                status=status.HTTP_409_CONFLICT,
+            )
 
 
 # ─── Return / Devolutions ───
@@ -474,24 +481,28 @@ class RefundReturnView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        refund_amount = return_req.refund_amount or return_req.order.total
+        from apps.wallet.services import get_refundable_amount
+        refund_amount = return_req.refund_amount or get_refundable_amount(return_req.order)
 
         # W2 Carteira: reembolso (reverte escrow se retido; senão debita vendedor; credita comprador)
         from apps.wallet.services import process_refund, InsufficientFunds
+        from apps.affiliates.services import reverse_commissions_for_refund
         try:
             with transaction.atomic():
                 process_refund(
                     return_req.order, request.user, return_req.buyer, refund_amount,
                     f'Reembolso da devolução #{return_req.rma_number}',
+                    refund_id=return_req.id,
+                )
+                reverse_commissions_for_refund(
+                    return_req.order, refund_amount, refund_id=return_req.id,
                 )
                 return_req.status = 'refunded'
                 return_req.save()
         except InsufficientFunds as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Reverter comissão de afiliado (se existir)
-        from apps.affiliates.services import reject_commissions_for_order
-        reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada')
+        except ValueError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         # Revogar acesso a downloads digitais e matrículas em cursos após reembolso
         from apps.products.models_digital import DigitalDownload
@@ -611,26 +622,34 @@ class AdminOverrideView(APIView):
             return_req.refund_amount = refund_amount
 
             # W2 Carteira: reembolso (reverte escrow se retido; senão debita vendedor; credita comprador)
-            from apps.wallet.services import process_refund, InsufficientFunds
+            from apps.wallet.services import process_refund, get_refundable_amount, InsufficientFunds
+            from apps.affiliates.services import reverse_commissions_for_refund
             seller = return_req.order.store.owner if return_req.order.store else None
+            refund_amount = (
+                serializer.validated_data.get('refund_amount')
+                or get_refundable_amount(return_req.order)
+            )
+            return_req.refund_amount = refund_amount
             try:
                 with transaction.atomic():
                     process_refund(
                         return_req.order, seller, return_req.order.buyer, refund_amount,
                         f'Reembolso da devolução #{return_req.rma_number} (decisão do admin)',
+                        refund_id=return_req.id,
+                    )
+                    reverse_commissions_for_refund(
+                        return_req.order, refund_amount, refund_id=return_req.id,
                     )
                     return_req.status = 'refunded'
                     return_req.save()
             except InsufficientFunds as e:
                 return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError as e:
+                return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return_req.save()
 
-        # Reverter comissão de afiliado em caso de reembolso
         if action == 'refund':
-            from apps.affiliates.services import reject_commissions_for_order
-            reject_commissions_for_order(return_req.order, f'Devolução #{return_req.rma_number} reembolsada pelo admin')
-
             # Revogar acesso a downloads digitais e matrículas em cursos após reembolso
             from apps.products.models_digital import DigitalDownload
             from apps.courses.models import Enrollment

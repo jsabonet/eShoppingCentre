@@ -72,6 +72,8 @@ def complete_payment(order_id, *, provider, provider_transaction_id='',
     # Liquida o dinheiro: crédito imediato (digital/curso) ou retenção em escrow (físico).
     from apps.wallet.services import settle_payment
     settle_payment(order)
+    from apps.affiliates.services import record_order_conversions
+    record_order_conversions(order)
 
     # Libertar conteúdo digital / matrículas apenas agora que o pagamento entrou.
     from apps.orders.services import process_delivery

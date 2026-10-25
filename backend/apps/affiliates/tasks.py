@@ -1,4 +1,5 @@
 from celery import shared_task
+from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
 
@@ -12,9 +13,9 @@ def auto_approve_affiliate_commissions():
     Aprova comissões 'pending' de encomendas entregues há mais de
     APPROVE_AFTER_DAYS dias (após a janela de devolução) e actualiza os tiers.
     """
-    from django.db.models import F, Q
+    from django.db.models import Q
     from .models import AffiliateCommission, AffiliateProfile
-    from .services import update_tier
+    from .services import approve_commission, record_order_conversions, update_tier
     from apps.notifications import email_service
 
     cutoff = timezone.now() - timedelta(days=APPROVE_AFTER_DAYS)
@@ -28,11 +29,16 @@ def auto_approve_affiliate_commissions():
     affected_ids = set()
     count = 0
     for comm in pending:
-        comm.status = 'approved'
-        comm.save(update_fields=['status'])
-        AffiliateProfile.objects.filter(pk=comm.affiliate_id).update(
-            total_commission=F('total_commission') + comm.amount
-        )
+        with transaction.atomic():
+            comm = AffiliateCommission.objects.select_for_update().select_related(
+                'affiliate__user', 'order',
+            ).get(pk=comm.pk)
+            if comm.status != 'pending':
+                continue
+            record_order_conversions(comm.order)
+            comm = approve_commission(comm)
+            if comm.status != 'approved':
+                continue
         from apps.notifications.models import Notification
         Notification.objects.create(
             user=comm.affiliate.user,

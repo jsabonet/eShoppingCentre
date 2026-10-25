@@ -417,6 +417,11 @@ function ProductDetailContent({ product, categoryName, categorySlug, relatedProd
                     <p className="text-sm text-green-600 font-medium mb-4">
                       <Truck size={14} className="inline" /> Frete grátis
                     </p>
+                    {(product.minOrderQuantity || 1) > 1 && (
+                      <p className="text-sm text-amber-700 font-medium mb-2">
+                        Compra mínima: {product.minOrderQuantity} unidades
+                      </p>
+                    )}
                     <p className="text-sm mb-2">
                       {displayStock > 0 ? (
                         <span className="text-green-600 font-semibold">

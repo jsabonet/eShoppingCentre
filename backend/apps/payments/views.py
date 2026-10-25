@@ -4,6 +4,7 @@ from urllib.parse import quote
 
 from django.conf import settings
 from django.db import transaction
+from django.db import models
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 from rest_framework import permissions, status
@@ -123,7 +124,100 @@ def _order_items_to_payload(order, order_items, goods_value):
 def _orders_for_vpay_id(order_id):
     if not order_id:
         return Order.objects.none()
+    attempt = PaymentTransaction.objects.filter(
+        provider='vpay',
+    ).filter(
+        models.Q(gateway_order_id=order_id)
+        | models.Q(provider_transaction_id=order_id)
+    ).first()
+    if attempt and attempt.orders.exists():
+        return attempt.orders.all()
     return Order.objects.filter(payment_id=order_id)
+
+
+def _payment_attempt(order_id):
+    return PaymentTransaction.objects.filter(
+        provider='vpay',
+    ).filter(
+        models.Q(gateway_order_id=order_id)
+        | models.Q(provider_transaction_id=order_id)
+    ).first()
+
+
+def _order_total(orders):
+    return sum((order.total for order in orders), Decimal('0.00'))
+
+
+def _attempt_orders(attempt):
+    orders = list(attempt.orders.select_related('buyer', 'store__owner').all())
+    if not orders and (attempt.gateway_order_id or attempt.provider_transaction_id):
+        orders = list(
+            Order.objects.filter(
+                payment_id=attempt.gateway_order_id or attempt.provider_transaction_id,
+            )
+            .select_related('buyer', 'store__owner')
+        )
+        if orders:
+            attempt.orders.add(*orders)
+    return orders
+
+
+def _mark_attempt_failed(order_id, gateway_status):
+    """Apply a definitive negative gateway state without overriding a paid order."""
+    from apps.orders.models import Order, OrderStatusHistory
+    from apps.orders.services import cancel_order
+
+    with transaction.atomic():
+        attempt = PaymentTransaction.objects.select_for_update().filter(
+            provider='vpay',
+        ).filter(
+            models.Q(gateway_order_id=order_id)
+            | models.Q(provider_transaction_id=order_id)
+        ).first()
+        if attempt and attempt.status in ('completed', 'refund_pending', 'refunded'):
+            return False
+        order_ids = (
+            list(attempt.orders.values_list('id', flat=True))
+            if attempt else []
+        )
+        orders = list(Order.objects.select_for_update().filter(
+            models.Q(pk__in=order_ids) | models.Q(payment_id=order_id),
+        ).order_by('pk'))
+        if not orders or any(order.payment_status == 'completed' for order in orders):
+            return False
+        current_attempt_orders = [
+            order for order in orders if order.payment_id == order_id
+        ]
+        if attempt:
+            attempt.status = 'failed'
+            attempt.error_message = f'VPay status: {gateway_status}'
+            attempt.provider_response = {
+                **(attempt.provider_response or {}),
+                'terminal_status': gateway_status,
+            }
+            attempt.save(update_fields=[
+                'status', 'error_message', 'provider_response', 'updated_at',
+            ])
+        for order in current_attempt_orders:
+            if order.payment_status not in ('pending', 'failed'):
+                continue
+            previous_status = order.status
+            if order.status != 'cancelled':
+                cancel_order(
+                    order,
+                    changed_by=None,
+                    notes=f'Pagamento {gateway_status} confirmado pela VPay',
+                )
+                OrderStatusHistory.objects.create(
+                    order=order,
+                    previous_status=previous_status,
+                    new_status='cancelled',
+                    changed_by=None,
+                    notes=f'Pagamento {gateway_status} confirmado pela VPay',
+                )
+            order.payment_status = 'failed'
+            order.save(update_fields=['payment_status', 'updated_at'])
+        return True
 
 
 def _amount_matches(amount, total):
@@ -145,11 +239,30 @@ def _valid_amount(amount):
 
 @transaction.atomic
 def _confirm_payment(order_id, event_data, delivery_id=''):
-    orders = list(_orders_for_vpay_id(order_id).select_related('buyer', 'store__owner'))
+    attempt = PaymentTransaction.objects.select_for_update().filter(
+        provider='vpay',
+    ).filter(
+        models.Q(gateway_order_id=order_id)
+        | models.Q(provider_transaction_id=order_id)
+    ).first()
+    source_id = event_data.get('sourceId')
+    if not attempt and isinstance(event_data.get('source'), dict):
+        source_id = source_id or event_data['source'].get('sourceId')
+    if not attempt and source_id:
+        attempt = PaymentTransaction.objects.select_for_update().filter(
+            provider='vpay',
+            source_id=str(source_id),
+        ).first()
+        if attempt and not attempt.gateway_order_id:
+            attempt.gateway_order_id = order_id
+            attempt.save(update_fields=['gateway_order_id', 'updated_at'])
+    orders = _attempt_orders(attempt) if attempt else list(
+        _orders_for_vpay_id(order_id).select_related('buyer', 'store__owner')
+    )
     if not orders:
         return None, False
 
-    total = sum((order.total for order in orders), Decimal('0.00'))
+    total = _order_total(orders)
     if not _amount_matches(event_data.get('amount'), total):
         logger.error('VPay amount mismatch for order %s', order_id)
         return None, False
@@ -159,29 +272,85 @@ def _confirm_payment(order_id, event_data, delivery_id=''):
 
     transaction_id = str(event_data.get('transactionId') or '')
     record_key = f'vpay:{order_id}'
-    txn, _ = PaymentTransaction.objects.get_or_create(
-        idempotency_key=record_key,
-        defaults={
-            'order': orders[0],
-            'provider': 'vpay',
-            'provider_transaction_id': transaction_id,
-            'amount': total,
-            'currency': 'MZN',
-            'status': 'completed',
-            'provider_response': {
-                'event': event_data,
-                'delivery_id': delivery_id,
+    if attempt and transaction_id and attempt.provider_transaction_id:
+        prior_id = attempt.provider_transaction_id
+        if prior_id != transaction_id:
+            logger.error('VPay transaction id mismatch for order %s', order_id)
+            return None, False
+    txn = attempt
+    if txn is None:
+        txn, _ = PaymentTransaction.objects.get_or_create(
+            idempotency_key=record_key,
+            defaults={
+                'order': orders[0],
+                'provider': 'vpay',
+                'provider_transaction_id': transaction_id,
+                'gateway_order_id': order_id,
+                'amount': total,
+                'currency': 'MZN',
+                'status': 'pending',
+                'provider_response': {
+                    'event': event_data,
+                    'delivery_id': delivery_id,
+                },
+                'completed_at': timezone.now(),
             },
-            'completed_at': timezone.now(),
-        },
-    )
-    if txn.status != 'completed':
-        txn.status = 'completed'
-        txn.provider_transaction_id = transaction_id
-        txn.provider_response = {'event': event_data, 'delivery_id': delivery_id}
+        )
+        txn.orders.add(*orders)
+    current_attempt = all(order.payment_id == order_id for order in orders)
+    cancelled_order = any(order.status == 'cancelled' for order in orders)
+    if not current_attempt or cancelled_order:
+        txn.status = 'refund_pending'
+        txn.provider_transaction_id = transaction_id or txn.provider_transaction_id
+        txn.gateway_order_id = order_id
+        txn.provider_response = {
+            **(txn.provider_response or {}),
+            'event': event_data,
+            'delivery_id': delivery_id,
+            'exception': 'payment_after_cancel' if cancelled_order else 'superseded_payment_attempt',
+        }
+        txn.completed_at = timezone.now()
+        txn.error_message = (
+            'Pagamento recebido após cancelamento; reembolso necessário.'
+            if cancelled_order
+            else 'Pagamento recebido numa tentativa substituída; reembolso necessário.'
+        )
+        txn.save(update_fields=[
+            'status', 'provider_transaction_id', 'gateway_order_id',
+            'provider_response', 'completed_at', 'error_message', 'updated_at',
+        ])
+        from apps.notifications.email_service import dispatch, send_admin_alert_email
+        transaction.on_commit(lambda: dispatch(
+            send_admin_alert_email,
+            f'Pagamento VPay requer reembolso: {order_id}',
+            txn.error_message,
+        ))
+        if cancelled_order:
+            for index, order in enumerate(orders):
+                orders[index], _ = complete_payment(
+                    order.id,
+                    provider='vpay',
+                    provider_transaction_id=transaction_id,
+                    provider_response=event_data,
+                )
+        return orders, True
+    if txn.status not in ('completed', 'refund_pending', 'refunded'):
+        txn.status = (
+            'refund_pending'
+            if cancelled_order
+            else 'completed'
+        )
+        if transaction_id:
+            txn.provider_transaction_id = transaction_id
+        txn.gateway_order_id = order_id
+        txn.provider_response = {
+            **(txn.provider_response or {}),
+            'event': event_data,
+            'delivery_id': delivery_id,
+        }
         txn.completed_at = timezone.now()
         txn.save(update_fields=[
-            'status', 'provider_transaction_id', 'provider_response',
+            'status', 'provider_transaction_id', 'gateway_order_id', 'provider_response',
             'completed_at', 'updated_at',
         ])
 
@@ -195,7 +364,6 @@ def _confirm_payment(order_id, event_data, delivery_id=''):
         )
         orders[index] = completed_order
         created_any = created_any or created
-
     # Email-resumo único quando o checkout foi dividido por várias lojas.
     if created_any and len(orders) > 1:
         from apps.notifications import email_service
@@ -217,73 +385,143 @@ class PaymentsInitiateView(APIView):
             return Response({'error': 'Nenhuma encomenda indicada.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        orders = list(Order.objects.filter(
-            id__in=order_ids,
-            buyer=request.user,
-        ).prefetch_related('items'))
-        if len(orders) != len(set(order_ids)):
-            return Response({'error': 'Encomenda(s) inválida(s) ou não autorizada(s).'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            orders = list(Order.objects.select_for_update().filter(
+                id__in=order_ids,
+                buyer=request.user,
+            ).prefetch_related('items'))
+            if len(orders) != len(set(order_ids)):
+                return Response({'error': 'Encomenda(s) inválida(s) ou não autorizada(s).'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            orders.sort(key=lambda order: str(order.pk))
+            if any(order.status != 'pending' or order.payment_status != 'pending' for order in orders):
+                return Response(
+                    {'error': 'Apenas encomendas pendentes e não canceladas podem iniciar pagamento.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if any(
+                order.reserved_until and order.reserved_until <= timezone.now()
+                for order in orders
+            ):
+                return Response(
+                    {'error': 'A reserva expirou. Crie uma nova encomenda para pagar.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            total = _order_total(orders)
+            if total <= 0:
+                return Response({'error': 'Montante de pagamento inválido.'},
+                                status=status.HTTP_400_BAD_REQUEST)
 
-        pending = [order for order in orders if order.payment_status == 'pending']
-        already_paid = [order for order in orders if order.payment_status == 'completed']
-        if already_paid and not pending:
-            return Response({
-                'error': 'Encomenda(s) já pagas.',
-                'order_ids': [str(order.id) for order in already_paid],
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        payable = pending or orders
-        total = sum((order.total for order in payable), Decimal('0.00'))
-        if total <= 0:
-            return Response({'error': 'Montante de pagamento inválido.'},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        source_id = f'checkout-{get_random_string(20).lower()}'
-        result = VPayClient().create_order(_build_order_payload(payable, source_id))
-        if not result['ok']:
-            message = result.get('message') or 'Erro ao criar pedido na VPay.'
-            PaymentTransaction.objects.create(
-                order=payable[0],
+            requested_ids = {order.id for order in orders}
+            open_attempt_ids = PaymentTransaction.objects.filter(
                 provider='vpay',
+                status__in=['pending', 'processing'],
+                orders__in=orders,
+            ).values_list('pk', flat=True).distinct()
+            open_attempts = list(
+                PaymentTransaction.objects.select_for_update().filter(
+                    pk__in=open_attempt_ids,
+                ).order_by('-created_at')
+            )
+            existing = open_attempts[0] if open_attempts else None
+            if existing:
+                existing_order_ids = set(existing.orders.values_list('id', flat=True))
+                if (
+                    existing.status in ('pending', 'processing')
+                    and existing.gateway_order_id
+                    and existing_order_ids == requested_ids
+                ):
+                    return Response({
+                        'checkout_url': existing.provider_response.get('checkout')
+                        or _checkout_url(existing.gateway_order_id),
+                        'payment_id': existing.gateway_order_id,
+                        'reference': existing.gateway_order_id,
+                        'order_ids': [str(order.id) for order in orders],
+                        'reused': True,
+                    }, status=status.HTTP_200_OK)
+                return Response(
+                    {
+                        'error': (
+                            'Estas encomendas estão associadas a outra tentativa '
+                            'de pagamento em aberto. Conclua ou contacte o suporte '
+                            'antes de iniciar outro checkout.'
+                        ),
+                        'reference': existing.gateway_order_id or existing.source_id,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            source_id = f'checkout-{get_random_string(20).lower()}'
+            attempt = PaymentTransaction.objects.create(
+                order=orders[0],
+                provider='vpay',
+                source_id=source_id,
                 amount=total,
                 currency='MZN',
-                status='failed',
-                provider_response=result.get('data') or {},
-                error_message=message,
+                status='processing',
+                provider_response={'request': {'sourceId': source_id}},
+            )
+            attempt.orders.add(*orders)
+
+        result = VPayClient().create_order(_build_order_payload(orders, source_id))
+        if not result['ok']:
+            message = result.get('message') or 'Erro ao criar pedido na VPay.'
+            outcome_unknown = result.get('outcome_unknown') or (
+                result.get('http_status') is not None
+                and result['http_status'] >= 500
+            )
+            attempt.status = 'processing' if outcome_unknown else 'failed'
+            attempt.error_message = message
+            attempt.provider_response = {
+                **(attempt.provider_response or {}),
+                'creation_response': result.get('data') or {},
+                'creation_outcome_unknown': bool(outcome_unknown),
+            }
+            attempt.save(update_fields=[
+                'status', 'error_message', 'provider_response', 'updated_at',
+            ])
+            response_status = (
+                status.HTTP_409_CONFLICT if outcome_unknown
+                else status.HTTP_502_BAD_GATEWAY
             )
             return Response(
-                {'error': _friendly_error(message), 'detail': message},
-                status=status.HTTP_502_BAD_GATEWAY,
+                {
+                    'error': _friendly_error(message),
+                    'detail': message,
+                    **({'reference': source_id} if outcome_unknown else {}),
+                },
+                status=response_status,
             )
 
         data = result['data']
         gateway_order_id = str(data['orderId'])
         checkout_url = data.get('checkout') or _checkout_url(gateway_order_id)
         with transaction.atomic():
-            PaymentTransaction.objects.update_or_create(
-                idempotency_key=f'vpay:{gateway_order_id}',
-                defaults={
-                    'order': payable[0],
-                    'provider': 'vpay',
-                    'provider_transaction_id': gateway_order_id,
-                    'amount': total,
-                    'currency': 'MZN',
-                    'status': 'pending',
-                    'provider_response': data,
-                    'error_message': '',
-                    'completed_at': None,
-                },
-            )
-            for order in payable:
-                order.payment_id = gateway_order_id
-                order.save(update_fields=['payment_id', 'updated_at'])
+            attempt = PaymentTransaction.objects.select_for_update().get(pk=attempt.pk)
+            attempt.gateway_order_id = gateway_order_id
+            attempt.status = 'pending'
+            attempt.provider_response = {**data, 'checkout': checkout_url}
+            attempt.save(update_fields=[
+                'gateway_order_id', 'status', 'provider_response', 'updated_at',
+            ])
+            for order in orders:
+                locked_order = Order.objects.select_for_update().get(pk=order.pk)
+                if locked_order.payment_status != 'pending' or locked_order.status != 'pending':
+                    attempt.status = 'processing'
+                    attempt.error_message = 'A encomenda mudou de estado durante a criação do pagamento.'
+                    attempt.save(update_fields=['status', 'error_message', 'updated_at'])
+                    return Response(
+                        {'error': 'A encomenda mudou de estado. O pagamento requer reconciliação manual.'},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                locked_order.payment_id = gateway_order_id
+                locked_order.save(update_fields=['payment_id', 'updated_at'])
 
         return Response({
             'checkout_url': checkout_url,
             'payment_id': gateway_order_id,
             'reference': gateway_order_id,
-            'order_ids': [str(order.id) for order in payable],
+            'order_ids': [str(order.id) for order in orders],
         }, status=status.HTTP_200_OK)
 
 
@@ -296,14 +534,35 @@ class PaymentsStatusView(APIView):
             return Response({'error': 'Parâmetro `reference` obrigatório.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        orders = list(_orders_for_vpay_id(order_id).filter(
+        attempt = _payment_attempt(order_id)
+        source_attempt = None
+        if attempt is None:
+            source_attempt = PaymentTransaction.objects.filter(
+                provider='vpay',
+                source_id=order_id,
+            ).first()
+            attempt = source_attempt
+        order_queryset = (
+            attempt.orders.all()
+            if attempt
+            else _orders_for_vpay_id(order_id)
+        )
+        orders = list(order_queryset.filter(
             buyer=request.user,
         ).select_related('buyer', 'store__owner'))
         if not orders:
             return Response({'error': 'Pagamento não encontrado.'},
                             status=status.HTTP_404_NOT_FOUND)
 
-        if any(order.payment_status != 'completed' for order in orders):
+        provider_status = attempt.status if attempt else 'pending'
+        if source_attempt:
+            if source_attempt.status == 'processing':
+                provider_status = 'processing'
+            else:
+                provider_status = source_attempt.status
+        elif attempt and attempt.status in ('refund_pending', 'refunded', 'failed'):
+            provider_status = attempt.status
+        elif any(order.payment_status != 'completed' for order in orders):
             result = VPayClient().get_order_status(order_id)
             if not result['ok']:
                 return Response(
@@ -318,13 +577,15 @@ class PaymentsStatusView(APIView):
             payment_status = data.get('status')
             if payment_status == 'paid':
                 total = sum((order.total for order in orders), Decimal('0.00'))
-                if not _amount_matches(data.get('amount'), total):
+                if (
+                    not _amount_matches(data.get('amount'), total)
+                    or data.get('currency') != 'MZN'
+                ):
                     logger.error('VPay polling amount mismatch for order %s', order_id)
                     return Response({'error': 'Montante confirmado inválido.'},
                                     status=status.HTTP_502_BAD_GATEWAY)
                 confirmed_data = {
                     **data,
-                    'currency': data.get('currency', 'MZN'),
                     'transactionId': data.get('transactionId', ''),
                 }
                 confirmed_orders, _ = _confirm_payment(order_id, confirmed_data)
@@ -332,22 +593,30 @@ class PaymentsStatusView(APIView):
                     return Response({'error': 'Dados de pagamento inválidos da VPay.'},
                                     status=status.HTTP_502_BAD_GATEWAY)
                 orders = confirmed_orders
+                attempt = _payment_attempt(order_id)
+                provider_status = attempt.status if attempt else 'completed'
             elif payment_status in ('failed', 'cancelled'):
-                PaymentTransaction.objects.filter(
-                    idempotency_key=f'vpay:{order_id}',
-                    status='pending',
-                ).update(status='failed', error_message=f'VPay status: {payment_status}')
-                for order in orders:
-                    if order.payment_status == 'pending':
-                        order.payment_status = 'failed'
-                        order.save(update_fields=['payment_status', 'updated_at'])
+                _mark_attempt_failed(order_id, payment_status)
+                orders = list(
+                    _orders_for_vpay_id(order_id).filter(buyer=request.user)
+                    .select_related('buyer', 'store__owner')
+                )
+                attempt = _payment_attempt(order_id)
+                provider_status = attempt.status if attempt else 'failed'
+            else:
+                provider_status = 'pending'
+        elif not source_attempt and attempt and attempt.status == 'processing':
+            provider_status = 'processing'
 
         all_completed = all(order.payment_status == 'completed' for order in orders)
+        if provider_status not in ('refund_pending', 'refunded', 'failed', 'processing'):
+            provider_status = 'completed' if all_completed else (
+                'failed' if any(order.payment_status == 'failed' for order in orders)
+                else 'pending'
+            )
         return Response({
             'reference': order_id,
-            'status': 'completed' if all_completed else (
-                'failed' if any(order.payment_status == 'failed' for order in orders) else 'pending'
-            ),
+            'status': provider_status,
             'orders': [{
                 'id': str(order.id),
                 'order_number': order.order_number,

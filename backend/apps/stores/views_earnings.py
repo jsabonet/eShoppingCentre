@@ -1,11 +1,11 @@
 from rest_framework import permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db.models import Sum, Count
+from django.db.models import Q, Sum
 from django.utils import timezone
-from datetime import timedelta
 from apps.orders.models import Order
 from apps.orders.serializers import OrderSerializer
+from .financials import paid_order_revenue
 
 
 class StoreStatsView(APIView):
@@ -31,12 +31,10 @@ class StoreStatsView(APIView):
         orders = store.orders.all()
         today_orders = orders.filter(created_at__gte=today_start)
         completed_orders = orders.filter(payment_status='completed')
+        today_paid_orders = today_orders.filter(payment_status='completed')
 
-        total_revenue = float(completed_orders.aggregate(
-            total=Sum('total'))['total'] or 0)
-
-        today_revenue = float(today_orders.filter(payment_status='completed').aggregate(
-            total=Sum('total'))['total'] or 0)
+        total_revenue = float(paid_order_revenue(completed_orders))
+        today_revenue = float(paid_order_revenue(today_paid_orders))
 
         # Recent orders (last 5)
         recent = orders.select_related('buyer').order_by('-created_at')[:5]
@@ -56,17 +54,30 @@ class StoreStatsView(APIView):
 
         # Top products
         from apps.products.models import Product
-        top = Product.objects.filter(
-            store=store, status='active'
-        ).order_by('-sales_count')[:5]
-        top_data = [{
-            'id': str(p.id),
-            'name': p.name,
-            'slug': p.slug,
-            'sales': p.sales_count,
-            'revenue': float(p.price) * p.sales_count,
-            'image': p.images.filter(is_primary=True).first().image.url if p.images.filter(is_primary=True).exists() else None,
-        } for p in top]
+        top = Product.objects.filter(store=store, status='active').annotate(
+            paid_sales=Sum(
+                'order_items__quantity',
+                filter=Q(order_items__order__payment_status='completed'),
+            ),
+            paid_revenue=Sum(
+                'order_items__total_price',
+                filter=Q(order_items__order__payment_status='completed'),
+            ),
+        ).order_by('-paid_sales', '-paid_revenue')[:5].prefetch_related('images')
+        top_data = []
+        for product in top:
+            primary_image = next(
+                (image for image in product.images.all() if image.is_primary),
+                None,
+            )
+            top_data.append({
+                'id': str(product.id),
+                'name': product.name,
+                'slug': product.slug,
+                'sales': product.paid_sales or 0,
+                'revenue': float(product.paid_revenue or 0),
+                'image': primary_image.image.url if primary_image else None,
+            })
 
         # Type-specific stats
         downloaded_today = 0
@@ -105,7 +116,7 @@ class StoreStatsView(APIView):
             # Stats cards — common
             'product_type': store.product_type,
             'shipping_configured': shipping_configured,
-            'today_sales': today_orders.count(),
+            'today_sales': today_paid_orders.count(),
             'today_revenue': today_revenue,
             'total_revenue': total_revenue,
             'total_products': store.products.filter(status='active').count(),

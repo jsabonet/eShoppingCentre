@@ -55,7 +55,10 @@ class VPayClient:
             )
         except requests.RequestException as exc:
             logger.error('VPay create_order request failed: %s', exc)
-            return self._failure('Não foi possível contactar a VPay.')
+            return self._failure(
+                'Não foi possível confirmar a criação do pedido VPay.',
+                outcome_unknown=True,
+            )
 
         body = self._json_or_empty(response)
         if (response.ok and isinstance(body, dict)
@@ -174,10 +177,13 @@ class VPayClient:
         return body if isinstance(body, dict) else {}
 
     @staticmethod
-    def _failure(message, http_status=None, data=None):
-        return {
+    def _failure(message, http_status=None, data=None, *, outcome_unknown=False):
+        result = {
             'ok': False,
             'data': data,
             'message': message or 'A VPay recusou o pedido.',
             'http_status': http_status,
         }
+        if outcome_unknown:
+            result['outcome_unknown'] = True
+        return result

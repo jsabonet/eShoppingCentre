@@ -27,5 +27,6 @@ export function mapProduct(p: any): Product {
     storeOwnerId: p.store_owner_id || undefined,
     salesCount: p.sales_count ?? undefined,
     productType: p.product_type || 'physical',
+    minOrderQuantity: Number(p.min_order_quantity) || 1,
   };
 }

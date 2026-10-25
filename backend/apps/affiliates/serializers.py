@@ -42,8 +42,12 @@ class AffiliateCommissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AffiliateCommission
         fields = ('id', 'product_name', 'order_number', 'affiliate_email', 'amount',
-                  'commission_rate', 'status', 'rejection_reason', 'created_at')
-        read_only_fields = ('amount', 'commission_rate', 'status', 'rejection_reason')
+                  'reversed_amount', 'unrecovered_amount', 'commission_rate', 'status',
+                  'rejection_reason', 'created_at')
+        read_only_fields = (
+            'amount', 'reversed_amount', 'unrecovered_amount', 'commission_rate',
+            'status', 'rejection_reason',
+        )
 
 
 class AffiliateSettingsSerializer(serializers.ModelSerializer):

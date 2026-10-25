@@ -93,6 +93,10 @@ export default function CheckoutContent() {
   }, [shippingEstimates, shippingSelections]);
 
   const hasPhysicalItems = items.some(it => it.product.productType === 'physical');
+  const minimumQuantityItems = items.filter(
+    it => it.product.productType === 'physical'
+      && it.quantity < Math.max(1, Number(it.product.minOrderQuantity) || 1)
+  );
 
   const discountAmount = useMemo(() => {
     if (!couponInfo) return 0;
@@ -183,6 +187,11 @@ export default function CheckoutContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (minimumQuantityItems.length > 0) {
+      setError('A quantidade de alguns produtos está abaixo do mínimo exigido. Ajuste o carrinho antes de continuar.');
+      return;
+    }
 
     if (!form.fullName || !form.phone || !form.email) {
       alert('Por favor, preencha os campos obrigatórios.');
@@ -666,11 +675,24 @@ export default function CheckoutContent() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || minimumQuantityItems.length > 0}
               className="w-full mt-6 px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold rounded-md transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {submitting ? <><Loader2 size={18} className="animate-spin" /> A processar...</> : 'Confirmar Pedido'}
             </button>
+
+            {minimumQuantityItems.length > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                {minimumQuantityItems.map(item => (
+                  <p key={item.product.id}>
+                    {item.product.name}: mínimo de {item.product.minOrderQuantity || 1} unidade(s).
+                  </p>
+                ))}
+                <Link href="/cart" className="mt-2 inline-block font-medium underline">
+                  Ajustar quantidades no carrinho
+                </Link>
+              </div>
+            )}
 
             {error && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">

@@ -53,7 +53,7 @@ class MyAffiliateStatsView(APIView):
     def get(self, request):
         profile = get_object_or_404(AffiliateProfile, user=request.user)
         pending = profile.commissions.filter(status='pending').aggregate(
-            total=models.Sum('amount')
+            total=models.Sum(F('amount') - F('reversed_amount'))
         )['total'] or 0
         return Response({
             'total_clicks': profile.total_clicks,
@@ -120,8 +120,12 @@ class AffiliatePayoutView(APIView):
         payouts = profile.payouts.all()
         return Response(AffiliatePayoutSerializer(payouts, many=True).data)
 
+    @transaction.atomic
     def post(self, request):
-        profile = get_object_or_404(AffiliateProfile, user=request.user)
+        profile = get_object_or_404(
+            AffiliateProfile.objects.select_for_update(),
+            user=request.user,
+        )
         settings_obj = AffiliateSettings.get_settings()
 
         # Gate: verificação KYC obrigatória antes do 1º saque
@@ -142,9 +146,13 @@ class AffiliatePayoutView(APIView):
                 {'detail': f'O valor mínimo de saque é {settings_obj.min_payout_amount} MZN.'},
                 status=400,
             )
-        if amount > profile.available_commission:
+        pending_amount = profile.payouts.filter(
+            status__in=['pending', 'approved'],
+        ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+        available = profile.available_commission - pending_amount
+        if amount > available:
             return Response(
-                {'detail': f'Saldo insuficiente. Disponível: {profile.available_commission} MZN.'},
+                {'detail': f'Saldo insuficiente. Disponível: {max(available, Decimal("0.00"))} MZN.'},
                 status=400,
             )
 
@@ -239,9 +247,9 @@ class StoreAffiliatesView(APIView):
             affiliate_data[aff.id]['total_sales'] += link.conversions
             # Calculate commission for this affiliate from this store
             comm = AffiliateCommission.objects.filter(
-                affiliate=aff, product__store=store,
+                affiliate=aff, order__store=store,
                 status__in=['approved', 'paid']
-            ).aggregate(total=Sum('amount'))['total'] or 0
+            ).aggregate(total=Sum(F('amount') - F('reversed_amount')))['total'] or 0
             affiliate_data[aff.id]['total_commission'] += float(comm)
 
         result = list(affiliate_data.values())
@@ -338,42 +346,32 @@ class AdminAffiliateCommissionActionView(APIView):
     """Admin: aprova/rejeita manualmente uma comissão."""
     permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
 
+    @transaction.atomic
     def patch(self, request, pk):
-        comm = get_object_or_404(AffiliateCommission, pk=pk)
+        comm = get_object_or_404(
+            AffiliateCommission.objects.select_for_update().select_related('affiliate__user', 'order'),
+            pk=pk,
+        )
         action = request.data.get('action')
         if action == 'approve' and comm.status == 'pending':
-            comm.status = 'approved'
-            comm.save(update_fields=['status'])
-            # Circuito de dinheiro unificado: credita a carteira do afiliado.
-            wallet_services.credit(
-                wallet_services.get_wallet(comm.affiliate.user),
-                comm.amount, kind='payout',
-                ref_type='affiliate_commission', ref_id=comm.id,
-                description=f'Comissão de afiliado (encomenda {comm.order.order_number})',
-                txn_type='affiliate_commission',
-                idempotency_key=f'affiliate_commission:{comm.id}:credit',
-            )
-            AffiliateProfile.objects.filter(pk=comm.affiliate_id).update(
-                total_commission=F('total_commission') + comm.amount
-            )
+            from .services import approve_commission, record_order_conversions
+            record_order_conversions(comm.order)
+            comm = approve_commission(comm)
         elif action == 'reject' and comm.status in ['pending', 'approved']:
             was_approved = comm.status == 'approved'
+            if was_approved:
+                from .services import reverse_commission_amount
+                comm = reverse_commission_amount(
+                    comm, comm.amount - comm.reversed_amount,
+                    reversal_id=f'admin-reject-{request.user.pk}',
+                    reason='Comissão rejeitada pelo administrador',
+                )
             comm.status = 'rejected'
             comm.rejection_reason = request.data.get('reason', 'Rejeitada pelo admin')
             comm.save(update_fields=['status', 'rejection_reason'])
-            if was_approved:
-                # Reverte o crédito na carteira (devolve o valor ao saldo).
-                wallet_services.debit(
-                    wallet_services.get_wallet(comm.affiliate.user),
-                    comm.amount, kind='payout',
-                    ref_type='affiliate_commission', ref_id=comm.id,
-                    description=f'Reversão de comissão de afiliado rejeitada',
-                    txn_type='affiliate_commission',
-                    idempotency_key=f'affiliate_commission:{comm.id}:debit',
-                )
-                AffiliateProfile.objects.filter(pk=comm.affiliate_id).update(
-                    total_commission=F('total_commission') - comm.amount
-                )
+            if comm.conversion_recorded:
+                from .services import _reverse_conversion
+                _reverse_conversion(comm)
         return Response(AffiliateCommissionSerializer(comm).data)
 
 
@@ -390,13 +388,23 @@ class AdminAffiliatePayoutActionView(APIView):
     """Admin: aprova/rejeita um pedido de saque."""
     permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
 
+    @transaction.atomic
     def patch(self, request, pk):
-        payout = get_object_or_404(AffiliatePayout, pk=pk)
+        payout = get_object_or_404(
+            AffiliatePayout.objects.select_for_update(),
+            pk=pk,
+        )
         action = request.data.get('action')
         if action == 'approve' and payout.status == 'pending':
             from apps.wallet.models import Wallet
             try:
                 with transaction.atomic():
+                    profile = AffiliateProfile.objects.select_for_update().get(
+                        pk=payout.affiliate_id,
+                    )
+                    payout = AffiliatePayout.objects.select_for_update().get(pk=payout.pk)
+                    if payout.status != 'pending':
+                        return Response(AffiliatePayoutSerializer(payout).data)
                     # Circuito de dinheiro unificado: debita a carteira do afiliado.
                     wallet_services.debit(
                         wallet_services.get_wallet(payout.affiliate.user),
@@ -410,9 +418,8 @@ class AdminAffiliatePayoutActionView(APIView):
                     Wallet.objects.filter(user=payout.affiliate.user).update(
                         total_withdrawn=F('total_withdrawn') + payout.amount
                     )
-                    AffiliateProfile.objects.filter(pk=payout.affiliate_id).update(
-                        total_withdrawn=F('total_withdrawn') + payout.amount
-                    )
+                    profile.total_withdrawn += payout.amount
+                    profile.save(update_fields=['total_withdrawn'])
                     payout.status = 'paid'
                     payout.paid_at = timezone.now()
                     payout.approved_by = request.user
