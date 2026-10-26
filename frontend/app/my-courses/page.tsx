@@ -97,25 +97,22 @@ export default function MyCoursesPage() {
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const navy: [number, number, number] = [25, 45, 61];
       const green: [number, number, number] = [37, 104, 78];
-      const gold: [number, number, number] = [180, 151, 94];
       const muted: [number, number, number] = [103, 113, 120];
       const pageWidth = 297;
       const center = pageWidth / 2;
 
-      pdf.setFillColor(250, 249, 244);
+      pdf.setFillColor(252, 252, 250);
       pdf.rect(0, 0, pageWidth, 210, 'F');
-      pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.65);
-      pdf.rect(12, 12, 273, 186);
-      pdf.setDrawColor(224, 222, 213);
-      pdf.setLineWidth(0.3);
-      pdf.rect(16, 16, 265, 178);
 
       pdf.addImage(logoDataUrl, 'PNG', 22, 20, 25, 25);
       pdf.setTextColor(...navy);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(11);
       pdf.text('e-SHOPPING CENTRE', 51, 31);
+      pdf.setTextColor(...muted);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.text('APRENDIZAGEM ONLINE', 51, 36);
 
       pdf.addImage(qrCode, 'PNG', 254, 20, 19, 19);
       pdf.setTextColor(...green);
@@ -127,9 +124,6 @@ export default function MyCoursesPage() {
       pdf.setFont('times', 'bold');
       pdf.setFontSize(28);
       pdf.text('Certificado de Conclusão', center, 72, { align: 'center' });
-      pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.75);
-      pdf.line(center - 18, 80, center + 18, 80);
 
       pdf.setTextColor(...muted);
       pdf.setFont('helvetica', 'normal');
@@ -172,9 +166,6 @@ export default function MyCoursesPage() {
         lineHeightFactor: 1.15,
       });
 
-      pdf.setDrawColor(216, 215, 207);
-      pdf.setLineWidth(0.3);
-      pdf.line(28, 163, 269, 163);
       pdf.setTextColor(...muted);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
@@ -190,13 +181,6 @@ export default function MyCoursesPage() {
       pdf.setFont('courier', 'normal');
       pdf.setFontSize(7);
       pdf.text(certificate.certificate_number, 30, 189);
-      pdf.setTextColor(...green);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8);
-      pdf.textWithLink('Verificar autenticidade online', 269, 181, {
-        url: validationUrl,
-        align: 'right',
-      });
       pdf.save(`certificado-${certificate.certificate_number}.pdf`);
     } catch (error) {
       setCertificateError({
