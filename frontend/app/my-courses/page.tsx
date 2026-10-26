@@ -80,78 +80,76 @@ export default function MyCoursesPage() {
         margin: 1,
         width: 256,
       });
+      const logoResponse = await fetch('/icon.png');
+      if (!logoResponse.ok) {
+        throw new Error('Não foi possível carregar o logótipo oficial para o certificado.');
+      }
+      const logoBlob = await logoResponse.blob();
+      const logoDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') resolve(reader.result);
+          else reject(new Error('Não foi possível preparar o logótipo do certificado.'));
+        };
+        reader.onerror = () => reject(new Error('Não foi possível ler o logótipo do certificado.'));
+        reader.readAsDataURL(logoBlob);
+      });
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const navy: [number, number, number] = [25, 45, 61];
-      const green: [number, number, number] = [37, 104, 78];
-      const gold: [number, number, number] = [185, 148, 83];
+      const charcoal: [number, number, number] = [45, 45, 48];
+      const red: [number, number, number] = [211, 37, 48];
+      const orange: [number, number, number] = [239, 125, 35];
       const pageWidth = 297;
       const center = pageWidth / 2;
 
-      pdf.setFillColor(250, 249, 246);
+      pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, pageWidth, 210, 'F');
-      pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.7);
+      pdf.setFillColor(...red);
+      pdf.rect(0, 0, pageWidth, 2, 'F');
+      pdf.setDrawColor(225, 225, 225);
+      pdf.setLineWidth(0.35);
       pdf.rect(12, 12, 273, 186);
-      pdf.setDrawColor(218, 215, 205);
-      pdf.setLineWidth(0.25);
-      pdf.rect(16, 16, 265, 178);
 
-      pdf.setFillColor(...green);
-      pdf.circle(31, 31, 8, 'F');
-      pdf.setTextColor(255, 255, 255);
+      pdf.addImage(logoDataUrl, 'PNG', 22, 21, 25, 25);
+      pdf.setTextColor(...charcoal);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(11);
-      pdf.text('e', 31, 34.5, { align: 'center' });
-      pdf.setTextColor(...navy);
-      pdf.setFontSize(11);
-      pdf.text('e-SHOPPING CENTRE', 43, 29);
-      pdf.setTextColor(110, 119, 124);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
-      pdf.text('APRENDIZAGEM ONLINE', 43, 34);
+      pdf.text('e-SHOPPING CENTRE', 51, 35);
 
-      pdf.addImage(qrCode, 'PNG', 251, 21, 21, 21);
-      pdf.setTextColor(110, 119, 124);
-      pdf.setFontSize(6.5);
-      pdf.text('VALIDAR CERTIFICADO', 261.5, 46, { align: 'center' });
+      pdf.addImage(qrCode, 'PNG', 254, 21, 19, 19);
 
-      pdf.setTextColor(...green);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8);
-      pdf.text('RECONHECIMENTO DE CONCLUSÃO', center, 61, { align: 'center' });
-      pdf.setTextColor(...navy);
+      pdf.setTextColor(...charcoal);
       pdf.setFont('times', 'bold');
-      pdf.setFontSize(27);
-      pdf.text('Certificado de Conclusão', center, 76, { align: 'center' });
-      pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.8);
-      pdf.line(center - 18, 83, center + 18, 83);
+      pdf.setFontSize(28);
+      pdf.text('Certificado de Conclusão', center, 68, { align: 'center' });
+      pdf.setDrawColor(...orange);
+      pdf.setLineWidth(0.7);
+      pdf.line(center - 18, 75, center + 18, 75);
 
-      pdf.setTextColor(91, 99, 105);
+      pdf.setTextColor(90, 90, 90);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
-      pdf.text('Certificamos que', center, 96, { align: 'center' });
+      pdf.text('Certificamos que', center, 91, { align: 'center' });
 
-      pdf.setTextColor(...navy);
+      pdf.setTextColor(...charcoal);
       pdf.setFont('times', 'bold');
       pdf.setFontSize(28);
       let recipientLines = pdf.splitTextToSize(certificate.recipient_name, 215);
       const recipientFontSize = recipientLines.length > 1 ? 22 : 28;
       pdf.setFontSize(recipientFontSize);
       recipientLines = pdf.splitTextToSize(certificate.recipient_name, 215);
-      pdf.text(recipientLines, center, 108, {
+      pdf.text(recipientLines, center, 104, {
         align: 'center',
         lineHeightFactor: 1.15,
       });
 
-      const afterRecipientY = 108 + (recipientLines.length - 1) * recipientFontSize * 0.4;
+      const afterRecipientY = 104 + (recipientLines.length - 1) * recipientFontSize * 0.4;
       const completionY = afterRecipientY + 10;
-      pdf.setTextColor(91, 99, 105);
+      pdf.setTextColor(90, 90, 90);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
-      pdf.text('concluiu com êxito o curso', center, completionY, { align: 'center' });
+      pdf.text('concluiu com aproveitamento o curso', center, completionY, { align: 'center' });
 
-      pdf.setTextColor(...green);
+      pdf.setTextColor(...red);
       pdf.setFont('times', 'bold');
       pdf.setFontSize(20);
       let courseLines = pdf.splitTextToSize(certificate.course_title, 220);
@@ -163,10 +161,10 @@ export default function MyCoursesPage() {
         lineHeightFactor: 1.15,
       });
 
-      pdf.setDrawColor(218, 215, 205);
+      pdf.setDrawColor(225, 225, 225);
       pdf.setLineWidth(0.3);
       pdf.line(28, 166, 269, 166);
-      pdf.setTextColor(91, 99, 105);
+      pdf.setTextColor(90, 90, 90);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.text(
@@ -175,17 +173,15 @@ export default function MyCoursesPage() {
         176,
       );
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(...navy);
+      pdf.setTextColor(...charcoal);
       pdf.text('CÓDIGO DE AUTENTICIDADE', 30, 185);
       pdf.setFont('courier', 'normal');
       pdf.setFontSize(7.5);
       pdf.text(certificate.certificate_number, 30, 190);
-      pdf.setTextColor(...green);
+      pdf.setTextColor(...red);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7.5);
-      pdf.textWithLink('Verificar autenticidade online', 267, 181, {
-        url: validationUrl,
-      });
+      pdf.textWithLink('Validar certificado', 267, 181, { url: validationUrl });
       pdf.save(`certificado-${certificate.certificate_number}.pdf`);
     } catch (error) {
       setCertificateError({
