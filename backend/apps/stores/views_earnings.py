@@ -2,13 +2,14 @@ import csv
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 from io import BytesIO, StringIO
+from xml.sax.saxutils import escape
 
 from openpyxl import Workbook
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import LongTable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from rest_framework import permissions, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
@@ -17,7 +18,7 @@ from django.db.models import Count, Q, Sum
 from django.http import HttpResponse
 from django.utils.dateparse import parse_date
 from django.utils import timezone
-from apps.orders.models import Order, OrderItem
+from apps.orders.models import Order, OrderItem, ReturnRequest
 from .financials import paid_order_revenue
 from .models import StoreReportExport
 
@@ -240,15 +241,15 @@ def _build_excel_report(rows, summary_data, title, period_label, generated_by, g
 
 def _build_pdf_report(rows, summary_data, title, period_label, generated_by, generated_at, audit_id):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, title='Relatório financeiro do vendedor')
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), title='Relatório financeiro do vendedor')
     styles = getSampleStyleSheet()
     story = []
     story.append(Paragraph('Relatório financeiro do vendedor', styles['Title']))
-    story.append(Paragraph(f'Loja: {title}', styles['BodyText']))
-    story.append(Paragraph(f'Período: {period_label}', styles['BodyText']))
-    story.append(Paragraph(f'Gerado por: {generated_by}', styles['BodyText']))
-    story.append(Paragraph(f'Gerado em: {generated_at}', styles['BodyText']))
-    story.append(Paragraph(f'Referência de auditoria: {audit_id}', styles['BodyText']))
+    story.append(Paragraph(f'Loja: {escape(str(title))}', styles['BodyText']))
+    story.append(Paragraph(f'Período: {escape(str(period_label))}', styles['BodyText']))
+    story.append(Paragraph(f'Gerado por: {escape(str(generated_by))}', styles['BodyText']))
+    story.append(Paragraph(f'Gerado em: {escape(str(generated_at))}', styles['BodyText']))
+    story.append(Paragraph(f'Referência de auditoria: {escape(str(audit_id))}', styles['BodyText']))
     story.append(Spacer(1, 8 * mm))
     summary_rows = _serialize_report_summary_rows(summary_data)
     summary_table = Table(summary_rows, colWidths=[120 * mm, 40 * mm])
@@ -261,15 +262,33 @@ def _build_pdf_report(rows, summary_data, title, period_label, generated_by, gen
     ]))
     story.append(summary_table)
     story.append(Spacer(1, 8 * mm))
-    data_rows = rows[:80]
+    data_rows = rows
     if data_rows:
-        table = Table(data_rows, repeatRows=1)
+        cell_style = ParagraphStyle(
+            'ReportCell', parent=styles['BodyText'], fontSize=5.5, leading=6.5,
+        )
+        printable_width = landscape(A4)[0] - 20 * mm
+        column_width = printable_width / len(data_rows[0])
+        pdf_rows = [
+            [Paragraph(escape(str(value or '')), cell_style) for value in row]
+            for row in data_rows
+        ]
+        table = LongTable(
+            pdf_rows,
+            colWidths=[column_width] * len(data_rows[0]),
+            repeatRows=1,
+        )
         table.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+            ('ALIGN', (1, 1), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ]))
         story.append(table)
     doc.build(story)
@@ -413,9 +432,12 @@ class StoreEarningsReportView(APIView):
             generated_by_email=request.user.email,
             date_from=date_from,
             date_to=date_to,
+            report_type='sales',
+            export_format=export_format,
             criteria=criteria,
             order_count=len(orders),
             item_count=item_count,
+            row_count=item_count + empty_order_count,
             gross_sales=gross_sales,
             refunds=refunds,
             net_sales=net_sales,

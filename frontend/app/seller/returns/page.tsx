@@ -5,11 +5,12 @@ import Image from 'next/image';
 import {
   RotateCcw, CheckCircle, XCircle, Truck, Package, Search, RefreshCw,
   Loader2, AlertCircle, Eye, ChevronDown, ChevronUp, ArrowRight, MapPin,
-  DollarSign, FileText, Camera, User, Hash, Calendar,
+  DollarSign, FileText, Camera, User, Hash, Calendar, Download,
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import LightboxImage from '@/src/components/LightboxImage';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -88,6 +89,9 @@ export default function SellerReturnsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
   const [selectedReturn, setSelectedReturn] = useState<ReturnItem | null>(null);
   const [resolveModal, setResolveModal] = useState(false);
   const [detailModal, setDetailModal] = useState(false);
@@ -110,10 +114,18 @@ export default function SellerReturnsPage() {
   const fetchReturns = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/orders/returns/store/`, { headers: apiHeaders() });
-      if (!res.ok) throw new Error('Erro ao carregar.');
-      const data = await res.json();
-      setReturns(data.results || data || []);
+      const allReturns: ReturnItem[] = [];
+      let page = 1;
+      let hasNext = true;
+      while (hasNext) {
+        const res = await fetch(`${API_URL}/orders/returns/store/?page_size=100&page=${page}`, { headers: apiHeaders() });
+        if (!res.ok) throw new Error('Erro ao carregar.');
+        const data = await res.json();
+        allReturns.push(...(data.results || data || []));
+        hasNext = Boolean(data.next);
+        page += 1;
+      }
+      setReturns(allReturns);
     } catch { setReturns([]); showToast('error', 'Erro ao carregar devoluções.'); }
     finally { setLoading(false); }
   }, [apiHeaders]);
@@ -200,18 +212,46 @@ export default function SellerReturnsPage() {
       r.buyer_name.toLowerCase().includes(search.toLowerCase()) ||
       r.order_number.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || r.status === statusFilter;
-    return matchSearch && matchStatus;
+    const returnDate = String(r.created_at || '').slice(0, 10);
+    const matchDates = (!dateFrom || returnDate >= dateFrom) && (!dateTo || returnDate <= dateTo);
+    return matchSearch && matchStatus && matchDates;
   });
+
+  const exportReturns = () => {
+    const rows = filtered.map((item) => ({
+      id: item.rma_number,
+      encomenda: item.order_number,
+      cliente: item.buyer_name,
+      email: item.buyer_email,
+      telefone: item.buyer_phone,
+      motivo: item.reason_type_display || item.reason || '—',
+      status: STATUS_CONFIG[item.status]?.label || item.status,
+      valor_reembolso: item.refund_amount ?? 0,
+      data: new Date(item.created_at).toISOString().slice(0, 10),
+    }));
+
+    downloadReportFromObjects(
+      reportFormat,
+      `devolucoes-${new Date().toISOString().slice(0, 10)}.${reportFormat === 'excel' ? 'xlsx' : reportFormat}`,
+      'Relatório de devoluções',
+      ['id', 'encomenda', 'cliente', 'email', 'telefone', 'motivo', 'status', 'valor_reembolso', 'data'],
+      rows,
+    );
+  };
 
   const getTimelineIndex = (status: string) => STATUS_TIMELINE.findIndex(s => s.status === status);
 
   // --- COUNTERS ---
+  const metricReturns = returns.filter((item) => {
+    const returnDate = String(item.created_at || '').slice(0, 10);
+    return (!dateFrom || returnDate >= dateFrom) && (!dateTo || returnDate <= dateTo);
+  });
   const counts = {
-    requested: returns.filter(r => r.status === 'requested').length,
-    approved: returns.filter(r => r.status === 'approved').length,
-    shipped: returns.filter(r => r.status === 'shipped').length,
-    received: returns.filter(r => r.status === 'received').length,
-    refunded: returns.filter(r => r.status === 'refunded').length,
+    requested: metricReturns.filter(r => r.status === 'requested').length,
+    approved: metricReturns.filter(r => r.status === 'approved').length,
+    shipped: metricReturns.filter(r => r.status === 'shipped').length,
+    received: metricReturns.filter(r => r.status === 'received').length,
+    refunded: metricReturns.filter(r => r.status === 'refunded').length,
   };
 
   if (loading) {
@@ -246,7 +286,7 @@ export default function SellerReturnsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">Devoluções</h1>
-              <p className="text-sm text-muted-foreground">{returns.length} devolução(ões) no total</p>
+              <p className="text-sm text-muted-foreground">{filtered.length} de {returns.length} devolução(ões)</p>
             </div>
           </div>
           <button onClick={fetchReturns} className="p-2.5 hover:bg-muted rounded-lg transition-colors border border-border" title="Actualizar">
@@ -285,6 +325,29 @@ export default function SellerReturnsPage() {
             <option value="all">Todos os estados</option>
             {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">De
+            <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)}
+              className="rounded-xl border border-border bg-background px-2 py-2.5 text-sm text-foreground" />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">Até
+            <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)}
+              className="rounded-xl border border-border bg-background px-2 py-2.5 text-sm text-foreground" />
+          </label>
+          <select aria-label="Formato do relatório" value={reportFormat} onChange={e => setReportFormat(e.target.value as ReportFormat)}
+            className="px-4 py-2.5 border border-border rounded-xl text-sm bg-background">
+            <option value="csv">CSV</option>
+            <option value="excel">Excel (.xlsx)</option>
+            <option value="pdf">PDF</option>
+          </select>
+          <button
+            type="button"
+            onClick={exportReturns}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={15} />
+            Exportar {reportFormat === 'excel' ? 'Excel' : reportFormat.toUpperCase()}
+          </button>
         </div>
 
         {/* Table */}

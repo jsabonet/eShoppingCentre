@@ -684,7 +684,8 @@ export const affiliatesAPI = {
   createLink: (productId: string) =>
     api.post<AffiliateLink>('/affiliates/links/', { product_id: productId }),
 
-  myLinks: () => api.get<PaginatedResponse<AffiliateLink>>('/affiliates/me/links/'),
+  myLinks: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<AffiliateLink>>('/affiliates/me/links/', { params }),
 
   myCommissions: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<any>>('/affiliates/me/commissions/', { params }),
@@ -876,7 +877,7 @@ export const newsletterAPI = {
 };
 
 export const adminAPI = {
-  stats: () => api.get('/admin/stats/'),
+  stats: (params?: Record<string, any>) => api.get('/admin/stats/', { params }),
   auditEvents: (params?: Record<string, string | number>) => api.get('/admin/audit/events/', { params }),
   pendingStores: () => api.get('/admin/stores/pending/'),
   approveStore: (id: string) => api.patch(`/admin/stores/${id}/approve/`),

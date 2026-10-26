@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Package, Search, RefreshCw, Plus, Loader2, AlertCircle, CheckCircle, History, X, Circle, PackageX, AlertTriangle, ShoppingBag, Undo2, RotateCcw, Pencil } from 'lucide-react';
+import { Package, Search, RefreshCw, Plus, Loader2, AlertCircle, CheckCircle, History, X, Circle, PackageX, AlertTriangle, ShoppingBag, Undo2, RotateCcw, Pencil, Download } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { productsAPI } from '@/src/lib/api';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -21,6 +22,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
   const [restockModal, setRestockModal] = useState<ProductItem | null>(null);
   const [restockQty, setRestockQty] = useState(10);
   const [restockNotes, setRestockNotes] = useState('');
@@ -40,9 +42,20 @@ export default function InventoryPage() {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/products/my/?product_type=physical`, { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
-      const data = await res.json();
-      setProducts(data.results || data || []);
+      const allProducts: ProductItem[] = [];
+      let page = 1;
+      let hasNext = true;
+      while (hasNext) {
+        const res = await fetch(`${API_URL}/products/my/?product_type=physical&page_size=100&page=${page}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        });
+        if (!res.ok) throw new Error('Erro ao carregar produtos.');
+        const data = await res.json();
+        allProducts.push(...(data.results || data || []));
+        hasNext = Boolean(data.next);
+        page += 1;
+      }
+      setProducts(allProducts);
     } catch { setProducts([]); }
     finally { setLoading(false); }
   }, []);
@@ -82,6 +95,25 @@ export default function InventoryPage() {
     if (stockFilter === 'normal') return p.stock > 5;
     return true;
   });
+
+  const exportInventory = () => {
+    const rows = filtered.map((product) => ({
+      produto: product.name,
+      sku: product.sku || '—',
+      stock: String(product.stock),
+      estado: product.stock === 0 ? 'Esgotado' : product.stock <= 5 ? 'Baixo' : 'Normal',
+      preco: Number(product.price || 0).toFixed(2),
+      vendas: String(product.sales_count || 0),
+    }));
+
+    downloadReportFromObjects(
+      reportFormat,
+      `inventario-${new Date().toISOString().slice(0, 10)}.${reportFormat === 'excel' ? 'xlsx' : reportFormat}`,
+      'Relatório de inventário',
+      ['produto', 'sku', 'stock', 'estado', 'preco', 'vendas'],
+      rows,
+    );
+  };
 
   if (loading) return <SellerLayout><div className="flex-1 flex items-center justify-center"><LoadingSpinner size={32} message="A carregar inventário..." /></div></SellerLayout>;
 
@@ -123,10 +155,27 @@ export default function InventoryPage() {
           ))}
         </div>
 
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input type="text" placeholder="Buscar por nome ou SKU..." value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20" />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input type="text" placeholder="Buscar por nome ou SKU..." value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20" />
+          </div>
+            <select aria-label="Formato do relatório" value={reportFormat} onChange={e => setReportFormat(e.target.value as ReportFormat)}
+              className="px-4 py-2.5 border border-border rounded-xl text-sm bg-background">
+              <option value="csv">CSV</option>
+              <option value="excel">Excel (.xlsx)</option>
+              <option value="pdf">PDF</option>
+            </select>
+          <button
+            type="button"
+            onClick={exportInventory}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={15} />
+            Exportar {reportFormat === 'excel' ? 'Excel' : reportFormat.toUpperCase()}
+          </button>
         </div>
 
         {filtered.length === 0 ? (

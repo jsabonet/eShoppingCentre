@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Edit3, Eye, Settings, Trash2, Loader2 } from 'lucide-react';
+import { Edit3, Eye, Settings, Trash2, Loader2, Search, Download } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -34,6 +35,9 @@ interface CourseProduct {
 export default function SellerCoursesPage() {
   const [courses, setCourses] = useState<CourseProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
 
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -55,12 +59,20 @@ export default function SellerCoursesPage() {
     try {
       const token = localStorage.getItem('access_token');
       // Use server-side product_type filter instead of client-side filtering
-      const res = await fetch(`${API_URL}/products/my/?product_type=course`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      });
-      if (res.ok) {
+      const results: any[] = [];
+      let page = 1;
+      let hasNext = true;
+      while (hasNext) {
+        const res = await fetch(`${API_URL}/products/my/?product_type=course&page_size=100&page=${page}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+        if (!res.ok) break;
         const data = await res.json();
-        const results = data.results || data || [];
+        results.push(...(data.results || data || []));
+        hasNext = Boolean(data.next);
+        page += 1;
+      }
+      if (results.length || page === 2) {
         // Map products to course format — no client-side filter needed
         const courseProducts = results.map((p: any) => ({
             id: p.id,
@@ -106,6 +118,25 @@ export default function SellerCoursesPage() {
     draft: 'bg-gray-100 text-gray-700',
   };
 
+  const filteredCourses = courses.filter((course) => {
+    const matchesSearch = course.name.toLowerCase().includes(search.trim().toLowerCase());
+    return matchesSearch && (statusFilter === 'all' || course.status === statusFilter);
+  });
+
+  const exportCourses = () => {
+    const rows = filteredCourses.map((course) => ({
+      curso: course.name,
+      estado: statusLabel[course.status] || course.status,
+      preco: course.price,
+      alunos: course.sales_count,
+      aulas: course.total_lessons ?? '',
+      identificador: course.course_id || course.id,
+    }));
+    const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
+    downloadReportFromObjects(reportFormat, `cursos-${new Date().toISOString().slice(0, 10)}.${extension}`,
+      'Relatório de cursos', ['curso', 'estado', 'preco', 'alunos', 'aulas', 'identificador'], rows);
+  };
+
   if (loading) {
     return (
       <SellerLayout>
@@ -127,7 +158,7 @@ export default function SellerCoursesPage() {
             <div>
               <h1 className="text-2xl font-bold">Meus Cursos</h1>
               <p className="text-sm text-muted-foreground">
-                {courses.length} curso(s) — Gira o conteudo de cada um
+                {filteredCourses.length} de {courses.length} curso(s)
               </p>
             </div>
           </div>
@@ -147,8 +178,32 @@ export default function SellerCoursesPage() {
             </Link>
           </div>
         ) : (
+          <>
+          <div className="mb-4 flex flex-col sm:flex-row gap-3">
+            <label className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar curso"
+                className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm" />
+            </label>
+            <select aria-label="Filtrar cursos por estado" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="all">Todos os estados</option>
+              {Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <select aria-label="Formato do relatório" value={reportFormat} onChange={(event) => setReportFormat(event.target.value as ReportFormat)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+            </select>
+            <button type="button" onClick={exportCourses} disabled={!filteredCourses.length}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+              <Download size={15} /> Exportar
+            </button>
+          </div>
+          {filteredCourses.length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">Nenhum curso corresponde aos filtros.</p>
+          ) : (
           <div className="space-y-3">
-            {courses.map((course) => (
+            {filteredCourses.map((course) => (
               <div key={course.id} className="bg-card border border-border rounded-xl p-5 flex items-center gap-4 hover:bg-muted/20 transition-colors">
                 <div className="p-3 bg-purple-100 rounded-lg">
                   <CourseIcon size={24} className="text-purple-600" />
@@ -205,6 +260,8 @@ export default function SellerCoursesPage() {
               </div>
             ))}
           </div>
+          )}
+          </>
         )}
       </div>
     </SellerLayout>

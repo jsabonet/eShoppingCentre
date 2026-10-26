@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { TicketPercent, Plus, Trash2, Pencil, RefreshCw, X, Loader2, CheckCircle, AlertCircle, Percent, Coins, Calendar, Dices, Tag, Info } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -34,6 +34,11 @@ const generateCode = () => {
 export default function SellerCouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -52,10 +57,18 @@ export default function SellerCouponsPage() {
   const fetchCoupons = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/products/coupons/`, { headers: headers() });
-      if (!res.ok) throw new Error('Erro');
-      const data = await res.json();
-      setCoupons(data.results || data || []);
+      const allCoupons: Coupon[] = [];
+      let page = 1;
+      let hasNext = true;
+      while (hasNext) {
+        const res = await fetch(`${API_URL}/products/coupons/?page_size=100&page=${page}`, { headers: headers() });
+        if (!res.ok) throw new Error('Erro');
+        const data = await res.json();
+        allCoupons.push(...(data.results || data || []));
+        hasNext = Boolean(data.next);
+        page += 1;
+      }
+      setCoupons(allCoupons);
     } catch { setCoupons([]); }
     finally { setLoading(false); }
   }, [headers]);
@@ -126,6 +139,33 @@ export default function SellerCouponsPage() {
     } catch { showToast('error', 'Erro ao eliminar.'); }
   };
 
+  const filteredCoupons = coupons.filter((coupon) => {
+    const matchesSearch = coupon.code.toLowerCase().includes(search.trim().toLowerCase());
+    const createdDate = String(coupon.created_at || '').slice(0, 10);
+    const matchesDates = (!dateFrom || createdDate >= dateFrom) && (!dateTo || createdDate <= dateTo);
+    const matchesStatus = statusFilter === 'all'
+      || (statusFilter === 'valid' ? coupon.is_valid : !coupon.is_valid);
+    return matchesSearch && matchesDates && matchesStatus;
+  });
+
+  const exportCoupons = () => {
+    const rows = filteredCoupons.map((coupon) => ({
+      codigo: coupon.code,
+      tipo_desconto: coupon.discount_type === 'percentage' ? 'Percentagem' : 'Valor fixo',
+      valor_desconto: Number(coupon.discount_value),
+      compra_minima: Number(coupon.min_purchase),
+      utilizacoes: coupon.used_count,
+      limite_utilizacoes: coupon.max_uses || 'Sem limite',
+      estado: coupon.is_valid ? 'Activo' : 'Inactivo/Expirado',
+      inicio: String(coupon.starts_at || '').slice(0, 10),
+      fim: String(coupon.ends_at || '').slice(0, 10),
+      criado_em: String(coupon.created_at || '').slice(0, 10),
+    }));
+    const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
+    downloadReportFromObjects(reportFormat, `utilizacao-cupons-${new Date().toISOString().slice(0, 10)}.${extension}`,
+      'Relatório de cupões', ['codigo', 'tipo_desconto', 'valor_desconto', 'compra_minima', 'utilizacoes', 'limite_utilizacoes', 'estado', 'inicio', 'fim', 'criado_em'], rows);
+  };
+
   return (
     <SellerLayout>
       <div className="flex-1 p-6">
@@ -140,7 +180,7 @@ export default function SellerCouponsPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-xl font-bold">Cupões de Desconto</h1>
-            <p className="text-sm text-muted-foreground">{coupons.length} cupões</p>
+            <p className="text-sm text-muted-foreground">{filteredCoupons.length} de {coupons.length} cupões</p>
           </div>
           <div className="flex gap-2">
             <button onClick={fetchCoupons} className="p-2 hover:bg-muted rounded-lg"><RefreshCw size={16} /></button>
@@ -158,6 +198,35 @@ export default function SellerCouponsPage() {
             <p className="text-muted-foreground">Nenhum cupão criado ainda.</p>
           </div>
         ) : (
+          <>
+          <div className="mb-4 flex flex-col sm:flex-row gap-3">
+            <label className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar código"
+                className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm" />
+            </label>
+            <select aria-label="Filtrar cupões por estado" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="all">Todos os estados</option><option value="valid">Válidos</option><option value="invalid">Inactivos/expirados</option>
+            </select>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">De
+              <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)}
+                className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">Até
+              <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)}
+                className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+            </label>
+            <select aria-label="Formato do relatório" value={reportFormat} onChange={(event) => setReportFormat(event.target.value as ReportFormat)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+            </select>
+            <button type="button" onClick={exportCoupons} disabled={!filteredCoupons.length}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+              <Download size={15} /> Exportar
+            </button>
+          </div>
+
           <div className="bg-white rounded-xl border border-border overflow-hidden">
             <table className="w-full text-sm">
               <thead><tr className="border-b-2 border-border bg-muted/20">
@@ -169,7 +238,9 @@ export default function SellerCouponsPage() {
                 <th className="text-right py-3 px-4 font-semibold text-muted-foreground text-[11px] uppercase w-24">Acção</th>
               </tr></thead>
               <tbody className="divide-y divide-border">
-                {coupons.map(c => (
+                {filteredCoupons.length === 0 ? (
+                  <tr><td colSpan={6} className="py-10 text-center text-sm text-muted-foreground">Nenhum cupão corresponde aos filtros.</td></tr>
+                ) : filteredCoupons.map(c => (
                   <tr key={c.id} className="hover:bg-muted/20">
                     <td className="py-2.5 px-4 font-mono font-semibold text-xs">{c.code}</td>
                     <td className="py-2.5 px-4 text-xs">
@@ -193,6 +264,7 @@ export default function SellerCouponsPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {modal && (

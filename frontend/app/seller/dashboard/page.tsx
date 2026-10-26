@@ -149,6 +149,9 @@ export default function SellerDashboardPage() {
             <button onClick={fetchDashboard} disabled={loading} className="p-2 hover:bg-muted rounded-lg transition-colors" title="Actualizar">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
+            <Link href="/seller/earnings" className="px-3 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted flex items-center gap-2">
+              <Download size={15} /> Relatórios
+            </Link>
             {data.status === 'active' && (
               <Link
                 href="/seller/products/new"

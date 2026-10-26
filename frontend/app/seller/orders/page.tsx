@@ -5,12 +5,13 @@ import Image from 'next/image';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
   Camera, Loader2, X, AlertCircle, ChevronDown, ChevronUp, History,
-  Store, Eye, User, Phone, Mail, MapPin,
+  Store, Eye, User, Phone, Mail, MapPin, Download,
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import LightboxImage from '@/src/components/LightboxImage';
 import { ordersAPI } from '@/src/lib/api';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -57,6 +58,9 @@ export default function SellerOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
   const [updating, setUpdating] = useState<string | null>(null);
   const [shipModal, setShipModal] = useState<{ orderId: string; orderNumber: string } | null>(null);
   const [shipForm, setShipForm] = useState({ shipping_notes: '', tracking_code: '' });
@@ -72,11 +76,20 @@ export default function SellerOrdersPage() {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/orders/store/`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
-      });
-      const data = await res.json();
-      setOrders(data.results || data || []);
+      const allOrders: OrderItem[] = [];
+      let page = 1;
+      let hasNext = true;
+      while (hasNext) {
+        const res = await fetch(`${API_URL}/orders/store/?page_size=100&page=${page}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        });
+        if (!res.ok) throw new Error('Erro ao carregar encomendas.');
+        const data = await res.json();
+        allOrders.push(...(data.results || data || []));
+        hasNext = Boolean(data.next);
+        page += 1;
+      }
+      setOrders(allOrders);
     } catch { setOrders([]); }
     finally { setLoading(false); }
   }, []);
@@ -146,8 +159,32 @@ export default function SellerOrdersPage() {
   const filtered = orders.filter(o => {
     const q = search.toLowerCase();
     const m = (o.buyer_email || '').toLowerCase().includes(q) || o.order_number.toLowerCase().includes(q);
-    return m && (statusFilter === 'all' || o.status === statusFilter);
+    const orderDate = String(o.created_at || '').slice(0, 10);
+    return m && (!dateFrom || orderDate >= dateFrom) && (!dateTo || orderDate <= dateTo)
+      && (statusFilter === 'all' || o.status === statusFilter);
   });
+
+  const exportOrders = () => {
+    const rows = filtered.map((order) => ({
+      id: order.order_number,
+      cliente: order.buyer_name || order.buyer_email || '—',
+      email: order.buyer_email || '',
+      telefone: order.buyer_phone || '',
+      status: STATUS_CONFIG[order.status]?.label || order.status,
+      pagamento: order.payment_method || '',
+      total: Number(order.total || 0).toFixed(2),
+      data: new Date(order.created_at).toISOString().slice(0, 10),
+      itens: String(order.items?.length || 0),
+    }));
+
+    downloadReportFromObjects(
+      reportFormat,
+      `encomendas-${new Date().toISOString().slice(0, 10)}.${reportFormat === 'excel' ? 'xlsx' : reportFormat}`,
+      'Relatório de encomendas',
+      ['id', 'cliente', 'email', 'telefone', 'status', 'pagamento', 'total', 'data', 'itens'],
+      rows,
+    );
+  };
 
   if (loading) {
     return <SellerLayout><div className="flex-1 flex items-center justify-center"><LoadingSpinner size={32} message="A carregar..." /></div></SellerLayout>;
@@ -169,7 +206,7 @@ export default function SellerOrdersPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Encomendas</h1>
-            <p className="text-sm text-muted-foreground">{orders.length} encomendas</p>
+            <p className="text-sm text-muted-foreground">{filtered.length} de {orders.length} encomendas</p>
           </div>
           <button onClick={fetchOrders} className="p-2 hover:bg-muted rounded-lg" title="Actualizar"><RefreshCw size={16} /></button>
         </div>
@@ -185,6 +222,29 @@ export default function SellerOrdersPage() {
             <option value="all">Todos os status</option>
             {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">De
+            <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)}
+              className="rounded-xl border border-border bg-background px-2 py-2.5 text-sm text-foreground" />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">Até
+            <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)}
+              className="rounded-xl border border-border bg-background px-2 py-2.5 text-sm text-foreground" />
+          </label>
+          <select aria-label="Formato do relatório" value={reportFormat} onChange={e => setReportFormat(e.target.value as ReportFormat)}
+            className="px-4 py-2.5 border border-border rounded-xl text-sm bg-background">
+            <option value="csv">CSV</option>
+            <option value="excel">Excel (.xlsx)</option>
+            <option value="pdf">PDF</option>
+          </select>
+          <button
+            type="button"
+            onClick={exportOrders}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={15} />
+            Exportar {reportFormat === 'excel' ? 'Excel' : reportFormat.toUpperCase()}
+          </button>
         </div>
 
         <div className="bg-card border border-border rounded-xl overflow-hidden">

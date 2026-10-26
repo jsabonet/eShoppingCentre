@@ -10,6 +10,7 @@ import {
 import AdminLayout from '@/src/components/admin/AdminLayout';
 import { adminAPI } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const API_BASE = (process.env.NEXT_PUBLIC_MEDIA_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api\/v1\/?$/, '');
 
@@ -26,6 +27,7 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   suspended: { label: 'Suspenso', cls: 'bg-orange-100 text-orange-700' },
   rejected: { label: 'Rejeitado', cls: 'bg-red-100 text-red-700' },
 };
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 export default function AdminStoreDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +42,9 @@ export default function AdminStoreDetailPage() {
   const [storeReviews, setStoreReviews] = useState<any[]>([]);
   const [chatModal, setChatModal] = useState<{ convId: string; messages: any[] } | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [monthFrom, setMonthFrom] = useState('');
+  const [monthTo, setMonthTo] = useState('');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -75,6 +80,24 @@ export default function AdminStoreDetailPage() {
   }, [id, isAuthenticated, isAdmin, authLoading, router]);
 
   const status = store ? (STATUS_BADGE[store.status] || { label: store.status, cls: 'bg-gray-100 text-gray-700' }) : null;
+  const monthlySales = (store?.monthly_sales || []).filter((entry: any) => {
+    const monthIndex = MONTH_NAMES.indexOf(entry.month);
+    if (monthIndex < 0) return false;
+    const monthKey = `${entry.year}-${String(monthIndex + 1).padStart(2, '0')}`;
+    return (!monthFrom || monthKey >= monthFrom) && (!monthTo || monthKey <= monthTo);
+  });
+
+  const exportMonthlySales = () => {
+    const rows = monthlySales.map((entry: any) => ({
+      periodo: `${entry.year}-${String(MONTH_NAMES.indexOf(entry.month) + 1).padStart(2, '0')}`,
+      mes: entry.month,
+      encomendas: entry.orders,
+      receita: Number(entry.total || 0),
+    }));
+    const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
+    downloadReportFromObjects(reportFormat, `vendas-loja-${store.id}.${extension}`, `Vendas mensais - ${store.name}`,
+      ['periodo', 'mes', 'encomendas', 'receita'], rows);
+  };
 
   const openConversation = async (convId: string) => {
     setChatLoading(true);
@@ -204,10 +227,28 @@ export default function AdminStoreDetailPage() {
               {/* Monthly sales chart */}
               {store.monthly_sales?.length > 0 && (
                 <div className="bg-white rounded-lg border border-border p-5 shadow-sm">
-                  <h3 className="font-bold mb-3 flex items-center gap-2"><TrendingUp size={16} /> Vendas Mensais</h3>
-                  <div className="flex items-end gap-2 h-40">
-                    {store.monthly_sales.map((m: any) => {
-                      const maxVal = Math.max(...store.monthly_sales.map((x: any) => x.total || 0), 1);
+                  <div className="mb-4 flex flex-col sm:flex-row sm:items-end gap-3">
+                    <h3 className="font-bold flex items-center gap-2 sm:mr-auto"><TrendingUp size={16} /> Vendas Mensais</h3>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">De
+                      <input type="month" value={monthFrom} max={monthTo || undefined} onChange={(event) => setMonthFrom(event.target.value)}
+                        className="rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground" />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">Até
+                      <input type="month" value={monthTo} min={monthFrom || undefined} onChange={(event) => setMonthTo(event.target.value)}
+                        className="rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground" />
+                    </label>
+                    <select aria-label="Formato do relatório" value={reportFormat} onChange={(event) => setReportFormat(event.target.value as ReportFormat)}
+                      className="rounded-md border border-border bg-white px-2 py-1.5 text-sm">
+                      <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+                    </select>
+                    <button type="button" onClick={exportMonthlySales} disabled={!monthlySales.length}
+                      className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50">
+                      <Download size={14} /> Exportar
+                    </button>
+                  </div>
+                  {monthlySales.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">Sem dados no período selecionado.</p> : <div className="flex items-end gap-2 h-40">
+                    {monthlySales.map((m: any) => {
+                      const maxVal = Math.max(...monthlySales.map((x: any) => x.total || 0), 1);
                       const height = ((m.total || 0) / maxVal) * 100;
                       return (
                         <div key={m.month} className="flex-1 flex flex-col items-center gap-1 min-w-0">
@@ -220,7 +261,7 @@ export default function AdminStoreDetailPage() {
                         </div>
                       );
                     })}
-                  </div>
+                  </div>}
                 </div>
               )}
 

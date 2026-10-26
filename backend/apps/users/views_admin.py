@@ -6,12 +6,14 @@ from django.db.models import Sum
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
+from django.utils.dateparse import parse_date
 from apps.notifications import email_service
 from apps.users.models import User
 from apps.stores.models import Store
 from apps.orders.models import Order
 from apps.wallet.models import WalletTransaction, Wallet
 from apps.affiliates.models import AffiliateProfile
+from rest_framework.exceptions import ValidationError
 from .serializers import UserProfileSerializer, AdminUserCreateSerializer, AdminUserSerializer
 
 UserModel = get_user_model()
@@ -21,16 +23,45 @@ class AdminStatsView(APIView):
     permission_classes = [permissions.IsAdminUser]
 
     def get(self, request):
-        total_revenue = WalletTransaction.objects.filter(
+        date_from_value = request.query_params.get('date_from')
+        date_to_value = request.query_params.get('date_to')
+        if bool(date_from_value) != bool(date_to_value):
+            raise ValidationError({'date': 'Indique as datas inicial e final.'})
+
+        date_from = parse_date(date_from_value) if date_from_value else None
+        date_to = parse_date(date_to_value) if date_to_value else None
+        if date_from_value and date_from is None:
+            raise ValidationError({'date_from': 'Use uma data válida no formato AAAA-MM-DD.'})
+        if date_to_value and date_to is None:
+            raise ValidationError({'date_to': 'Use uma data válida no formato AAAA-MM-DD.'})
+        if date_from and date_to and date_from > date_to:
+            raise ValidationError({'date_to': 'A data final deve ser igual ou posterior à inicial.'})
+
+        def for_period(queryset, field='created_at'):
+            if date_from:
+                queryset = queryset.filter(**{f'{field}__date__gte': date_from})
+                queryset = queryset.filter(**{f'{field}__date__lte': date_to})
+            return queryset
+
+        revenue_transactions = for_period(WalletTransaction.objects.filter(
             type='fee', status='completed'
-        ).aggregate(total=Sum('amount'))['total'] or 0
+        ))
+        total_revenue = revenue_transactions.aggregate(total=Sum('amount'))['total'] or 0
+        orders = for_period(Order.objects.all())
+        users = for_period(UserModel.objects.all(), 'date_joined')
+        stores = for_period(Store.objects.all())
+        from apps.products.models import Product
+        products = for_period(Product.objects.all())
 
         return Response({
-            'total_users': UserModel.objects.count(),
-            'total_stores': Store.objects.count(),
-            'total_orders': Order.objects.count(),
+            'date_from': date_from.isoformat() if date_from else None,
+            'date_to': date_to.isoformat() if date_to else None,
+            'total_products': products.count(),
+            'total_users': users.count(),
+            'total_stores': stores.count(),
+            'total_orders': orders.count(),
             'total_revenue': float(total_revenue),
-            'pending_stores': Store.objects.filter(status='pending').count(),
+            'pending_stores': stores.filter(status='pending').count(),
             'pending_payouts': 0,
         })
 

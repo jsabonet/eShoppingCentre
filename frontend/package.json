@@ -44,9 +44,12 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "exceljs": "^4.4.0",
     "firebase": "^12.16.0",
     "framer-motion": "^11.11.1",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
     "lucide-react": "^0.545.0",
     "next": "^15.3.3",
     "next-themes": "^0.4.6",
@@ -79,5 +82,10 @@
       "esbuild",
       "sharp"
     ]
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

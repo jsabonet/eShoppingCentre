@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Link as LinkIcon, Copy, Check, ExternalLink, RefreshCw, Loader2, Plus } from 'lucide-react';
+import { Link as LinkIcon, Copy, Check, ExternalLink, RefreshCw, Loader2, Plus, Search, Download } from 'lucide-react';
 import AffiliateLayout from '@/src/components/AffiliateLayout';
 import { affiliatesAPI, productsAPI, type AffiliateLink } from '@/src/lib/api';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 export default function AffiliateLinksPage() {
   const [links, setLinks] = useState<AffiliateLink[]>([]);
@@ -12,16 +13,40 @@ export default function AffiliateLinksPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [linksRes, prodRes] = await Promise.all([
-        affiliatesAPI.myLinks(),
-        productsAPI.list({ page_size: 100, affiliate_enabled: true }),
+      const [allLinks, allProducts] = await Promise.all([
+        (async () => {
+          const results: AffiliateLink[] = [];
+          let page = 1;
+          let hasNext = true;
+          while (hasNext) {
+            const { data } = await affiliatesAPI.myLinks({ page_size: 100, page });
+            results.push(...(data.results || []));
+            hasNext = Boolean(data.next);
+            page += 1;
+          }
+          return results;
+        })(),
+        (async () => {
+          const results: any[] = [];
+          let page = 1;
+          let hasNext = true;
+          while (hasNext) {
+            const { data } = await productsAPI.list({ page_size: 100, page, affiliate_enabled: true });
+            results.push(...(data.results || []));
+            hasNext = Boolean(data.next);
+            page += 1;
+          }
+          return results;
+        })(),
       ]);
-      setLinks(Array.isArray(linksRes.data.results) ? linksRes.data.results : []);
-      setProducts(Array.isArray(prodRes.data.results) ? prodRes.data.results : []);
+      setLinks(allLinks);
+      setProducts(allProducts);
     } catch (error) {
       console.error('Falha ao carregar links e produtos de afiliado:', error);
       setLinks([]);
@@ -46,6 +71,28 @@ export default function AffiliateLinksPage() {
     navigator.clipboard.writeText(url);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const filteredLinks = links.filter((link) => {
+    const query = search.trim().toLowerCase();
+    return !query || [link.product_name, link.code, link.short_url]
+      .some((value) => String(value || '').toLowerCase().includes(query));
+  });
+  const totalClicks = filteredLinks.reduce((sum, link) => sum + link.clicks, 0);
+  const totalConversions = filteredLinks.reduce((sum, link) => sum + link.conversions, 0);
+
+  const exportLinks = () => {
+    const rows = filteredLinks.map((link) => ({
+      produto: link.product_name,
+      codigo: link.code,
+      url: link.short_url,
+      cliques: link.clicks,
+      vendas: link.conversions,
+      conversao: link.clicks > 0 ? `${((link.conversions / link.clicks) * 100).toFixed(1)}%` : '0%',
+    }));
+    const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
+    downloadReportFromObjects(reportFormat, `links-afiliado-${new Date().toISOString().slice(0, 10)}.${extension}`,
+      'Relatório de links de afiliado', ['produto', 'codigo', 'url', 'cliques', 'vendas', 'conversao'], rows);
   };
 
   return (
@@ -85,8 +132,30 @@ export default function AffiliateLinksPage() {
             <p className="text-muted-foreground">Ainda não tem links. Gere o primeiro acima.</p>
           </div>
         ) : (
+          <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div className="rounded-lg border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Links filtrados</p><p className="text-xl font-bold">{filteredLinks.length}</p></div>
+            <div className="rounded-lg border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Cliques</p><p className="text-xl font-bold">{totalClicks}</p></div>
+            <div className="rounded-lg border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Vendas atribuídas</p><p className="text-xl font-bold">{totalConversions}</p></div>
+          </div>
+          <div className="mb-4 flex flex-col sm:flex-row gap-3">
+            <label className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar produto, código ou URL"
+                className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm" />
+            </label>
+            <select aria-label="Formato do relatório" value={reportFormat} onChange={(event) => setReportFormat(event.target.value as ReportFormat)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+            </select>
+            <button type="button" onClick={exportLinks} disabled={!filteredLinks.length}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+              <Download size={15} /> Exportar
+            </button>
+          </div>
+          {filteredLinks.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">Nenhum link corresponde à pesquisa.</p> : (
           <div className="space-y-4">
-            {links.map((link) => (
+            {filteredLinks.map((link) => (
               <div key={link.id} className="bg-card border border-border rounded-xl p-4">
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="min-w-0">
@@ -110,6 +179,8 @@ export default function AffiliateLinksPage() {
               </div>
             ))}
           </div>
+          )}
+          </>
         )}
       </div>
     </AffiliateLayout>

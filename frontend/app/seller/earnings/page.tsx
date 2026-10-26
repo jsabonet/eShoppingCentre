@@ -6,6 +6,7 @@ import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { storesAPI, walletAPI } from '@/src/lib/api';
 import type { WalletInfo, WalletTransaction } from '@/src/lib/api';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 function localDateString(date: Date) {
   const year = date.getFullYear();
@@ -27,17 +28,38 @@ export default function SellerEarningsPage() {
   const [reportFormat, setReportFormat] = useState<'csv' | 'excel' | 'pdf'>('csv');
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
+  const [transactionDateFrom, setTransactionDateFrom] = useState('');
+  const [transactionDateTo, setTransactionDateTo] = useState('');
+  const [transactionType, setTransactionType] = useState('all');
+  const [transactionFormat, setTransactionFormat] = useState<ReportFormat>('csv');
+
+  const reportFormatOptions = [
+    { value: 'csv', label: 'CSV' },
+    { value: 'excel', label: 'Excel (.xlsx)' },
+    { value: 'pdf', label: 'PDF' },
+  ] as const;
 
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
-      const [wRes, tRes, pRes] = await Promise.all([
+      const [wRes, allTransactions, pRes] = await Promise.all([
         walletAPI.myWallet(),
-        walletAPI.myTransactions(),
+        (async () => {
+          const results: WalletTransaction[] = [];
+          let page = 1;
+          let hasNext = true;
+          while (hasNext) {
+            const { data } = await walletAPI.myTransactions({ page_size: 100, page });
+            results.push(...(data.results || []));
+            hasNext = Boolean(data.next);
+            page += 1;
+          }
+          return results;
+        })(),
         walletAPI.myPayouts(),
       ]);
       setWallet(wRes.data);
-      setTransactions((tRes.data as any).results || tRes.data || []);
+      setTransactions(allTransactions);
       setPayouts(Array.isArray(pRes.data) ? pRes.data : (pRes.data as any)?.results || []);
     } catch { /* silently fail */ }
     finally { setLoading(false); }
@@ -124,6 +146,25 @@ export default function SellerEarningsPage() {
 
   const available = Number(wallet?.available_payout ?? wallet?.payout_balance ?? 0);
   const totalEarned = Number(wallet?.total_earned || 0);
+  const filteredTransactions = transactions.filter((transaction) => {
+    const date = String(transaction.created_at || '').slice(0, 10);
+    return (!transactionDateFrom || date >= transactionDateFrom)
+      && (!transactionDateTo || date <= transactionDateTo)
+      && (transactionType === 'all' || transaction.type === transactionType);
+  });
+
+  const exportTransactions = () => {
+    const rows = filteredTransactions.map((transaction) => ({
+      tipo: transaction.type,
+      descricao: transaction.description || '',
+      valor: Number(transaction.amount || 0),
+      estado: transaction.status,
+      data: String(transaction.created_at || '').slice(0, 10),
+    }));
+    const extension = transactionFormat === 'excel' ? 'xlsx' : transactionFormat;
+    downloadReportFromObjects(transactionFormat, `transacoes-carteira-${new Date().toISOString().slice(0, 10)}.${extension}`,
+      'Relatório de transações da carteira', ['tipo', 'descricao', 'valor', 'estado', 'data'], rows);
+  };
 
   return (
     <SellerLayout>
@@ -187,6 +228,18 @@ export default function SellerEarningsPage() {
                 className="rounded-md border border-border bg-background px-3 py-2"
               />
             </label>
+            <label className="flex flex-col gap-1 text-sm">
+              Formato
+              <select
+                value={reportFormat}
+                onChange={(event) => setReportFormat(event.target.value as 'csv' | 'excel' | 'pdf')}
+                className="rounded-md border border-border bg-background px-3 py-2"
+              >
+                {reportFormatOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               onClick={downloadReport}
@@ -196,7 +249,7 @@ export default function SellerEarningsPage() {
               {reportLoading
                 ? <Loader2 size={16} className="animate-spin" />
                 : <Download size={16} />}
-              {reportLoading ? 'A gerar...' : 'Exportar CSV'}
+              {reportLoading ? 'A gerar...' : `Exportar ${reportFormatOptions.find((option) => option.value === reportFormat)?.label ?? 'CSV'}`}
             </button>
           </div>
           {reportError && (
@@ -209,14 +262,38 @@ export default function SellerEarningsPage() {
         </section>
 
         <div className="bg-card border border-border rounded-xl">
-          <div className="p-4 border-b border-border">
+          <div className="space-y-3 border-b border-border p-4">
             <h2 className="font-bold">Histórico de Transacções</h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">De
+                <input type="date" value={transactionDateFrom} max={transactionDateTo || undefined} onChange={(event) => setTransactionDateFrom(event.target.value)}
+                  className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">Até
+                <input type="date" value={transactionDateTo} min={transactionDateFrom || undefined} onChange={(event) => setTransactionDateTo(event.target.value)}
+                  className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+              </label>
+              <select aria-label="Filtrar transações por tipo" value={transactionType} onChange={(event) => setTransactionType(event.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                <option value="all">Todos os tipos</option>
+                {Array.from(new Set(transactions.map((transaction) => transaction.type))).map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+              <select aria-label="Formato do relatório" value={transactionFormat} onChange={(event) => setTransactionFormat(event.target.value as ReportFormat)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+              </select>
+              <button type="button" onClick={exportTransactions} disabled={!filteredTransactions.length}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+                <Download size={15} /> Exportar
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">{filteredTransactions.length} de {transactions.length} transações</p>
           </div>
           <div className="divide-y divide-border">
-            {transactions.length === 0 && (
-              <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma transacção ainda.</p>
+            {filteredTransactions.length === 0 && (
+              <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma transacção corresponde aos filtros.</p>
             )}
-            {transactions.map((tx) => {
+            {filteredTransactions.map((tx) => {
               const isPositive = tx.type === 'sale' || tx.type === 'deposit' || tx.type === 'refund';
               const isSale = tx.type === 'sale';
               const isWithdrawal = tx.type === 'withdrawal';

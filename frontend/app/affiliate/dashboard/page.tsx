@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { MousePointerClick, ShoppingCart, DollarSign, TrendingUp, Gift, RefreshCw, Loader2 } from 'lucide-react';
+import { MousePointerClick, ShoppingCart, DollarSign, TrendingUp, Gift, RefreshCw, Loader2, FileText } from 'lucide-react';
 import AffiliateLayout from '@/src/components/AffiliateLayout';
 import { affiliatesAPI, type AffiliateProfile } from '@/src/lib/api';
 
@@ -61,6 +61,9 @@ export default function AffiliateDashboardPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={load} className="p-2 hover:bg-muted rounded-lg"><RefreshCw size={16} /></button>
+            <Link href="/affiliate/earnings" className="px-3 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted flex items-center gap-2">
+              <FileText size={15} /> Relatórios
+            </Link>
             <Link href="/affiliate/links" className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 flex items-center gap-2">
               <Gift size={16} /> Gerar Links
             </Link>

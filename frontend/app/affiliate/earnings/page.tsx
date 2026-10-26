@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, ArrowUp, RefreshCw, Loader2, Wallet, X, ShieldCheck, FileText } from 'lucide-react';
+import { DollarSign, ArrowUp, RefreshCw, Loader2, Wallet, X, ShieldCheck, FileText, Search, Download } from 'lucide-react';
 import AffiliateLayout from '@/src/components/AffiliateLayout';
 import { affiliatesAPI, type AffiliateProfile } from '@/src/lib/api';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Pendente', approved: 'Aprovado', paid: 'Pago', rejected: 'Rejeitado',
@@ -18,6 +19,16 @@ export default function AffiliateEarningsPage() {
   const [commissions, setCommissions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
+  const [payoutSearch, setPayoutSearch] = useState('');
+  const [payoutStatusFilter, setPayoutStatusFilter] = useState('all');
+  const [payoutDateFrom, setPayoutDateFrom] = useState('');
+  const [payoutDateTo, setPayoutDateTo] = useState('');
+  const [payoutFormat, setPayoutFormat] = useState<ReportFormat>('csv');
   const [showPayout, setShowPayout] = useState(false);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('mpesa');
@@ -34,13 +45,23 @@ export default function AffiliateEarningsPage() {
     try {
       const [p, c, k, w] = await Promise.all([
         affiliatesAPI.myProfile(),
-        affiliatesAPI.myCommissions({ page_size: 100 }),
+        (async () => {
+          const results: any[] = [];
+          let page = 1;
+          let hasNext = true;
+          while (hasNext) {
+            const { data } = await affiliatesAPI.myCommissions({ page_size: 100, page });
+            results.push(...(data.results || data || []));
+            hasNext = Boolean(data.next);
+            page += 1;
+          }
+          return results;
+        })(),
         affiliatesAPI.myKYC(),
         affiliatesAPI.myPayouts(),
       ]);
       setProfile(p.data);
-      const cData = c.data;
-      setCommissions(cData.results || cData || []);
+      setCommissions(c);
       setKyc(k.data?.status && k.data.status !== 'none' ? k.data : null);
       setPayouts(Array.isArray(w.data) ? w.data : []);
     } catch { setProfile(null); setCommissions([]); setKyc(null); setPayouts([]); }
@@ -97,10 +118,55 @@ export default function AffiliateEarningsPage() {
     }
   };
 
-  const pendingTotal = commissions.filter(c => c.status === 'pending' || c.status === 'approved')
+  const filteredCommissions = commissions.filter((commission) => {
+    const query = search.trim().toLowerCase();
+    const matchesSearch = !query || [commission.product_name, commission.order_number]
+      .some((value) => String(value || '').toLowerCase().includes(query));
+    const createdDate = String(commission.created_at || '').slice(0, 10);
+    const matchesFrom = !dateFrom || createdDate >= dateFrom;
+    const matchesTo = !dateTo || createdDate <= dateTo;
+    return matchesSearch && matchesFrom && matchesTo
+      && (statusFilter === 'all' || commission.status === statusFilter);
+  });
+
+  const pendingTotal = filteredCommissions.filter(c => c.status === 'pending' || c.status === 'approved')
     .reduce((s, c) => s + Number(c.amount), 0);
-  const paidTotal = commissions.filter(c => c.status === 'paid')
+  const paidTotal = filteredCommissions.filter(c => c.status === 'paid')
     .reduce((s, c) => s + Number(c.amount), 0);
+
+  const exportCommissions = () => {
+    const rows = filteredCommissions.map((commission) => ({
+      produto: commission.product_name || '—',
+      encomenda: commission.order_number || '—',
+      valor: Number(commission.amount || 0),
+      data: String(commission.created_at || '').slice(0, 10),
+      estado: STATUS_LABEL[commission.status] || commission.status,
+    }));
+    const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
+    downloadReportFromObjects(reportFormat, `comissoes-${new Date().toISOString().slice(0, 10)}.${extension}`, 'Relatório de comissões',
+      ['produto', 'encomenda', 'valor', 'data', 'estado'], rows);
+  };
+
+  const filteredPayouts = payouts.filter((payout) => {
+    const query = payoutSearch.trim().toLowerCase();
+    const matchesSearch = !query || String(payout.method || '').toLowerCase().includes(query);
+    const date = String(payout.created_at || '').slice(0, 10);
+    return matchesSearch && (!payoutDateFrom || date >= payoutDateFrom)
+      && (!payoutDateTo || date <= payoutDateTo)
+      && (payoutStatusFilter === 'all' || payout.status === payoutStatusFilter);
+  });
+
+  const exportPayouts = () => {
+    const rows = filteredPayouts.map((payout) => ({
+      valor: Number(payout.amount || 0),
+      metodo: payout.method || '',
+      data: String(payout.created_at || '').slice(0, 10),
+      estado: STATUS_LABEL[payout.status] || payout.status,
+    }));
+    const extension = payoutFormat === 'excel' ? 'xlsx' : payoutFormat;
+    downloadReportFromObjects(payoutFormat, `saques-afiliado-${new Date().toISOString().slice(0, 10)}.${extension}`,
+      'Relatório de saques do afiliado', ['valor', 'metodo', 'data', 'estado'], rows);
+  };
 
   return (
     <AffiliateLayout>
@@ -136,22 +202,51 @@ export default function AffiliateEarningsPage() {
           <div className="bg-card border border-border rounded-xl p-6">
             <p className="text-sm text-muted-foreground mb-1">Total Pendente</p>
             <p className="text-2xl font-bold text-yellow-600">{pendingTotal.toLocaleString('pt-MZ')} MZN</p>
-            <span className="text-xs text-muted-foreground">Aguarda aprovação/pagamento</span>
+            <span className="text-xs text-muted-foreground">No período/estado filtrado</span>
           </div>
           <div className="bg-card border border-border rounded-xl p-6">
             <p className="text-sm text-muted-foreground mb-1">Total Recebido</p>
             <p className="text-2xl font-bold text-green-600">{paidTotal.toLocaleString('pt-MZ')} MZN</p>
-            <span className="flex items-center gap-1 text-xs text-green-600"><ArrowUp size={12} />Total histórico</span>
+            <span className="flex items-center gap-1 text-xs text-green-600"><ArrowUp size={12} />No período/estado filtrado</span>
           </div>
         </div>
 
         <div className="bg-card border border-border rounded-xl">
-          <div className="p-4 border-b border-border">
+          <div className="p-4 border-b border-border space-y-3">
             <h2 className="font-bold">Histórico de Comissões</h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <label className="relative flex-1">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar produto ou encomenda"
+                  className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm" />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">De
+                <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)}
+                  className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">Até
+                <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)}
+                  className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+              </label>
+              <select aria-label="Filtrar por estado" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                <option value="all">Todos os estados</option>
+                {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <select aria-label="Formato do relatório" value={reportFormat} onChange={(event) => setReportFormat(event.target.value as ReportFormat)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+              </select>
+              <button type="button" onClick={exportCommissions} disabled={!filteredCommissions.length}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+                <Download size={15} /> Exportar
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">{filteredCommissions.length} de {commissions.length} comissões</p>
           </div>
           {loading ? (
             <div className="text-center py-12"><Loader2 size={28} className="animate-spin mx-auto text-muted-foreground" /></div>
-          ) : commissions.length === 0 ? (
+          ) : filteredCommissions.length === 0 ? (
             <div className="text-center py-12">
               <DollarSign size={48} className="mx-auto text-muted-foreground mb-3 opacity-30" />
               <p className="text-muted-foreground">Ainda não tem comissões.</p>
@@ -169,7 +264,7 @@ export default function AffiliateEarningsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {commissions.map((c) => (
+                  {filteredCommissions.map((c) => (
                     <tr key={c.id} className="hover:bg-muted/30">
                       <td className="py-3 px-4">{c.product_name || '—'}</td>
                       <td className="py-3 px-4 font-mono text-xs">{c.order_number}</td>
@@ -192,8 +287,37 @@ export default function AffiliateEarningsPage() {
         {/* Meus Saques */}
         {payouts.length > 0 && (
           <div className="bg-card border border-border rounded-xl mt-6">
-            <div className="p-4 border-b border-border">
+            <div className="space-y-3 border-b border-border p-4">
               <h2 className="font-bold">Meus Saques</h2>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <label className="flex-1">
+                  <span className="sr-only">Buscar método de saque</span>
+                  <input value={payoutSearch} onChange={(event) => setPayoutSearch(event.target.value)} placeholder="Buscar método"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+                </label>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">De
+                  <input type="date" value={payoutDateFrom} max={payoutDateTo || undefined} onChange={(event) => setPayoutDateFrom(event.target.value)}
+                    className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+                </label>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">Até
+                  <input type="date" value={payoutDateTo} min={payoutDateFrom || undefined} onChange={(event) => setPayoutDateTo(event.target.value)}
+                    className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+                </label>
+                <select aria-label="Filtrar saques por estado" value={payoutStatusFilter} onChange={(event) => setPayoutStatusFilter(event.target.value)}
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                  <option value="all">Todos os estados</option>
+                  {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+                <select aria-label="Formato do relatório de saques" value={payoutFormat} onChange={(event) => setPayoutFormat(event.target.value as ReportFormat)}
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                  <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+                </select>
+                <button type="button" onClick={exportPayouts} disabled={!filteredPayouts.length}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+                  <Download size={15} /> Exportar
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">{filteredPayouts.length} de {payouts.length} saques</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -206,7 +330,7 @@ export default function AffiliateEarningsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {payouts.map((p) => (
+                  {filteredPayouts.map((p) => (
                     <tr key={p.id} className="hover:bg-muted/30">
                       <td className="py-3 px-4 font-medium">{Number(p.amount).toLocaleString('pt-MZ')} MZN</td>
                       <td className="py-3 px-4 uppercase text-xs">{p.method}</td>

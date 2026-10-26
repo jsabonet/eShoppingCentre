@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Users, DollarSign, Wallet, Settings, RefreshCw, Loader2, CheckCircle, AlertCircle, Ban, ShieldCheck, Percent, FileText } from 'lucide-react';
+import { Users, DollarSign, Wallet, Settings, RefreshCw, Loader2, CheckCircle, AlertCircle, Ban, ShieldCheck, Percent, FileText, Search, Download } from 'lucide-react';
 import { affiliatesAPI, type AffiliateProfile } from '@/src/lib/api';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Pendente', approved: 'Aprovado', paid: 'Pago', rejected: 'Rejeitado',
@@ -11,6 +12,24 @@ const STATUS_COLOR: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-700', approved: 'bg-blue-100 text-blue-700',
   paid: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700',
 };
+
+async function fetchAllPages<T>(fetchPage: (params: Record<string, any>) => Promise<{ data: T[] | { results?: T[]; next?: string | null } }>) {
+  const results: T[] = [];
+  let page = 1;
+  let hasNext = true;
+  while (hasNext) {
+    const { data } = await fetchPage({ page_size: 100, page });
+    if (Array.isArray(data)) {
+      results.push(...data);
+      hasNext = false;
+    } else {
+      results.push(...(data.results || []));
+      hasNext = Boolean(data.next);
+      page += 1;
+    }
+  }
+  return results;
+}
 
 export default function AdminAffiliates() {
   const [view, setView] = useState<'affiliates' | 'commissions' | 'payouts' | 'kyc' | 'settings'>('affiliates');
@@ -22,6 +41,11 @@ export default function AdminAffiliates() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToast({ type, text }); setTimeout(() => setToast(null), 4000);
@@ -31,16 +55,16 @@ export default function AdminAffiliates() {
     setLoading(true);
     try {
       const [a, c, p, k, s] = await Promise.all([
-        affiliatesAPI.adminList({ page_size: 200 }),
-        affiliatesAPI.adminCommissions({ page_size: 200 }),
-        affiliatesAPI.adminPayouts({ page_size: 200 }),
-        affiliatesAPI.adminKYC({ page_size: 200 }),
+        fetchAllPages<AffiliateProfile>(affiliatesAPI.adminList),
+        fetchAllPages<any>(affiliatesAPI.adminCommissions),
+        fetchAllPages<any>(affiliatesAPI.adminPayouts),
+        fetchAllPages<any>(affiliatesAPI.adminKYC),
         affiliatesAPI.adminSettings(),
       ]);
-      setAffiliates(a.data.results || a.data || []);
-      setCommissions(c.data.results || c.data || []);
-      setPayouts(p.data.results || p.data || []);
-      setKycList(k.data.results || k.data || []);
+      setAffiliates(a);
+      setCommissions(c);
+      setPayouts(p);
+      setKycList(k);
       setSettings(s.data);
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -90,6 +114,75 @@ export default function AdminAffiliates() {
     finally { setSaving(false); }
   };
 
+  const matchesSearch = (values: unknown[], query: string) => !query || values
+    .some((value) => String(value || '').toLowerCase().includes(query));
+  const inDateRange = (value: string | undefined) => {
+    const date = String(value || '').slice(0, 10);
+    return (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo);
+  };
+  const query = search.trim().toLowerCase();
+  const filteredAffiliates = affiliates.filter((affiliate) =>
+    matchesSearch([affiliate.user_name, affiliate.user_email, affiliate.referral_code], query)
+      && (statusFilter === 'all' || affiliate.status === statusFilter));
+  const filteredCommissions = commissions.filter((commission) =>
+    matchesSearch([commission.affiliate_email, commission.order_number, commission.product_name], query)
+      && inDateRange(commission.created_at)
+      && (statusFilter === 'all' || commission.status === statusFilter));
+  const filteredPayouts = payouts.filter((payout) =>
+    matchesSearch([payout.affiliate_email, payout.method], query)
+      && inDateRange(payout.created_at)
+      && (statusFilter === 'all' || payout.status === statusFilter));
+
+  const exportCurrentReport = () => {
+    let title = 'Relatório de afiliados';
+    let headers: string[];
+    let rows: Array<Record<string, string | number>>;
+    if (view === 'affiliates') {
+      headers = ['afiliado', 'email', 'codigo', 'nivel', 'cliques', 'vendas', 'comissao', 'estado'];
+      rows = filteredAffiliates.map((affiliate) => ({
+        afiliado: affiliate.user_name || affiliate.user_email,
+        email: affiliate.user_email,
+        codigo: affiliate.referral_code,
+        nivel: affiliate.commission_tier,
+        cliques: affiliate.total_clicks,
+        vendas: affiliate.total_sales,
+        comissao: Number(affiliate.total_commission),
+        estado: affiliate.status,
+      }));
+    } else if (view === 'commissions') {
+      title = 'Relatório de comissões de afiliados';
+      headers = ['encomenda', 'afiliado', 'produto', 'valor', 'valor_revertido', 'taxa_percentual', 'estado', 'data'];
+      rows = filteredCommissions.map((commission) => ({
+        encomenda: commission.order_number || '',
+        afiliado: commission.affiliate_email || '',
+        produto: commission.product_name || '',
+        valor: Number(commission.amount || 0),
+        valor_revertido: Number(commission.reversed_amount || 0),
+        taxa_percentual: Number(commission.commission_rate || 0),
+        estado: STATUS_LABEL[commission.status] || commission.status,
+        data: String(commission.created_at || '').slice(0, 10),
+      }));
+    } else {
+      title = 'Relatório de saques de afiliados';
+      headers = ['afiliado', 'valor', 'taxa', 'valor_liquido', 'metodo', 'estado', 'data'];
+      rows = filteredPayouts.map((payout) => ({
+        afiliado: payout.affiliate_email || '',
+        valor: Number(payout.amount || 0),
+        taxa: Number(payout.fee || 0),
+        valor_liquido: Number(payout.net_amount || 0),
+        metodo: payout.method || '',
+        estado: STATUS_LABEL[payout.status] || payout.status,
+        data: String(payout.created_at || '').slice(0, 10),
+      }));
+    }
+    const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
+    downloadReportFromObjects(reportFormat, `admin-${view}-${new Date().toISOString().slice(0, 10)}.${extension}`,
+      title, headers, rows);
+  };
+
+  const activeRows = view === 'affiliates' ? filteredAffiliates
+    : view === 'commissions' ? filteredCommissions : filteredPayouts;
+
   return (
     <div>
       {toast && (
@@ -115,12 +208,48 @@ export default function AdminAffiliates() {
           { id: 'kyc', label: 'Verificações', icon: FileText },
           { id: 'settings', label: 'Configurações', icon: Settings },
         ] as const).map(t => (
-          <button key={t.id} onClick={() => setView(t.id)}
+          <button key={t.id} onClick={() => { setView(t.id); setStatusFilter('all'); }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${view === t.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
             <t.icon size={16} /> {t.label}
           </button>
         ))}
       </div>
+
+      {view !== 'kyc' && view !== 'settings' && (
+        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-white p-4 lg:flex-row lg:items-end">
+          <label className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar afiliado, encomenda ou produto"
+              className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm" />
+          </label>
+          {view !== 'affiliates' && <>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">De
+              <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)}
+                className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">Até
+              <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)}
+                className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+            </label>
+          </>}
+          <select aria-label="Filtrar por estado" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+            <option value="all">Todos os estados</option>
+            {(view === 'affiliates' ? ['active', 'pending', 'suspended'] : ['pending', 'approved', 'paid', 'rejected'])
+              .map((status) => <option key={status} value={status}>
+                {status === 'active' ? 'Activo' : status === 'suspended' ? 'Suspenso' : STATUS_LABEL[status] || status}
+              </option>)}
+          </select>
+          <select aria-label="Formato do relatório" value={reportFormat} onChange={(event) => setReportFormat(event.target.value as ReportFormat)}
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+            <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+          </select>
+          <button type="button" onClick={exportCurrentReport} disabled={!activeRows.length || Boolean(dateFrom) !== Boolean(dateTo)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+            <Download size={15} /> Exportar
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12"><Loader2 size={28} className="animate-spin mx-auto text-muted-foreground" /></div>
@@ -140,7 +269,7 @@ export default function AdminAffiliates() {
                     <th className="text-right py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase w-28">Acção</th>
                   </tr></thead>
                   <tbody className="divide-y divide-border">
-                    {affiliates.map(a => (
+                    {filteredAffiliates.map(a => (
                       <tr key={a.id} className="hover:bg-muted/20">
                         <td className="py-2.5 px-3">
                           <p className="text-xs font-medium">{a.user_name || a.user_email}</p>
@@ -183,7 +312,7 @@ export default function AdminAffiliates() {
                     <th className="text-right py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase w-28">Acção</th>
                   </tr></thead>
                   <tbody className="divide-y divide-border">
-                    {commissions.map(c => (
+                    {filteredCommissions.map(c => (
                       <tr key={c.id} className="hover:bg-muted/20">
                         <td className="py-2.5 px-3 font-mono text-xs">{c.order_number}</td>
                         <td className="py-2.5 px-3 text-xs">{c.affiliate_email || '—'}</td>
@@ -220,7 +349,7 @@ export default function AdminAffiliates() {
                     <th className="text-right py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase w-28">Acção</th>
                   </tr></thead>
                   <tbody className="divide-y divide-border">
-                    {payouts.map(p => (
+                    {filteredPayouts.map(p => (
                       <tr key={p.id} className="hover:bg-muted/20">
                         <td className="py-2.5 px-3 text-xs">{p.affiliate_email}</td>
                         <td className="py-2.5 px-3 text-xs font-semibold">{Number(p.amount).toLocaleString('pt-MZ')} MZN</td>

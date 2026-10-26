@@ -8,6 +8,7 @@ import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { productsAPI, storesAPI } from '@/src/lib/api';
 import type { Product } from '@/src/lib/api';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
 
@@ -69,6 +70,7 @@ export default function SellerProductsPage() {
   const [storeType, setStoreType] = useState<string>('physical');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [stockModal, setStockModal] = useState<any | null>(null);
   const [savingAffiliate, setSavingAffiliate] = useState<string | null>(null);
@@ -92,8 +94,16 @@ export default function SellerProductsPage() {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await productsAPI.myProducts();
-      setProducts((data as any).results || data || []);
+      const allProducts: Product[] = [];
+      let page = 1;
+      let hasNext = true;
+      while (hasNext) {
+        const { data } = await productsAPI.myProducts({ page_size: 100, page });
+        allProducts.push(...((data as any).results || data || []));
+        hasNext = Boolean((data as any).next);
+        page += 1;
+      }
+      setProducts(allProducts);
     } catch { setProducts([]); }
     finally { setLoading(false); }
   }, []);
@@ -166,6 +176,25 @@ export default function SellerProductsPage() {
     deleted: 'bg-gray-100 text-gray-400',
   };
 
+  const exportProducts = () => {
+    const rows = filtered.map((product) => {
+      const item = product as any;
+      return {
+        produto: product.name,
+        tipo: item.product_type || storeType,
+        preco: Number(product.price || 0),
+        stock: item.stock ?? '',
+        vendas_downloads: item.digital_downloads ?? product.sales_count ?? 0,
+        estado: statusLabel[product.status] || product.status,
+        afiliacao: product.affiliate_enabled === false ? 'Inactiva' : 'Activa',
+        comissao_percentual: Number(product.affiliate_commission ?? 10),
+      };
+    });
+    const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
+    downloadReportFromObjects(reportFormat, `produtos-${new Date().toISOString().slice(0, 10)}.${extension}`,
+      'Relatório de produtos e desempenho', ['produto', 'tipo', 'preco', 'stock', 'vendas_downloads', 'estado', 'afiliacao', 'comissao_percentual'], rows);
+  };
+
   if (loading) {
     return (
       <SellerLayout>
@@ -206,6 +235,14 @@ export default function SellerProductsPage() {
             <option value="inactive">Inactivo</option>
             <option value="draft">Rascunho</option>
           </select>
+          <select aria-label="Formato do relatório" value={reportFormat} onChange={(event) => setReportFormat(event.target.value as ReportFormat)}
+            className="px-3 py-2 border border-border rounded-md text-sm bg-background">
+            <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+          </select>
+          <button type="button" onClick={exportProducts} disabled={!filtered.length}
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+            <Download size={15} /> Exportar {reportFormat === 'excel' ? 'Excel' : reportFormat.toUpperCase()}
+          </button>
         </div>
 
         {/* Afiliação em massa removida */}

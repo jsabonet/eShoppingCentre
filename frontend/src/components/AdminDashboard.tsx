@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard, Package, ShoppingCart, LogOut, Plus, Edit, Trash2,
   TrendingUp, Users, DollarSign, Eye, X, ChevronLeft, ChevronRight,
-  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw, LifeBuoy, TicketPercent, Wallet, ShieldCheck
+  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw, LifeBuoy, TicketPercent, Wallet, ShieldCheck, Download
 } from 'lucide-react';
 import { adminAPI, productsAPI, ordersAPI, storesAPI, type Product as APIProduct } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -21,6 +21,7 @@ import AdminWallet from './admin/AdminWallet';
 import AdminBlogManagement from './admin/AdminBlogManagement';
 import AdminBlogCategories from './admin/AdminBlogCategories';
 import AdminAuditTrail from './admin/AdminAuditTrail';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const BACKEND_READY = true;
 
@@ -169,6 +170,9 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
     totalStores: 0,
     pendingStores: 0,
   });
+  const [statsDateFrom, setStatsDateFrom] = useState('');
+  const [statsDateTo, setStatsDateTo] = useState('');
+  const [statsReportFormat, setStatsReportFormat] = useState<ReportFormat>('csv');
 
   // Product form state
   const [productForm, setProductForm] = useState({
@@ -200,12 +204,12 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
 
   useEffect(() => {
     if (isAuthenticated && isAdmin) {
-      loadDashboardStats();
+      if (Boolean(statsDateFrom) === Boolean(statsDateTo)) loadDashboardStats();
       if (activeTab === 'stores') loadStores();
       if (activeTab === 'categories') loadCategories();
       if (activeTab === 'users') loadUsers();
     }
-  }, [isAuthenticated, isAdmin, activeTab]);
+  }, [isAuthenticated, isAdmin, activeTab, statsDateFrom, statsDateTo]);
 
   const loadDashboardStats = async () => {
     if (!BACKEND_READY) {
@@ -213,16 +217,12 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
       return;
     }
     try {
-      const [statsRes, productsRes] = await Promise.allSettled([
-        adminAPI.stats(),
-        productsAPI.list({ page_size: 1 }),
+      const [statsRes] = await Promise.allSettled([
+        adminAPI.stats({ date_from: statsDateFrom || undefined, date_to: statsDateTo || undefined }),
       ]);
       const apiStats = statsRes.status === 'fulfilled' ? statsRes.value.data : {};
-      const totalProducts = productsRes.status === 'fulfilled'
-        ? (productsRes.value.data as any).count || 0
-        : 0;
       setStats({
-        totalProducts,
+        totalProducts: apiStats.total_products || 0,
         totalOrders: apiStats.total_orders || 0,
         totalRevenue: apiStats.total_revenue || 0,
         totalUsers: apiStats.total_users || 0,
@@ -230,6 +230,22 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
         pendingStores: apiStats.pending_stores || 0,
       });
     } catch { setStats({ totalProducts: 45, totalOrders: 128, totalRevenue: 45600, totalUsers: 4, totalStores: 1, pendingStores: 0 }); }
+  };
+
+  const exportAdminStats = () => {
+    const rows = [
+      { indicador: 'Produtos', valor: stats.totalProducts },
+      { indicador: 'Pedidos', valor: stats.totalOrders },
+      { indicador: 'Receita de taxas (MZN)', valor: stats.totalRevenue },
+      { indicador: 'Utilizadores', valor: stats.totalUsers },
+      { indicador: 'Lojas', valor: stats.totalStores },
+      { indicador: 'Lojas pendentes', valor: stats.pendingStores },
+    ];
+    const extension = statsReportFormat === 'excel' ? 'xlsx' : statsReportFormat;
+    const period = statsDateFrom && statsDateTo ? `${statsDateFrom}-${statsDateTo}` : 'acumulado';
+    downloadReportFromObjects(statsReportFormat, `indicadores-plataforma-${period}.${extension}`,
+      `Indicadores da plataforma (${statsDateFrom && statsDateTo ? `${statsDateFrom} a ${statsDateTo}` : 'acumulado'})`,
+      ['indicador', 'valor'], rows);
   };
 
   const loadProducts = async () => {
@@ -637,6 +653,28 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div>
+            <section className="mb-6 flex flex-col gap-3 rounded-lg border border-border bg-white p-4 sm:flex-row sm:items-end">
+              <div className="sm:mr-auto">
+                <h2 className="font-semibold">Relatório de indicadores</h2>
+                <p className="text-xs text-muted-foreground">Período por data de criação; receita considera taxas concluídas.</p>
+              </div>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">De
+                <input type="date" value={statsDateFrom} max={statsDateTo || undefined} onChange={(event) => setStatsDateFrom(event.target.value)}
+                  className="rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">Até
+                <input type="date" value={statsDateTo} min={statsDateFrom || undefined} onChange={(event) => setStatsDateTo(event.target.value)}
+                  className="rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground" />
+              </label>
+              <select aria-label="Formato do relatório" value={statsReportFormat} onChange={(event) => setStatsReportFormat(event.target.value as ReportFormat)}
+                className="rounded-md border border-border bg-white px-3 py-2 text-sm">
+                <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+              </select>
+              <button type="button" onClick={exportAdminStats} disabled={Boolean(statsDateFrom) !== Boolean(statsDateTo)}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+                <Download size={15} /> Exportar
+              </button>
+            </section>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               <div className="bg-white rounded-lg p-6 shadow-sm border border-border">
                 <div className="flex items-center gap-3">
