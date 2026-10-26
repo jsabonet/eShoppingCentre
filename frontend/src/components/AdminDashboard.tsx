@@ -174,6 +174,8 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   // Users state
   const [users, setUsers] = useState<any[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [includeDeletedUsers, setIncludeDeletedUsers] = useState(false);
+  const [userActionError, setUserActionError] = useState('');
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [userForm, setUserForm] = useState({
@@ -512,10 +514,13 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
     } catch {} finally { setCoursesLoading(false); }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = async (includeDeleted = includeDeletedUsers) => {
     setUsersLoading(true);
     try {
-      const { data } = await adminAPI.listUsers({ page_size: 100 });
+      const { data } = await adminAPI.listUsers({
+        page_size: 100,
+        ...(includeDeleted ? { include_deleted: 'true' } : {}),
+      });
       setUsers((data as any).results || []);
     } catch (err: any) {
       console.error('Erro ao carregar utilizadores:', err?.response?.status, err?.response?.data || err?.message);
@@ -586,6 +591,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   };
 
   const handleDeleteUser = (userId: string) => {
+    setUserActionError('');
     setConfirmModal({
       open: true,
       title: 'Eliminar Utilizador (soft-delete)',
@@ -594,12 +600,17 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
       onConfirm: async () => {
         try {
           await adminAPI.deleteUser(userId);
-          loadUsers();
+          setUsers(currentUsers => currentUsers.filter(user => user.id !== userId));
+          await loadUsers();
           loadDashboardStats();
         } catch (err: any) {
           console.error('Erro ao eliminar utilizador:', err);
+          setUserActionError(
+            err?.response?.data?.detail || 'Não foi possível eliminar o utilizador. Tente novamente.',
+          );
+        } finally {
+          setConfirmModal(null);
         }
-        setConfirmModal(null);
       },
     });
   };
@@ -1349,13 +1360,38 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Gestão de Utilizadores</h2>
-              <button
-                onClick={() => { setEditingUser(null); resetUserForm(); setShowUserForm(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground font-medium rounded-md transition-colors"
-              >
-                <Plus size={16} /> Novo Utilizador
-              </button>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={includeDeletedUsers}
+                    onChange={event => {
+                      setIncludeDeletedUsers(event.target.checked);
+                      setUserActionError('');
+                      void loadUsers(event.target.checked);
+                    }}
+                    className="rounded"
+                  />
+                  Mostrar utilizadores eliminados
+                </label>
+                <button
+                  onClick={() => { setEditingUser(null); resetUserForm(); setShowUserForm(true); }}
+                  className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground font-medium rounded-md transition-colors"
+                >
+                  <Plus size={16} /> Novo Utilizador
+                </button>
+              </div>
             </div>
+            {userActionError && (
+              <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {userActionError}
+              </p>
+            )}
+            {includeDeletedUsers && (
+              <p className="mb-4 text-sm text-muted-foreground">
+                Utilizadores eliminados aparecem identificados como eliminados. Pode editar e reativar uma conta.
+              </p>
+            )}
 
             {/* User Form Modal */}
             {showUserForm && (
@@ -1482,6 +1518,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Utilizador</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Email</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Roles</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Estado</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Verificado</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Registo</th>
                         <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Ações</th>
@@ -1509,6 +1546,17 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                             </div>
                           </td>
                           <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                              u.deleted_at
+                                ? 'bg-red-100 text-red-700'
+                                : u.is_active
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {u.deleted_at ? 'Eliminado' : u.is_active ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
                             {u.is_verified ? (
                               <CheckCircle size={16} className="text-green-500" />
                             ) : (
@@ -1521,8 +1569,9 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                           <td className="px-4 py-3 text-right">
                             <button onClick={() => handleEditUser(u)}
                               className="p-1.5 hover:bg-muted rounded-md"><Edit size={16} className="text-muted-foreground" /></button>
-                            <button onClick={() => handleDeleteUser(u.id)}
+                            {!u.deleted_at && <button onClick={() => handleDeleteUser(u.id)}
                               className="p-1.5 hover:bg-destructive/10 rounded-md"><Trash2 size={16} className="text-destructive" /></button>
+                            }
                           </td>
                         </tr>
                       ))}

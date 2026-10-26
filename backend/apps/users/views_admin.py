@@ -336,8 +336,13 @@ class AdminAllOrdersView(generics.ListAPIView):
 
 class AdminUserListView(generics.ListCreateAPIView):
     """Admin: listar e criar utilizadores"""
-    queryset = UserModel.objects.all().order_by('-date_joined')
     permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        users = UserModel.objects.all()
+        if self.request.query_params.get('include_deleted') != 'true':
+            users = users.filter(deleted_at__isnull=True)
+        return users.order_by('-date_joined')
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
