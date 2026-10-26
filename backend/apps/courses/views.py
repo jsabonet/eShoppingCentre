@@ -1,4 +1,4 @@
-from rest_framework import generics, permissions, status, filters
+from rest_framework import generics, permissions, status, filters, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -462,6 +462,16 @@ class CourseUpdateView(APIView):
             if field in request.data:
                 setattr(course, field, request.data[field])
 
+        if 'access_duration_days' in request.data:
+            value = request.data['access_duration_days']
+            if value in (None, ''):
+                course.access_duration_days = None
+            else:
+                try:
+                    course.access_duration_days = serializers.IntegerField(min_value=1).run_validation(value)
+                except serializers.ValidationError as error:
+                    return Response({'access_duration_days': error.detail}, status=400)
+
         # Campos editaveis no Product (nome, preco, descricao, slug)
         product = course.product
         product_fields = ['name', 'price', 'compare_price', 'description', 'short_description', 'slug']
@@ -486,6 +496,7 @@ class CourseUpdateView(APIView):
             'price': float(product.price),
             'level': course.level,
             'duration': course.duration,
+            'access_duration_days': course.access_duration_days,
             'total_lessons': course.total_lessons,
             'certificate_enabled': course.certificate_enabled,
             'preview_video_url': course.preview_video_url,

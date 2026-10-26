@@ -20,6 +20,7 @@ interface CourseData {
   compare_price: number | null;
   level: string;
   duration: string;
+  access_duration_days: number | null;
   total_lessons: number;
   certificate_enabled: boolean;
   preview_video_url: string;
@@ -43,7 +44,7 @@ export default function CourseEditPage() {
   const [form, setForm] = useState({
     name: '', slug: '', price: '', compare_price: '',
     description: '', short_description: '',
-    level: 'beginner', duration: '', certificate_enabled: true,
+    level: 'beginner', duration: '', access_duration_days: '', certificate_enabled: true,
     preview_video_url: '', status: 'active',
   });
 
@@ -91,6 +92,7 @@ export default function CourseEditPage() {
           compare_price: productData?.compare_price ? parseFloat(productData.compare_price) : null,
           level: productData?.course?.level || 'beginner',
           duration: productData?.course?.duration || '',
+          access_duration_days: productData?.course?.access_duration_days ?? null,
           total_lessons: (data.modules || []).reduce((s: number, m: any) => s + (m.lessons?.length || 0), 0),
           certificate_enabled: productData?.course?.certificate_enabled ?? true,
           preview_video_url: productData?.course?.preview_video_url || '',
@@ -110,6 +112,8 @@ export default function CourseEditPage() {
           short_description: productData?.short_description || '',
           level: productData?.course?.level || 'beginner',
           duration: productData?.course?.duration || '',
+          access_duration_days: productData?.course?.access_duration_days != null
+            ? String(productData.course.access_duration_days) : '',
           certificate_enabled: productData?.course?.certificate_enabled ?? true,
           preview_video_url: productData?.course?.preview_video_url || '',
           status: productData?.status || 'active',
@@ -140,6 +144,7 @@ export default function CourseEditPage() {
           short_description: form.short_description,
           level: form.level,
           duration: form.duration,
+          access_duration_days: form.access_duration_days === '' ? null : Number(form.access_duration_days),
           certificate_enabled: form.certificate_enabled,
           preview_video_url: form.preview_video_url,
           status: form.status,
@@ -345,6 +350,21 @@ export default function CourseEditPage() {
                     <option value="inactive">🔴 Inactivo</option>
                   </select>
                 </div>
+              </div>
+              <div className="mt-5 max-w-md">
+                <label className={labelBase}>Tempo de acesso (dias)</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={form.access_duration_days}
+                  onChange={e => setForm({ ...form, access_duration_days: e.target.value })}
+                  placeholder="Vazio = acesso vitalício"
+                  className={inputBase}
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Define por quantos dias cada aluno terá acesso após a matrícula. Deixe vazio para acesso vitalício.
+                </p>
               </div>
             </div>
           </div>
