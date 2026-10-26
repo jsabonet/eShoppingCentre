@@ -133,7 +133,7 @@ export default function MyCoursesPage() {
       pdf.setTextColor(...muted);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
-      pdf.text('Certificamos que', center, 88, { align: 'center' });
+      pdf.text('A E-SHOPPING CENTRE certifica que', center, 88, { align: 'center' });
 
       pdf.setTextColor(...navy);
       pdf.setFont('times', 'bold');
