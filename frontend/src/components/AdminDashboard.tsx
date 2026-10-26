@@ -986,7 +986,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                     <option value="csv">CSV</option><option value="excel">Excel</option><option value="pdf">PDF</option>
                   </select>
                   <button type="button" onClick={exportStoresReport} disabled={storesLoading || Boolean(storeDateFrom) !== Boolean(storeDateTo)}
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50">
+                    className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
                     <Download size={15} /> Exportar
                   </button>
                 </div>
@@ -1145,7 +1145,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                     <option value="csv">CSV</option><option value="excel">Excel</option><option value="pdf">PDF</option>
                   </select>
                   <button type="button" onClick={exportProductsReport} disabled={adminProductsLoading || Boolean(productDateFrom) !== Boolean(productDateTo)}
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50">
+                    className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
                     <Download size={15} /> Exportar
                   </button>
                 </div>

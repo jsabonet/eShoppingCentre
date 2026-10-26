@@ -271,7 +271,7 @@ export default function AdminOrders() {
           </select>
         </label>
         <button type="button" onClick={exportOrders} disabled={exporting || orderCount === 0}
-          className="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-2 self-end rounded-lg bg-[#F2871A] px-3 py-2 text-sm font-medium text-white hover:bg-[#db7410] disabled:cursor-not-allowed disabled:opacity-50">
+          className="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-2 self-end rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
           {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
           {exporting ? 'A gerar...' : 'Exportar relatório'}
         </button>

@@ -245,7 +245,7 @@ export default function AdminWallet() {
           </select>
         </label>
         <button type="button" onClick={exportPayouts} disabled={!filteredPayouts.length}
-          className="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-2 self-end rounded-lg bg-[#F2871A] px-3 py-2 text-sm font-medium text-white hover:bg-[#db7410] disabled:cursor-not-allowed disabled:opacity-50">
+          className="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-2 self-end rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
           <Download size={15} /> Exportar relatório
         </button>
         <p className="text-xs text-muted-foreground sm:col-span-2 xl:col-span-4">
