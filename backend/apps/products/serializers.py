@@ -140,6 +140,7 @@ class SellerProductSerializer(serializers.ModelSerializer):
                 'certificate_enabled': course.certificate_enabled,
                 'preview_video_url': course.preview_video_url,
                 'modules_count': course.modules.count(),
+                'access_duration_days': course.access_duration_days,
             }
         except Exception:
             return None
