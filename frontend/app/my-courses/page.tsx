@@ -95,93 +95,124 @@ export default function MyCoursesPage() {
         reader.readAsDataURL(logoBlob);
       });
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const charcoal: [number, number, number] = [45, 45, 48];
-      const red: [number, number, number] = [211, 37, 48];
-      const orange: [number, number, number] = [239, 125, 35];
+      const navy: [number, number, number] = [25, 45, 61];
+      const green: [number, number, number] = [37, 104, 78];
+      const blue: [number, number, number] = [66, 104, 137];
+      const muted: [number, number, number] = [103, 113, 120];
+      const border: [number, number, number] = [218, 225, 228];
       const pageWidth = 297;
       const center = pageWidth / 2;
 
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, pageWidth, 210, 'F');
-      pdf.setFillColor(...red);
-      pdf.rect(0, 0, pageWidth, 2, 'F');
-      pdf.setDrawColor(225, 225, 225);
-      pdf.setLineWidth(0.35);
-      pdf.rect(12, 12, 273, 186);
+      pdf.setDrawColor(...navy);
+      pdf.setLineWidth(0.55);
+      pdf.roundedRect(12, 12, 273, 186, 2, 2);
 
-      pdf.addImage(logoDataUrl, 'PNG', 22, 21, 25, 25);
-      pdf.setTextColor(...charcoal);
+      pdf.addImage(logoDataUrl, 'PNG', 22, 19, 27, 27);
+      pdf.setTextColor(...navy);
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(11);
-      pdf.text('e-SHOPPING CENTRE', 51, 35);
-
-      pdf.addImage(qrCode, 'PNG', 254, 21, 19, 19);
-
-      pdf.setTextColor(...charcoal);
-      pdf.setFont('times', 'bold');
-      pdf.setFontSize(28);
-      pdf.text('Certificado de Conclusão', center, 68, { align: 'center' });
-      pdf.setDrawColor(...orange);
-      pdf.setLineWidth(0.7);
-      pdf.line(center - 18, 75, center + 18, 75);
-
-      pdf.setTextColor(90, 90, 90);
+      pdf.setFontSize(12);
+      pdf.text('e-SHOPPING CENTRE', 54, 29);
+      pdf.setTextColor(...muted);
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
+      pdf.setFontSize(8);
+      pdf.text('Certificação de cursos', 54, 35);
+
+      pdf.setDrawColor(...border);
+      pdf.setLineWidth(0.3);
+      pdf.roundedRect(245, 17, 30, 34, 1.5, 1.5);
+      pdf.addImage(qrCode, 'PNG', 251, 19, 18, 18);
+      pdf.setTextColor(...blue);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.text('VALIDAR', 260, 45, { align: 'center' });
+
+      pdf.setDrawColor(...border);
+      pdf.setLineWidth(0.35);
+      pdf.line(22, 56, 275, 56);
+
+      pdf.setTextColor(...navy);
+      pdf.setFont('times', 'bold');
+      pdf.setFontSize(27);
+      pdf.text('Certificado de Conclusão', center, 69, { align: 'center' });
+      pdf.setDrawColor(...green);
+      pdf.setLineWidth(0.75);
+      pdf.line(center - 16, 75, center + 16, 75);
+
+      pdf.setFillColor(247, 249, 250);
+      pdf.setDrawColor(...border);
+      pdf.setLineWidth(0.3);
+      pdf.roundedRect(29, 81, 239, 69, 2, 2, 'FD');
+
+      pdf.setTextColor(...muted);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
       pdf.text('Certificamos que', center, 91, { align: 'center' });
 
-      pdf.setTextColor(...charcoal);
+      pdf.setTextColor(...navy);
       pdf.setFont('times', 'bold');
-      pdf.setFontSize(28);
-      let recipientLines = pdf.splitTextToSize(certificate.recipient_name, 215);
-      const recipientFontSize = recipientLines.length > 1 ? 22 : 28;
+      let recipientFontSize = 25;
       pdf.setFontSize(recipientFontSize);
-      recipientLines = pdf.splitTextToSize(certificate.recipient_name, 215);
+      let recipientLines = pdf.splitTextToSize(certificate.recipient_name, 215);
+      while (recipientLines.length > 2 && recipientFontSize > 16) {
+        recipientFontSize -= 1;
+        pdf.setFontSize(recipientFontSize);
+        recipientLines = pdf.splitTextToSize(certificate.recipient_name, 215);
+      }
       pdf.text(recipientLines, center, 104, {
         align: 'center',
         lineHeightFactor: 1.15,
       });
 
-      const afterRecipientY = 104 + (recipientLines.length - 1) * recipientFontSize * 0.4;
-      const completionY = afterRecipientY + 10;
-      pdf.setTextColor(90, 90, 90);
+      const completionY = 104 + (recipientLines.length - 1) * recipientFontSize * 0.4 + 8;
+      pdf.setTextColor(...muted);
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
+      pdf.setFontSize(8.5);
       pdf.text('concluiu com aproveitamento o curso', center, completionY, { align: 'center' });
 
-      pdf.setTextColor(...red);
+      pdf.setTextColor(...green);
       pdf.setFont('times', 'bold');
-      pdf.setFontSize(20);
-      let courseLines = pdf.splitTextToSize(certificate.course_title, 220);
-      const courseFontSize = courseLines.length > 1 ? 16 : 20;
+      let courseFontSize = 18;
       pdf.setFontSize(courseFontSize);
-      courseLines = pdf.splitTextToSize(certificate.course_title, 220);
+      let courseLines = pdf.splitTextToSize(certificate.course_title, 215);
+      while (courseLines.length > 2 && courseFontSize > 13) {
+        courseFontSize -= 1;
+        pdf.setFontSize(courseFontSize);
+        courseLines = pdf.splitTextToSize(certificate.course_title, 215);
+      }
       pdf.text(courseLines, center, completionY + 11, {
         align: 'center',
         lineHeightFactor: 1.15,
       });
 
-      pdf.setDrawColor(225, 225, 225);
-      pdf.setLineWidth(0.3);
-      pdf.line(28, 166, 269, 166);
-      pdf.setTextColor(90, 90, 90);
+      pdf.setFillColor(255, 255, 255);
+      pdf.setDrawColor(...border);
+      pdf.roundedRect(29, 158, 239, 27, 2, 2, 'FD');
+      pdf.line(109, 162, 109, 181);
+      pdf.line(219, 162, 219, 181);
+
+      pdf.setTextColor(...muted);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.text('DATA DE EMISSÃO', 36, 168);
+      pdf.setTextColor(...navy);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.text(new Date(certificate.issued_at).toLocaleDateString('pt-MZ'), 36, 177);
+
+      pdf.setTextColor(...muted);
+      pdf.setFontSize(7);
+      pdf.text('CÓDIGO DE AUTENTICIDADE', 118, 168);
+      pdf.setTextColor(...navy);
+      pdf.setFont('courier', 'normal');
+      pdf.setFontSize(8);
+      pdf.text(certificate.certificate_number, 118, 177, { maxWidth: 96 });
+
+      pdf.setTextColor(...blue);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
-      pdf.text(
-        `Emitido em ${new Date(certificate.issued_at).toLocaleDateString('pt-MZ')}`,
-        30,
-        176,
-      );
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(...charcoal);
-      pdf.text('CÓDIGO DE AUTENTICIDADE', 30, 185);
-      pdf.setFont('courier', 'normal');
-      pdf.setFontSize(7.5);
-      pdf.text(certificate.certificate_number, 30, 190);
-      pdf.setTextColor(...red);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7.5);
-      pdf.textWithLink('Validar certificado', 267, 181, { url: validationUrl });
+      pdf.textWithLink('Abrir verificação', 228, 173, { url: validationUrl });
       pdf.save(`certificado-${certificate.certificate_number}.pdf`);
     } catch (error) {
       setCertificateError({
