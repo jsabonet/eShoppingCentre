@@ -97,19 +97,19 @@ export default function MyCoursesPage() {
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const navy: [number, number, number] = [25, 45, 61];
       const green: [number, number, number] = [37, 104, 78];
-      const blue: [number, number, number] = [66, 104, 137];
       const muted: [number, number, number] = [103, 113, 120];
       const border: [number, number, number] = [218, 225, 228];
       const pageWidth = 297;
       const center = pageWidth / 2;
 
-      pdf.setFillColor(255, 255, 255);
+      pdf.setFillColor(250, 250, 247);
       pdf.rect(0, 0, pageWidth, 210, 'F');
+      pdf.setDrawColor(212, 219, 218);
+      pdf.setLineWidth(0.35);
+      pdf.rect(10, 10, 277, 190);
       pdf.setDrawColor(...navy);
-      pdf.setLineWidth(0.55);
-      pdf.roundedRect(12, 12, 273, 186, 2, 2);
-      pdf.setFillColor(...green);
-      pdf.roundedRect(12.5, 12.5, 272, 2.5, 1, 1, 'F');
+      pdf.setLineWidth(0.65);
+      pdf.rect(13, 13, 271, 184);
 
       pdf.addImage(logoDataUrl, 'PNG', 22, 19, 27, 27);
       pdf.setTextColor(...navy);
@@ -122,30 +122,30 @@ export default function MyCoursesPage() {
       pdf.text('Certificação de cursos', 54, 35);
 
       pdf.setDrawColor(...border);
-      pdf.setLineWidth(0.3);
-      pdf.roundedRect(245, 17, 30, 34, 1.5, 1.5);
+      pdf.setLineWidth(0.35);
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(246, 17, 28, 32, 'FD');
       pdf.addImage(qrCode, 'PNG', 251, 19, 18, 18);
       pdf.setTextColor(...green);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(6.5);
       pdf.text('VALIDAR', 260, 45, { align: 'center' });
 
-      pdf.setDrawColor(...border);
-      pdf.setLineWidth(0.35);
-      pdf.line(22, 56, 275, 56);
+      pdf.setDrawColor(...green);
+      pdf.setLineWidth(0.65);
+      pdf.line(22, 55, 275, 55);
 
       pdf.setTextColor(...navy);
       pdf.setFont('times', 'bold');
       pdf.setFontSize(27);
       pdf.text('Certificado de Conclusão', center, 69, { align: 'center' });
-      pdf.setDrawColor(...green);
-      pdf.setLineWidth(0.75);
-      pdf.line(center - 16, 75, center + 16, 75);
 
-      pdf.setFillColor(245, 249, 247);
-      pdf.setDrawColor(...green);
-      pdf.setLineWidth(0.45);
-      pdf.roundedRect(29, 81, 239, 69, 2, 2, 'FD');
+      pdf.setFillColor(245, 248, 246);
+      pdf.setDrawColor(208, 220, 214);
+      pdf.setLineWidth(0.4);
+      pdf.rect(29, 80, 239, 71, 'FD');
+      pdf.setFillColor(...green);
+      pdf.rect(29, 80, 2, 71, 'F');
 
       pdf.setTextColor(...muted);
       pdf.setFont('helvetica', 'normal');
@@ -190,9 +190,9 @@ export default function MyCoursesPage() {
 
       pdf.setFillColor(255, 255, 255);
       pdf.setDrawColor(...border);
-      pdf.roundedRect(29, 158, 239, 27, 2, 2, 'FD');
-      pdf.setDrawColor(...green);
-      pdf.setLineWidth(0.45);
+      pdf.setLineWidth(0.35);
+      pdf.rect(29, 158, 239, 27, 'FD');
+      pdf.setDrawColor(...border);
       pdf.line(109, 162, 109, 181);
       pdf.line(219, 162, 219, 181);
 
