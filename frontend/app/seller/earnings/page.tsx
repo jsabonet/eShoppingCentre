@@ -179,7 +179,7 @@ export default function SellerEarningsPage() {
 
   return (
     <SellerLayout>
-      <div className="p-6">
+      <div className="min-w-0 p-4 sm:p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Ganhos</h1>
@@ -209,7 +209,7 @@ export default function SellerEarningsPage() {
           </div>
         </div>
 
-        <section className="bg-card border border-border rounded-xl p-5 mb-6">
+        <section className="min-w-0 bg-card border border-border rounded-xl p-4 sm:p-5 mb-6">
           <div className="mb-4">
             <h2 className="font-bold">Relatório de vendas</h2>
             <p className="text-sm text-muted-foreground mt-1">
@@ -217,18 +217,18 @@ export default function SellerEarningsPage() {
               reembolsos e totais. O período máximo é de 366 dias e 50.000 linhas.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-            <label className="flex flex-col gap-1 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-end">
+            <label className="flex min-w-0 flex-col gap-1 text-sm">
               Data inicial
               <input
                 type="date"
                 value={reportDateFrom}
                 max={reportDateTo}
                 onChange={(event) => setReportDateFrom(event.target.value)}
-                className="rounded-md border border-border bg-background px-3 py-2"
+                className="min-h-11 w-full min-w-0 rounded-md border border-border bg-background px-3 py-2"
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className="flex min-w-0 flex-col gap-1 text-sm">
               Data final
               <input
                 type="date"
@@ -236,15 +236,15 @@ export default function SellerEarningsPage() {
                 min={reportDateFrom}
                 max={localDateString(new Date())}
                 onChange={(event) => setReportDateTo(event.target.value)}
-                className="rounded-md border border-border bg-background px-3 py-2"
+                className="min-h-11 w-full min-w-0 rounded-md border border-border bg-background px-3 py-2"
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className="flex min-w-0 flex-col gap-1 text-sm">
               Formato
               <select
                 value={reportFormat}
                 onChange={(event) => setReportFormat(event.target.value as 'csv' | 'excel' | 'pdf')}
-                className="rounded-md border border-border bg-background px-3 py-2"
+                className="min-h-11 w-full min-w-0 rounded-md border border-border bg-background px-3 py-2"
               >
                 {reportFormatOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -273,26 +273,32 @@ export default function SellerEarningsPage() {
         </section>
 
         <div className="bg-card border border-border rounded-xl">
-          <div className="space-y-3 border-b border-border p-4">
+          <div className="min-w-0 space-y-3 border-b border-border p-4">
             <h2 className="font-bold">Histórico de Transacções</h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">De
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3 items-end">
+              <label className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground">De
                 <input type="date" value={transactionDateFrom} max={transactionDateTo || undefined} onChange={(event) => setTransactionDateFrom(event.target.value)}
-                  className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+                  className="min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
               </label>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">Até
+              <label className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground">Até
                 <input type="date" value={transactionDateTo} min={transactionDateFrom || undefined} onChange={(event) => setTransactionDateTo(event.target.value)}
-                  className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+                  className="min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
               </label>
-              <select aria-label="Filtrar transações por tipo" value={transactionType} onChange={(event) => setTransactionType(event.target.value)}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                <option value="all">Todos os tipos</option>
-                {Array.from(new Set(transactions.map((transaction) => transaction.type))).map((type) => <option key={type} value={type}>{type}</option>)}
-              </select>
-              <select aria-label="Formato do relatório" value={transactionFormat} onChange={(event) => setTransactionFormat(event.target.value as ReportFormat)}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
-              </select>
+              <label className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground">
+                Tipo de transacção
+                <select aria-label="Filtrar transações por tipo" value={transactionType} onChange={(event) => setTransactionType(event.target.value)}
+                  className="min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+                  <option value="all">Todos os tipos</option>
+                  {Array.from(new Set(transactions.map((transaction) => transaction.type))).map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </label>
+              <label className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground">
+                Formato
+                <select aria-label="Formato do relatório" value={transactionFormat} onChange={(event) => setTransactionFormat(event.target.value as ReportFormat)}
+                  className="min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+                  <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
+                </select>
+              </label>
               <button type="button" onClick={exportTransactions} disabled={!filteredTransactions.length}
                 className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
                 <Download size={15} /> Exportar

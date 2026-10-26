@@ -1,12 +1,13 @@
-from rest_framework import permissions, generics
+from rest_framework import permissions, generics, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from django.utils.dateparse import parse_date
+from django.db.models import Q
 from apps.notifications import email_service
 from apps.users.models import User
 from apps.stores.models import Store
@@ -91,15 +92,67 @@ class ApproveStoreView(APIView):
             return Response({'detail': 'Loja não encontrada.'}, status=404)
 
 
+class AdminStoreReportSerializer(serializers.ModelSerializer):
+    owner_name = serializers.SerializerMethodField()
+    owner_email = serializers.EmailField(source='owner.email', read_only=True)
+    total_products = serializers.IntegerField(source='_admin_total_products', read_only=True)
+
+    class Meta:
+        model = Store
+        fields = (
+            'id', 'name', 'logo', 'category', 'location', 'email',
+            'status', 'owner_name', 'owner_email', 'total_products',
+            'total_sales', 'created_at',
+        )
+
+    def get_owner_name(self, obj):
+        return obj.owner.get_full_name()
+
+
 class AdminAllStoresView(generics.ListAPIView):
     """Admin: listar TODAS as lojas (qualquer status)"""
-    queryset = Store.objects.all().order_by('-created_at')
-    serializer_class = None
     permission_classes = [permissions.IsAdminUser]
 
+    def get_queryset(self):
+        queryset = Store.objects.select_related('owner').annotate(
+            _admin_total_products=Count('products', filter=~Q(products__status='deleted'))
+        ).order_by('-created_at')
+        search = self.request.query_params.get('search', '').strip()
+        status_filter = self.request.query_params.get('status', '').strip()
+        category = self.request.query_params.get('category', '').strip()
+        date_from_value = self.request.query_params.get('date_from')
+        date_to_value = self.request.query_params.get('date_to')
+
+        if bool(date_from_value) != bool(date_to_value):
+            raise ValidationError({'date': 'Indique as datas inicial e final.'})
+        date_from = parse_date(date_from_value) if date_from_value else None
+        date_to = parse_date(date_to_value) if date_to_value else None
+        if date_from_value and date_from is None:
+            raise ValidationError({'date_from': 'Use uma data válida no formato AAAA-MM-DD.'})
+        if date_to_value and date_to is None:
+            raise ValidationError({'date_to': 'Use uma data válida no formato AAAA-MM-DD.'})
+        if date_from and date_to and date_from > date_to:
+            raise ValidationError({'date_to': 'A data final deve ser igual ou posterior à inicial.'})
+
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(owner__email__icontains=search) |
+                Q(owner__first_name__icontains=search) |
+                Q(owner__last_name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(location__icontains=search)
+            )
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if category:
+            queryset = queryset.filter(category__icontains=category)
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from, created_at__date__lte=date_to)
+        return queryset
+
     def get_serializer_class(self):
-        from apps.stores.serializers import StoreDetailSerializer
-        return StoreDetailSerializer
+        return AdminStoreReportSerializer
 
 
 class AdminStoreManageView(APIView):

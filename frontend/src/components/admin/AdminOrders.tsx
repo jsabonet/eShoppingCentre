@@ -6,7 +6,9 @@ import LightboxImage from '@/src/components/LightboxImage';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
   AlertCircle, ChevronDown, ChevronUp, History, Eye, User, Phone, Mail, Loader2,
+  Download, ChevronLeft, ChevronRight,
 } from 'lucide-react';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -30,6 +32,8 @@ interface StatusEntry {
 interface OrderItem {
   id: string; order_number: string; status: string; total: number;
   payment_method: string; created_at: string;
+  payment_status?: string; subtotal?: number; discount?: number; shipping_cost?: number;
+  platform_fee?: number; affiliate_commission?: number;
   buyer_email?: string; buyer_phone?: string; buyer_name?: string;
   store_name?: string; store_phone?: string;
   items?: any[]; shipping_notes?: string; tracking_code?: string;
@@ -41,7 +45,16 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
+  const [orderCount, setOrderCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<OrderItem | null>(null);
   const [detailModal, setDetailModal] = useState(false);
@@ -57,18 +70,31 @@ export default function AdminOrders() {
     return { Authorization: `Bearer ${token}` };
   }, []);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/orders/admin/`, { headers: headers() });
+      const params = new URLSearchParams({ page: String(page), page_size: '20' });
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      if (statusFilter) params.set('status', statusFilter);
+      if (paymentStatusFilter) params.set('payment_status', paymentStatusFilter);
+      if (paymentMethodFilter) params.set('payment_method', paymentMethodFilter);
+      if (dateFrom) params.set('date_from', dateFrom);
+      if (dateTo) params.set('date_to', dateTo);
+      const res = await fetch(`${API_URL}/orders/admin/?${params}`, { headers: headers() });
       if (!res.ok) throw new Error('Sem permissão');
       const data = await res.json();
       setOrders(data.results || data || []);
+      setOrderCount(data.count ?? (data.results || data || []).length);
+      setCurrentPage(page);
     } catch { setOrders([]); }
     finally { setLoading(false); }
-  }, [headers]);
+  }, [headers, debouncedSearch, statusFilter, paymentStatusFilter, paymentMethodFilter, dateFrom, dateTo]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -95,11 +121,77 @@ export default function AdminOrders() {
     } finally { setUpdating(null); }
   };
 
-  const filtered = orders.filter(o => {
-    const q = search.toLowerCase();
-    const m = (o.buyer_email || '').toLowerCase().includes(q) || o.order_number.toLowerCase().includes(q) || (o.store_name || '').toLowerCase().includes(q);
-    return m && (statusFilter === 'all' || o.status === statusFilter);
-  });
+  const filtered = orders;
+
+  const exportOrders = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ page_size: '100' });
+      if (search.trim()) params.set('search', search.trim());
+      if (statusFilter) params.set('status', statusFilter);
+      if (paymentStatusFilter) params.set('payment_status', paymentStatusFilter);
+      if (paymentMethodFilter) params.set('payment_method', paymentMethodFilter);
+      if (dateFrom) params.set('date_from', dateFrom);
+      if (dateTo) params.set('date_to', dateTo);
+
+      const reportOrders: OrderItem[] = [];
+      let page = 1;
+      let pageCount = 1;
+      do {
+        params.set('page', String(page));
+        const res = await fetch(`${API_URL}/orders/admin/?${params}`, { headers: headers() });
+        if (!res.ok) throw new Error('Não foi possível carregar as encomendas para o relatório.');
+        const data = await res.json();
+        reportOrders.push(...(data.results || data || []));
+        pageCount = data.count ? Math.ceil(data.count / 100) : 1;
+        page += 1;
+      } while (page <= pageCount);
+
+      const rows = reportOrders.map((order) => ({
+        encomenda: order.order_number,
+        comprador: order.buyer_name || '',
+        email: order.buyer_email || '',
+        loja: order.store_name || '',
+        estado: STATUS_CONFIG[order.status]?.label || order.status,
+        pagamento: order.payment_status || '',
+        metodo: order.payment_method || '',
+        subtotal_mzn: Number(order.subtotal || 0),
+        desconto_mzn: Number(order.discount || 0),
+        envio_mzn: Number(order.shipping_cost || 0),
+        taxa_plataforma_mzn: Number(order.platform_fee || 0),
+        comissao_afiliado_mzn: Number(order.affiliate_commission || 0),
+        total_mzn: Number(order.total || 0),
+        data: new Date(order.created_at).toLocaleString('pt-MZ'),
+      }));
+      await downloadReportFromObjects(
+        reportFormat,
+        `relatorio-encomendas-${new Date().toISOString().slice(0, 10)}.${reportFormat === 'excel' ? 'xlsx' : reportFormat}`,
+        'Relatório de encomendas',
+        ['encomenda', 'comprador', 'email', 'loja', 'estado', 'pagamento', 'metodo', 'subtotal_mzn', 'desconto_mzn', 'envio_mzn', 'taxa_plataforma_mzn', 'comissao_afiliado_mzn', 'total_mzn', 'data'],
+        rows,
+        {
+          period: dateFrom || dateTo ? `${dateFrom || 'Início'} a ${dateTo || 'Hoje'}` : 'Todo o período',
+          filters: [
+            { label: 'Estado', value: statusFilter || 'Todos' },
+            { label: 'Pagamento', value: paymentStatusFilter || 'Todos' },
+            { label: 'Método', value: paymentMethodFilter || 'Todos' },
+            { label: 'Pesquisa', value: search.trim() || '—' },
+          ],
+          summary: [
+            { label: 'Encomendas', value: reportOrders.length },
+            { label: 'Total das encomendas (MZN)', value: rows.reduce((sum, order) => sum + order.total_mzn, 0).toFixed(2) },
+            { label: 'Descontos (MZN)', value: rows.reduce((sum, order) => sum + order.desconto_mzn, 0).toFixed(2) },
+            { label: 'Taxas de plataforma (MZN)', value: rows.reduce((sum, order) => sum + order.taxa_plataforma_mzn, 0).toFixed(2) },
+          ],
+          columns: ['Encomenda', 'Comprador', 'Email', 'Loja', 'Estado', 'Estado do pagamento', 'Método', 'Subtotal (MZN)', 'Desconto (MZN)', 'Envio (MZN)', 'Taxa plataforma (MZN)', 'Comissão afiliado (MZN)', 'Total (MZN)', 'Data'],
+        },
+      );
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Não foi possível exportar o relatório.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div>
@@ -115,28 +207,74 @@ export default function AdminOrders() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold">Todas as Encomendas</h2>
-          <p className="text-sm text-muted-foreground">{orders.length} encomendas no sistema</p>
+          <p className="text-sm text-muted-foreground">{orders.length} nesta página · {orderCount} resultados</p>
         </div>
-        <button onClick={fetchOrders} className="p-2 hover:bg-muted rounded-lg"><RefreshCw size={16} /></button>
+        <button onClick={() => fetchOrders(currentPage)} className="p-2 hover:bg-muted rounded-lg" title="Actualizar"><RefreshCw size={16} /></button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 mb-4">
-        {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-          <button key={k} onClick={() => setStatusFilter(statusFilter === k ? 'all' : k)}
-            className={`p-2 rounded-lg text-xs font-medium border transition-colors ${
-              statusFilter === k ? `${v.color} border-current` : 'bg-white border-border text-muted-foreground hover:bg-muted/50'
-            }`}>
-            <div className="text-lg font-bold">{orders.filter(r => r.status === k).length}</div>
-            <div>{v.label}</div>
-          </button>
-        ))}
-      </div>
-
-      <div className="relative mb-4">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input type="text" placeholder="Buscar por ID, comprador, loja..." value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 border border-border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent/20" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4 rounded-xl border border-border bg-white p-3">
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-2 xl:col-span-4">
+          <span className="flex items-center gap-1"><Search size={13} /> Pesquisar encomenda, comprador ou loja</span>
+          <input type="search" placeholder="ID, email, nome do comprador ou loja" value={search} onChange={e => setSearch(e.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20" />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Data inicial
+          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => setDateFrom(e.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground" />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Data final
+          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground" />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Estado da encomenda
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground">
+            <option value="">Todos os estados</option>
+            {Object.entries(STATUS_CONFIG).map(([value, config]) => <option key={value} value={value}>{config.label}</option>)}
+          </select>
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Estado do pagamento
+          <select value={paymentStatusFilter} onChange={e => setPaymentStatusFilter(e.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground">
+            <option value="">Todos os pagamentos</option>
+            <option value="pending">Pendente</option>
+            <option value="completed">Pago</option>
+            <option value="failed">Falhado</option>
+            <option value="refunded">Reembolsado</option>
+          </select>
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Método de pagamento
+          <select value={paymentMethodFilter} onChange={e => setPaymentMethodFilter(e.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground">
+            <option value="">Todos os métodos</option>
+            <option value="mpesa">M-Pesa</option>
+            <option value="emola">e-Mola</option>
+            <option value="vpay">VPay</option>
+            <option value="wallet">Carteira</option>
+            <option value="test">Teste</option>
+            <option value="card">Cartão</option>
+            <option value="bank">Transferência bancária</option>
+          </select>
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Formato do relatório
+          <select value={reportFormat} onChange={e => setReportFormat(e.target.value as ReportFormat)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground">
+            <option value="csv">CSV</option>
+            <option value="excel">Excel (.xlsx)</option>
+            <option value="pdf">PDF</option>
+          </select>
+        </label>
+        <button type="button" onClick={exportOrders} disabled={exporting || orderCount === 0}
+          className="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-2 self-end rounded-lg bg-[#F2871A] px-3 py-2 text-sm font-medium text-white hover:bg-[#db7410] disabled:cursor-not-allowed disabled:opacity-50">
+          {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+          {exporting ? 'A gerar...' : 'Exportar relatório'}
+        </button>
       </div>
 
       {loading ? (
@@ -165,7 +303,7 @@ export default function AdminOrders() {
                 {filtered.map(order => {
                   const s = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
                   const isExpanded = expanded.has(order.id);
-                  const hasHistory = order.status_history?.length > 0;
+                  const hasHistory = (order.status_history?.length ?? 0) > 0;
                   return (
                     <React.Fragment key={order.id}>
                       <tr key={order.id} className="hover:bg-muted/20 transition-colors">
@@ -238,6 +376,31 @@ export default function AdminOrders() {
           </div>
         </div>
       )}
+      {!loading && orderCount > 20 && (
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            Página {currentPage} de {Math.ceil(orderCount / 20)}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => fetchOrders(currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ChevronLeft size={16} /> Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => fetchOrders(currentPage + 1)}
+              disabled={currentPage >= Math.ceil(orderCount / 20)}
+              className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Próxima <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Detail Modal */}
       {detailModal && detail && (
@@ -272,11 +435,11 @@ export default function AdminOrders() {
             </div>
 
             {/* Itens da Encomenda */}
-            {detail.items?.length > 0 && (
+            {(detail.items?.length ?? 0) > 0 && (
               <div className="mb-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Itens da Encomenda</h3>
                 <div className="space-y-2">
-                  {detail.items.map((item: any, idx: number) => (
+                  {(detail.items ?? []).map((item: any, idx: number) => (
                     <div key={item.id || idx} className="flex items-center gap-3 bg-muted/20 rounded-xl p-2.5">
                       {item.product_image ? (
                         <LightboxImage src={item.product_image} alt={item.product_name || 'Produto'} fill
@@ -312,15 +475,15 @@ export default function AdminOrders() {
             )}
 
             {/* History Timeline */}
-            {detail.status_history?.length > 0 && (
+            {(detail.status_history?.length ?? 0) > 0 && (
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Histórico Completo</h3>
                 <div className="space-y-2">
-                  {detail.status_history.map((h, i) => (
+                  {(detail.status_history ?? []).map((h, i) => (
                     <div key={h.id} className="flex gap-2 text-xs">
                       <div className="flex flex-col items-center">
                         <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-accent' : 'bg-muted-foreground/30'}`} />
-                        {i < detail.status_history!.length - 1 && <div className="w-px flex-1 bg-border" />}
+                        {i < (detail.status_history?.length ?? 0) - 1 && <div className="w-px flex-1 bg-border" />}
                       </div>
                       <div className="pb-2">
                         <p><span className="font-medium">{h.changed_by_name}</span>: {STATUS_CONFIG[h.previous_status]?.label || h.previous_status} → <span className="font-semibold">{STATUS_CONFIG[h.new_status]?.label || h.new_status}</span></p>

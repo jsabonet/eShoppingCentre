@@ -882,7 +882,8 @@ export const adminAPI = {
   pendingStores: () => api.get('/admin/stores/pending/'),
   approveStore: (id: string) => api.patch(`/admin/stores/${id}/approve/`),
   // Full store management
-  allStores: () => api.get('/admin/stores/all/'),
+  allStores: (params?: Record<string, any>) => api.get('/admin/stores/all/', { params }),
+  allProducts: (params?: Record<string, any>) => api.get('/admin/products/', { params }),
   getStore: (id: string) => api.get(`/admin/stores/${id}/manage/`),
   manageStore: (id: string, action: 'approve' | 'reject' | 'suspend' | 'reactivate' | 'close' | 'request_docs' | 'clear_documents', reason?: string, documents?: string[]) =>
     api.patch(`/admin/stores/${id}/manage/`, { action, reason, documents }),

@@ -31,7 +31,7 @@ const PRODUCT_TYPE_LABELS: Record<string, string> = {
   course: 'Cursos',
 };
 
-type Tab = 'dashboard' | 'stores' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet' | 'audit';
+type Tab = 'dashboard' | 'stores' | 'products' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet' | 'audit';
 
 interface Product {
   id: string;
@@ -46,6 +46,19 @@ interface Product {
   on_sale: boolean;
   rating: number;
   review_count: number;
+  created_at: string;
+}
+
+interface AdminReportProduct {
+  id: string;
+  name: string;
+  product_type: string;
+  status: string;
+  price: number;
+  stock: number;
+  sales_count: number;
+  store_name: string;
+  category_name: string;
   created_at: string;
 }
 
@@ -119,6 +132,24 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   // Stores state
   const [stores, setStores] = useState<any[]>([]);
   const [storesLoading, setStoresLoading] = useState(false);
+  const [storeSearch, setStoreSearch] = useState('');
+  const [debouncedStoreSearch, setDebouncedStoreSearch] = useState('');
+  const [storeStatusFilter, setStoreStatusFilter] = useState('');
+  const [storeDateFrom, setStoreDateFrom] = useState('');
+  const [storeDateTo, setStoreDateTo] = useState('');
+  const [storesPage, setStoresPage] = useState(1);
+  const [storeReportFormat, setStoreReportFormat] = useState<ReportFormat>('csv');
+  const [adminProducts, setAdminProducts] = useState<AdminReportProduct[]>([]);
+  const [adminProductsLoading, setAdminProductsLoading] = useState(false);
+  const [productReportSearch, setProductReportSearch] = useState('');
+  const [debouncedProductReportSearch, setDebouncedProductReportSearch] = useState('');
+  const [productStatusFilter, setProductStatusFilter] = useState('');
+  const [productTypeFilter, setProductTypeFilter] = useState('');
+  const [productDateFrom, setProductDateFrom] = useState('');
+  const [productDateTo, setProductDateTo] = useState('');
+  const [productsPage, setProductsPage] = useState(1);
+  const [productReportFormat, setProductReportFormat] = useState<ReportFormat>('csv');
+  const [adminReportError, setAdminReportError] = useState('');
   const [showStoreEditForm, setShowStoreEditForm] = useState(false);
   const [editStoreForm, setEditStoreForm] = useState({ name: '', description: '', category: '', location: '', phone: '', email: '' });
   const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
@@ -193,6 +224,16 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   }, [initialTab]);
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedStoreSearch(storeSearch), 300);
+    return () => window.clearTimeout(timeout);
+  }, [storeSearch]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedProductReportSearch(productReportSearch), 300);
+    return () => window.clearTimeout(timeout);
+  }, [productReportSearch]);
+
+  useEffect(() => {
     if (!authLoading && !isAdmin) {
       router.replace('/admin/login');
       return;
@@ -205,11 +246,18 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   useEffect(() => {
     if (isAuthenticated && isAdmin) {
       if (Boolean(statsDateFrom) === Boolean(statsDateTo)) loadDashboardStats();
-      if (activeTab === 'stores') loadStores();
       if (activeTab === 'categories') loadCategories();
       if (activeTab === 'users') loadUsers();
     }
   }, [isAuthenticated, isAdmin, activeTab, statsDateFrom, statsDateTo]);
+
+  useEffect(() => {
+    if (isAuthenticated && isAdmin && activeTab === 'stores') loadStores();
+  }, [isAuthenticated, isAdmin, activeTab, debouncedStoreSearch, storeStatusFilter, storeDateFrom, storeDateTo]);
+
+  useEffect(() => {
+    if (isAuthenticated && isAdmin && activeTab === 'products') loadAdminProducts();
+  }, [isAuthenticated, isAdmin, activeTab, debouncedProductReportSearch, productStatusFilter, productTypeFilter, productDateFrom, productDateTo]);
 
   const loadDashboardStats = async () => {
     if (!BACKEND_READY) {
@@ -295,10 +343,57 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
 
   const loadStores = async () => {
     setStoresLoading(true);
+    setAdminReportError('');
     try {
-      const { data } = await adminAPI.allStores();
-      setStores(Array.isArray(data) ? data : (data as any).results || []);
-    } catch { console.error('Error loading stores'); } finally { setStoresLoading(false); }
+      const params: Record<string, string> = { page_size: '100' };
+      if (debouncedStoreSearch.trim()) params.search = debouncedStoreSearch.trim();
+      if (storeStatusFilter) params.status = storeStatusFilter;
+      if (storeDateFrom && storeDateTo) {
+        params.date_from = storeDateFrom;
+        params.date_to = storeDateTo;
+      }
+      const allStores: any[] = [];
+      let page = 1;
+      let pageCount = 1;
+      do {
+        const { data } = await adminAPI.allStores({ ...params, page });
+        allStores.push(...(data.results || data || []));
+        pageCount = data.count ? Math.ceil(data.count / 100) : 1;
+        page += 1;
+      } while (page <= pageCount);
+      setStores(allStores);
+    } catch {
+      setStores([]);
+      setAdminReportError('Não foi possível carregar as lojas para o relatório.');
+    } finally { setStoresLoading(false); }
+  };
+
+  const loadAdminProducts = async () => {
+    setAdminProductsLoading(true);
+    setAdminReportError('');
+    try {
+      const params: Record<string, string> = { page_size: '100' };
+      if (debouncedProductReportSearch.trim()) params.search = debouncedProductReportSearch.trim();
+      if (productStatusFilter) params.status = productStatusFilter;
+      if (productTypeFilter) params.product_type = productTypeFilter;
+      if (productDateFrom && productDateTo) {
+        params.date_from = productDateFrom;
+        params.date_to = productDateTo;
+      }
+      const allProducts: AdminReportProduct[] = [];
+      let page = 1;
+      let pageCount = 1;
+      do {
+        const { data } = await adminAPI.allProducts({ ...params, page });
+        allProducts.push(...(data.results || data || []));
+        pageCount = data.count ? Math.ceil(data.count / 100) : 1;
+        page += 1;
+      } while (page <= pageCount);
+      setAdminProducts(allProducts);
+    } catch {
+      setAdminProducts([]);
+      setAdminReportError('Não foi possível carregar os produtos para o relatório.');
+    } finally { setAdminProductsLoading(false); }
   };
 
   const handleStoreAction = (storeId: string, action: 'approve' | 'reject' | 'suspend' | 'reactivate') => {
@@ -605,6 +700,78 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
     p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
     p.category.toLowerCase().includes(productSearch.toLowerCase())
   );
+  const storesPageCount = Math.max(1, Math.ceil(stores.length / 20));
+  const visibleStores = stores.slice((storesPage - 1) * 20, storesPage * 20);
+  const adminProductsPageCount = Math.max(1, Math.ceil(adminProducts.length / 20));
+  const visibleAdminProducts = adminProducts.slice((productsPage - 1) * 20, productsPage * 20);
+
+  const exportStoresReport = async () => {
+    setAdminReportError('');
+    try {
+      const rows = stores.map((store) => ({
+        loja: store.name || '',
+        proprietario: store.owner_name || '',
+        email: store.owner_email || store.email || '',
+        categoria: store.category || '',
+        localizacao: store.location || '',
+        estado: store.status || '',
+        produtos: Number(store.total_products || 0),
+        vendas_totais_mzn: Number(store.total_sales || 0),
+        criada_em: store.created_at ? new Date(store.created_at).toLocaleString('pt-MZ') : '',
+      }));
+      const extension = storeReportFormat === 'excel' ? 'xlsx' : storeReportFormat;
+      await downloadReportFromObjects(
+        storeReportFormat,
+        `relatorio-lojas-${new Date().toISOString().slice(0, 10)}.${extension}`,
+        'Relatório de lojas',
+        ['loja', 'proprietario', 'email', 'categoria', 'localizacao', 'estado', 'produtos', 'vendas_totais_mzn', 'criada_em'],
+        rows,
+        {
+          subtitle: 'Lojas filtradas por pesquisa, estado e data de criação.',
+          period: storeDateFrom && storeDateTo ? `${storeDateFrom} a ${storeDateTo}` : 'Todos os períodos',
+          summary: [{ label: 'Lojas', value: rows.length }],
+        },
+      );
+    } catch {
+      setAdminReportError('Não foi possível gerar o relatório de lojas.');
+    }
+  };
+
+  const exportProductsReport = async () => {
+    setAdminReportError('');
+    try {
+      const rows = adminProducts.map((product) => ({
+        produto: product.name,
+        loja: product.store_name || '',
+        categoria: product.category_name || '',
+        tipo: PRODUCT_TYPE_LABELS[product.product_type] || product.product_type,
+        estado: product.status,
+        preco_mzn: Number(product.price || 0),
+        stock: Number(product.stock || 0),
+        vendas: Number(product.sales_count || 0),
+        criado_em: product.created_at ? new Date(product.created_at).toLocaleString('pt-MZ') : '',
+      }));
+      const extension = productReportFormat === 'excel' ? 'xlsx' : productReportFormat;
+      await downloadReportFromObjects(
+        productReportFormat,
+        `relatorio-produtos-${new Date().toISOString().slice(0, 10)}.${extension}`,
+        'Relatório de produtos',
+        ['produto', 'loja', 'categoria', 'tipo', 'estado', 'preco_mzn', 'stock', 'vendas', 'criado_em'],
+        rows,
+        {
+          subtitle: 'Produtos filtrados por pesquisa, estado, tipo e data de criação.',
+          period: productDateFrom && productDateTo ? `${productDateFrom} a ${productDateTo}` : 'Todos os períodos',
+          summary: [
+            { label: 'Produtos', value: rows.length },
+            { label: 'Unidades em stock', value: rows.reduce((total, row) => total + row.stock, 0) },
+            { label: 'Vendas registadas', value: rows.reduce((total, row) => total + row.vendas, 0) },
+          ],
+        },
+      );
+    } catch {
+      setAdminReportError('Não foi possível gerar o relatório de produtos.');
+    }
+  };
 
   if (loading) {
     return (
@@ -623,6 +790,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
           {([
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
             { id: 'stores', label: 'Lojas', icon: Store },
+            { id: 'products', label: 'Produtos', icon: Package },
             { id: 'returns', label: 'Devoluções', icon: RotateCcw },
             { id: 'orders', label: 'Encomendas', icon: ShoppingCart },
             { id: 'tickets', label: 'Suporte', icon: LifeBuoy },
@@ -781,8 +949,48 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
         {/* Stores Tab */}
         {activeTab === 'stores' && (
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Gestão de Lojas</h2>
+            <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-white p-4">
+              <div>
+                <h2 className="text-lg font-bold">Gestão de Lojas</h2>
+                <p className="text-xs text-muted-foreground">Filtre lojas e exporte os resultados em CSV, Excel ou PDF.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground xl:col-span-2">Pesquisar
+                  <input value={storeSearch} onChange={(event) => { setStoreSearch(event.target.value); setStoresPage(1); }}
+                    placeholder="Loja, proprietário, email ou localização"
+                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">Estado
+                  <select value={storeStatusFilter} onChange={(event) => { setStoreStatusFilter(event.target.value); setStoresPage(1); }}
+                    className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground">
+                    <option value="">Todos</option><option value="pending">Pendente</option><option value="active">Activa</option>
+                    <option value="suspended">Suspensa</option><option value="rejected">Rejeitada</option><option value="closed">Fechada</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">Criada de
+                  <input type="date" value={storeDateFrom} max={storeDateTo || undefined}
+                    onChange={(event) => { setStoreDateFrom(event.target.value); setStoresPage(1); }}
+                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">Criada até
+                  <input type="date" value={storeDateTo} min={storeDateFrom || undefined}
+                    onChange={(event) => { setStoreDateTo(event.target.value); setStoresPage(1); }}
+                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground" />
+                </label>
+                <div className="flex items-end gap-2">
+                  <select aria-label="Formato do relatório de lojas" value={storeReportFormat}
+                    onChange={(event) => setStoreReportFormat(event.target.value as ReportFormat)}
+                    className="min-w-0 flex-1 rounded-md border border-border bg-white px-2 py-2 text-sm">
+                    <option value="csv">CSV</option><option value="excel">Excel</option><option value="pdf">PDF</option>
+                  </select>
+                  <button type="button" onClick={exportStoresReport} disabled={storesLoading || Boolean(storeDateFrom) !== Boolean(storeDateTo)}
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50">
+                    <Download size={15} /> Exportar
+                  </button>
+                </div>
+              </div>
+              {Boolean(storeDateFrom) !== Boolean(storeDateTo) && <p className="text-xs text-amber-700">Indique as duas datas para aplicar o período.</p>}
+              {adminReportError && <p role="alert" className="text-sm text-red-600">{adminReportError}</p>}
             </div>
 
             {storesLoading ? (
@@ -804,14 +1012,14 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {stores.length === 0 ? (
+                      {visibleStores.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="text-center py-12 text-muted-foreground">
                             Nenhuma loja cadastrada.
                           </td>
                         </tr>
                       ) : (
-                        stores.map((store: any) => (
+                        visibleStores.map((store: any) => (
                           <tr key={store.id} className="hover:bg-muted/30">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
@@ -875,8 +1083,126 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                     </tbody>
                   </table>
                 </div>
+                {stores.length > 0 && (
+                  <div className="flex flex-col gap-2 border-t border-border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-muted-foreground">{stores.length} loja(s) encontradas</span>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => setStoresPage((page) => Math.max(1, page - 1))} disabled={storesPage === 1}
+                        className="rounded border border-border p-1.5 disabled:opacity-40"><ChevronLeft size={16} /></button>
+                      <span>Página {storesPage} de {storesPageCount}</span>
+                      <button type="button" onClick={() => setStoresPage((page) => Math.min(storesPageCount, page + 1))} disabled={storesPage === storesPageCount}
+                        className="rounded border border-border p-1.5 disabled:opacity-40"><ChevronRight size={16} /></button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'products' && (
+          <div>
+            <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-white p-4">
+              <div>
+                <h2 className="text-lg font-bold">Gestão e relatório de produtos</h2>
+                <p className="text-xs text-muted-foreground">Inclui produtos activos, inactivos, rascunhos e removidos.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-7">
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground xl:col-span-2">Pesquisar
+                  <input value={productReportSearch} onChange={(event) => { setProductReportSearch(event.target.value); setProductsPage(1); }}
+                    placeholder="Produto, loja ou categoria"
+                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">Estado
+                  <select value={productStatusFilter} onChange={(event) => { setProductStatusFilter(event.target.value); setProductsPage(1); }}
+                    className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground">
+                    <option value="">Todos</option><option value="draft">Rascunho</option><option value="active">Activo</option>
+                    <option value="inactive">Inactivo</option><option value="deleted">Removido</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">Tipo
+                  <select value={productTypeFilter} onChange={(event) => { setProductTypeFilter(event.target.value); setProductsPage(1); }}
+                    className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground">
+                    <option value="">Todos</option><option value="physical">Físico</option><option value="digital">Digital</option><option value="course">Curso</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">Criado de
+                  <input type="date" value={productDateFrom} max={productDateTo || undefined}
+                    onChange={(event) => { setProductDateFrom(event.target.value); setProductsPage(1); }}
+                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">Criado até
+                  <input type="date" value={productDateTo} min={productDateFrom || undefined}
+                    onChange={(event) => { setProductDateTo(event.target.value); setProductsPage(1); }}
+                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground" />
+                </label>
+                <div className="flex items-end gap-2">
+                  <select aria-label="Formato do relatório de produtos" value={productReportFormat}
+                    onChange={(event) => setProductReportFormat(event.target.value as ReportFormat)}
+                    className="min-w-0 flex-1 rounded-md border border-border bg-white px-2 py-2 text-sm">
+                    <option value="csv">CSV</option><option value="excel">Excel</option><option value="pdf">PDF</option>
+                  </select>
+                  <button type="button" onClick={exportProductsReport} disabled={adminProductsLoading || Boolean(productDateFrom) !== Boolean(productDateTo)}
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50">
+                    <Download size={15} /> Exportar
+                  </button>
+                </div>
+              </div>
+              {Boolean(productDateFrom) !== Boolean(productDateTo) && <p className="text-xs text-amber-700">Indique as duas datas para aplicar o período.</p>}
+              {adminReportError && <p role="alert" className="text-sm text-red-600">{adminReportError}</p>}
+            </div>
+            <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+              {adminProductsLoading ? (
+                <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="border-b border-border bg-muted/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-medium">Produto</th>
+                          <th className="px-4 py-3 text-left font-medium">Loja</th>
+                          <th className="px-4 py-3 text-left font-medium">Categoria</th>
+                          <th className="px-4 py-3 text-left font-medium">Tipo</th>
+                          <th className="px-4 py-3 text-center font-medium">Estado</th>
+                          <th className="px-4 py-3 text-right font-medium">Preço</th>
+                          <th className="px-4 py-3 text-right font-medium">Stock</th>
+                          <th className="px-4 py-3 text-right font-medium">Vendas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {visibleAdminProducts.length === 0 ? (
+                          <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">Nenhum produto encontrado.</td></tr>
+                        ) : visibleAdminProducts.map((product) => (
+                          <tr key={product.id} className="hover:bg-muted/30">
+                            <td className="px-4 py-3 font-medium">{product.name}</td>
+                            <td className="px-4 py-3">{product.store_name || '—'}</td>
+                            <td className="px-4 py-3">{product.category_name || '—'}</td>
+                            <td className="px-4 py-3">{PRODUCT_TYPE_LABELS[product.product_type] || product.product_type}</td>
+                            <td className="px-4 py-3 text-center">{product.status}</td>
+                            <td className="px-4 py-3 text-right">{Number(product.price).toLocaleString('pt-MZ')} MZN</td>
+                            <td className="px-4 py-3 text-right">{product.stock}</td>
+                            <td className="px-4 py-3 text-right">{product.sales_count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {adminProducts.length > 0 && (
+                    <div className="flex flex-col gap-2 border-t border-border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-muted-foreground">{adminProducts.length} produto(s) encontrados</span>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => setProductsPage((page) => Math.max(1, page - 1))} disabled={productsPage === 1}
+                          className="rounded border border-border p-1.5 disabled:opacity-40"><ChevronLeft size={16} /></button>
+                        <span>Página {productsPage} de {adminProductsPageCount}</span>
+                        <button type="button" onClick={() => setProductsPage((page) => Math.min(adminProductsPageCount, page + 1))} disabled={productsPage === adminProductsPageCount}
+                          className="rounded border border-border p-1.5 disabled:opacity-40"><ChevronRight size={16} /></button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
 

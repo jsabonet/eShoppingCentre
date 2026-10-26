@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Wallet, RefreshCw, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Wallet, RefreshCw, Loader2, CheckCircle, AlertCircle, Search, Download } from 'lucide-react';
 import { walletAPI } from '@/src/lib/api';
+import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Pendente', approved: 'Aprovado', paid: 'Pago', rejected: 'Rejeitado',
@@ -24,6 +25,13 @@ export default function AdminWallet() {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [recon, setRecon] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [methodFilter, setMethodFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const showToast = (type: 'success' | 'error', text: string) => {
@@ -33,11 +41,23 @@ export default function AdminWallet() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [pRes, rRes] = await Promise.all([
-        walletAPI.adminPayouts({ page_size: 200 }),
+      const [allPayouts, rRes] = await Promise.all([
+        (async () => {
+          const result: any[] = [];
+          let page = 1;
+          let hasNext = true;
+          while (hasNext) {
+            const { data } = await walletAPI.adminPayouts({ page_size: 100, page });
+            const pageResults = Array.isArray(data) ? data : data.results || [];
+            result.push(...pageResults);
+            hasNext = !Array.isArray(data) && Boolean(data.next);
+            page += 1;
+          }
+          return result;
+        })(),
         walletAPI.adminReconciliation(),
       ]);
-      setPayouts((pRes.data as any).results || pRes.data || []);
+      setPayouts(allPayouts);
       setRecon(rRes.data);
     } catch { setPayouts([]); }
     finally { setLoading(false); }
@@ -62,7 +82,64 @@ export default function AdminWallet() {
     catch { showToast('error', 'Erro ao rejeitar.'); }
   };
 
+  const filteredPayouts = payouts.filter((p) => {
+    const query = search.trim().toLowerCase();
+    const createdDate = String(p.created_at || '').slice(0, 10);
+    const searchable = [
+      p.user_name,
+      p.user_email,
+      p.admin_reference,
+      p.role,
+      formatAccount(p.account_details),
+    ].join(' ').toLowerCase();
+    return (!query || searchable.includes(query))
+      && (!statusFilter || p.status === statusFilter)
+      && (!methodFilter || p.method === methodFilter)
+      && (!roleFilter || p.role === roleFilter)
+      && (!dateFrom || createdDate >= dateFrom)
+      && (!dateTo || createdDate <= dateTo);
+  });
   const pending = payouts.filter(p => p.status === 'pending').length;
+
+  const exportPayouts = () => {
+    const rows = filteredPayouts.map((p) => ({
+      utilizador: p.user_name || '',
+      email: p.user_email || '',
+      papel: p.role || '',
+      valor_mzn: Number(p.amount || 0),
+      metodo: p.method_display || p.method || '',
+      conta: formatAccount(p.account_details),
+      estado: STATUS_LABEL[p.status] || p.status,
+      referencia: p.admin_reference || '',
+      criado_em: p.created_at ? new Date(p.created_at).toLocaleString('pt-MZ') : '',
+      aprovado_em: p.approved_at ? new Date(p.approved_at).toLocaleString('pt-MZ') : '',
+      pago_em: p.paid_at ? new Date(p.paid_at).toLocaleString('pt-MZ') : '',
+      motivo_rejeicao: p.rejection_reason || '',
+    }));
+    void downloadReportFromObjects(
+      reportFormat,
+      `relatorio-saques-${new Date().toISOString().slice(0, 10)}.${reportFormat === 'excel' ? 'xlsx' : reportFormat}`,
+      'Relatório de saques',
+      ['utilizador', 'email', 'papel', 'valor_mzn', 'metodo', 'conta', 'estado', 'referencia', 'criado_em', 'aprovado_em', 'pago_em', 'motivo_rejeicao'],
+      rows,
+      {
+        period: dateFrom || dateTo ? `${dateFrom || 'Início'} a ${dateTo || 'Hoje'}` : 'Todo o período',
+        filters: [
+          { label: 'Estado', value: statusFilter ? STATUS_LABEL[statusFilter] || statusFilter : 'Todos' },
+          { label: 'Método', value: methodFilter || 'Todos' },
+          { label: 'Papel', value: roleFilter || 'Todos' },
+          { label: 'Pesquisa', value: search.trim() || '—' },
+        ],
+        summary: [
+          { label: 'Pedidos', value: rows.length },
+          { label: 'Valor total (MZN)', value: rows.reduce((sum, payout) => sum + payout.valor_mzn, 0).toFixed(2) },
+          { label: 'Pendentes', value: filteredPayouts.filter((p) => p.status === 'pending').length },
+          { label: 'Pagos', value: filteredPayouts.filter((p) => p.status === 'paid').length },
+        ],
+        columns: ['Utilizador', 'Email', 'Papel', 'Valor (MZN)', 'Método', 'Conta', 'Estado', 'Referência', 'Criado em', 'Aprovado em', 'Pago em', 'Motivo da rejeição'],
+      },
+    ).catch(() => showToast('error', 'Não foi possível gerar o relatório de saques.'));
+  };
 
   return (
     <div>
@@ -110,6 +187,72 @@ export default function AdminWallet() {
         </div>
       )}
 
+      <section className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-border bg-white p-3 sm:grid-cols-2 xl:grid-cols-4">
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-2 xl:col-span-4">
+          <span className="flex items-center gap-1"><Search size={13} /> Pesquisar utilizador ou referência</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Nome, email, conta ou referência"
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground"
+          />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Data inicial
+          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground" />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Data final
+          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground" />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Estado
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground">
+            <option value="">Todos os estados</option>
+            {Object.entries(STATUS_LABEL).map(([status, label]) => <option key={status} value={status}>{label}</option>)}
+          </select>
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Método
+          <select value={methodFilter} onChange={(event) => setMethodFilter(event.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground">
+            <option value="">Todos os métodos</option>
+            <option value="mpesa">M-Pesa</option>
+            <option value="emola">e-Mola</option>
+            <option value="bank">Transferência Bancária</option>
+          </select>
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Papel
+          <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground">
+            <option value="">Todos</option>
+            <option value="seller">Vendedor</option>
+            <option value="affiliate">Afiliado</option>
+          </select>
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Formato do relatório
+          <select value={reportFormat} onChange={(event) => setReportFormat(event.target.value as ReportFormat)}
+            className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-foreground">
+            <option value="csv">CSV</option>
+            <option value="excel">Excel (.xlsx)</option>
+            <option value="pdf">PDF</option>
+          </select>
+        </label>
+        <button type="button" onClick={exportPayouts} disabled={!filteredPayouts.length}
+          className="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-2 self-end rounded-lg bg-[#F2871A] px-3 py-2 text-sm font-medium text-white hover:bg-[#db7410] disabled:cursor-not-allowed disabled:opacity-50">
+          <Download size={15} /> Exportar relatório
+        </button>
+        <p className="text-xs text-muted-foreground sm:col-span-2 xl:col-span-4">
+          {filteredPayouts.length} de {payouts.length} pedidos de saque
+        </p>
+      </section>
+
       {loading ? (
         <div className="text-center py-16"><Loader2 size={28} className="animate-spin mx-auto text-muted-foreground" /></div>
       ) : (
@@ -128,7 +271,7 @@ export default function AdminWallet() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {payouts.map((p) => (
+                {filteredPayouts.map((p) => (
                   <tr key={p.id} className="hover:bg-muted/20">
                     <td className="py-3 px-4">
                       <p className="font-medium">{p.user_name}</p>
@@ -160,7 +303,7 @@ export default function AdminWallet() {
                     </td>
                   </tr>
                 ))}
-                {payouts.length === 0 && (
+                {filteredPayouts.length === 0 && (
                   <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">Sem pedidos de saque.</td></tr>
                 )}
               </tbody>

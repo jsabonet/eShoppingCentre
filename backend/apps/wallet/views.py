@@ -2,6 +2,9 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
+from django.utils.dateparse import parse_date
+from rest_framework.exceptions import ValidationError
 from .models import PayoutRequest
 from .serializers import WalletSerializer, WalletTransactionSerializer, PayoutRequestSerializer
 from .services import request_payout, approve_payout, pay_payout, reject_payout, InsufficientFunds
@@ -69,7 +72,38 @@ class AdminPayoutListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
 
     def get_queryset(self):
-        return PayoutRequest.objects.select_related('user').order_by('-created_at')
+        queryset = PayoutRequest.objects.select_related('user')
+        params = self.request.query_params
+        allowed = {'page', 'page_size', 'search', 'status', 'method', 'role', 'date_from', 'date_to'}
+        unsupported = set(params) - allowed
+        if unsupported:
+            raise ValidationError({
+                'query_params': f'Filtros não suportados: {", ".join(sorted(unsupported))}.',
+            })
+
+        search = params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(user__email__icontains=search)
+                | Q(user__first_name__icontains=search)
+                | Q(user__last_name__icontains=search)
+                | Q(admin_reference__icontains=search)
+            )
+
+        for field in ('status', 'method', 'role'):
+            value = params.get(field, '').strip()
+            if value:
+                queryset = queryset.filter(**{field: value})
+
+        for field, lookup in (('date_from', 'created_at__date__gte'), ('date_to', 'created_at__date__lte')):
+            value = params.get(field)
+            if value:
+                parsed = parse_date(value)
+                if parsed is None:
+                    raise ValidationError({field: 'Use uma data válida no formato AAAA-MM-DD.'})
+                queryset = queryset.filter(**{lookup: parsed})
+
+        return queryset.order_by('-created_at')
 
 
 class AdminPayoutApproveView(APIView):

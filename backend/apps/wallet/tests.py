@@ -22,7 +22,7 @@ from apps.wallet.services import (
     get_refundable_amount,
     InsufficientFunds,
 )
-from apps.wallet.views import AdminReconciliationView, WalletPayoutView
+from apps.wallet.views import AdminPayoutListView, AdminReconciliationView, WalletPayoutView
 
 User = get_user_model()
 
@@ -48,6 +48,36 @@ def admin(db):
 @pytest.fixture
 def ref_id():
     return uuid.uuid4()
+
+
+@pytest.mark.django_db
+def test_admin_payout_list_filters_by_status_method_and_search(admin, user):
+    matching = PayoutRequest.objects.create(
+        user=user,
+        role='seller',
+        amount=Decimal('300.00'),
+        method='mpesa',
+        status='paid',
+        admin_reference='PAY-REPORT-123',
+    )
+    PayoutRequest.objects.create(
+        user=user,
+        role='affiliate',
+        amount=Decimal('200.00'),
+        method='emola',
+        status='pending',
+    )
+    request = APIRequestFactory().get(
+        '/api/v1/wallet/admin/payouts/',
+        {'status': 'paid', 'method': 'mpesa', 'search': 'PAY-REPORT-123'},
+    )
+    force_authenticate(request, user=admin)
+
+    response = AdminPayoutListView.as_view()(request)
+
+    assert response.status_code == 200
+    assert response.data['count'] == 1
+    assert response.data['results'][0]['id'] == str(matching.id)
 
 
 @pytest.mark.django_db

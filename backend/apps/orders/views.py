@@ -1,7 +1,10 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Order, ReturnRequest, ReturnImage, OrderStatusHistory, SupportTicket, SupportTicketImage, AbandonedCart
@@ -331,9 +334,45 @@ class AdminAllOrdersView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
 
     def get_queryset(self):
-        return Order.objects.select_related('buyer', 'store').prefetch_related(
+        queryset = Order.objects.select_related('buyer', 'store').prefetch_related(
             'items', 'status_history'
-        ).order_by('-created_at')
+        )
+        params = self.request.query_params
+        allowed = {
+            'page', 'page_size', 'search', 'status', 'payment_status',
+            'payment_method', 'date_from', 'date_to',
+        }
+        unsupported = set(params) - allowed
+        if unsupported:
+            raise ValidationError({
+                'query_params': f'Filtros não suportados: {", ".join(sorted(unsupported))}.',
+            })
+
+        search = params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(order_number__icontains=search)
+                | Q(buyer__email__icontains=search)
+                | Q(buyer__first_name__icontains=search)
+                | Q(buyer__last_name__icontains=search)
+                | Q(store__name__icontains=search)
+                | Q(store_name__icontains=search)
+            )
+
+        for field in ('status', 'payment_status', 'payment_method'):
+            value = params.get(field, '').strip()
+            if value:
+                queryset = queryset.filter(**{field: value})
+
+        for field, lookup in (('date_from', 'created_at__date__gte'), ('date_to', 'created_at__date__lte')):
+            value = params.get(field)
+            if value:
+                parsed = parse_date(value)
+                if parsed is None:
+                    raise ValidationError({field: 'Use uma data válida no formato AAAA-MM-DD.'})
+                queryset = queryset.filter(**{lookup: parsed})
+
+        return queryset.order_by('-created_at')
 
 
 class ResolveReturnView(APIView):

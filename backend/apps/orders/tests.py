@@ -6,10 +6,12 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.courses.models import Course, Enrollment
 from apps.notifications.models import Notification
 from apps.orders.models import Order, OrderItem
+from apps.orders.views import AdminAllOrdersView
 from apps.orders.serializers import CreateOrderSerializer, ReturnRequestSerializer
 from apps.orders.services import cancel_order
 from apps.orders.tasks import auto_release_unpaid_orders
@@ -71,6 +73,52 @@ def physical_product(db, store, category):
         stock=8,  # já deduzido de um stock original de 10 (2 unidades reservadas)
         status='active',
     )
+
+
+@pytest.mark.django_db
+def test_admin_order_list_filters_by_search_payment_and_date(buyer, store):
+    admin = User.objects.create_superuser(
+        email='orders-admin@example.com',
+        username='orders-admin',
+        password='Admin123!',
+    )
+    matching = Order.objects.create(
+        buyer=buyer,
+        store=store,
+        subtotal=Decimal('100.00'),
+        total=Decimal('100.00'),
+        payment_method='mpesa',
+        payment_status='completed',
+        status='confirmed',
+        shipping_address={},
+    )
+    Order.objects.create(
+        buyer=buyer,
+        store=store,
+        subtotal=Decimal('50.00'),
+        total=Decimal('50.00'),
+        payment_method='wallet',
+        payment_status='pending',
+        status='pending',
+        shipping_address={},
+    )
+    request = APIRequestFactory().get(
+        '/api/v1/orders/admin/',
+        {
+            'search': matching.order_number,
+            'payment_status': 'completed',
+            'payment_method': 'mpesa',
+            'date_from': timezone.localdate().isoformat(),
+            'date_to': timezone.localdate().isoformat(),
+        },
+    )
+    force_authenticate(request, user=admin)
+
+    response = AdminAllOrdersView.as_view()(request)
+
+    assert response.status_code == 200
+    assert response.data['count'] == 1
+    assert response.data['results'][0]['id'] == str(matching.id)
 
 
 @pytest.fixture

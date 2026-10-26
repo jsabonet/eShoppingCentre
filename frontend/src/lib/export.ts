@@ -14,6 +14,7 @@ export interface ReportContextItem {
 export interface ReportOptions {
   subtitle?: string;
   period?: string;
+  reference?: string;
   filters?: ReportContextItem[];
   summary?: ReportContextItem[];
   notes?: string[];
@@ -48,7 +49,7 @@ export function downloadCsvFromObjects(filename: string, headers: string[], data
 }
 
 async function loadBrandLogo() {
-  const response = await fetch('/icon.png');
+  const response = await fetch('/email-logo.png');
   if (!response.ok) {
     throw new Error(`Não foi possível carregar o logótipo para o PDF (${response.status}).`);
   }
@@ -121,16 +122,17 @@ export async function downloadReportFromObjects(
   }
 
   const pdf = new jsPDF({
-    orientation: headers.length > 6 ? 'landscape' : 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
-    format: 'a4',
+    format: 'a3',
   });
   const logoData = await loadBrandLogo();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 13;
-  const topMargin = 57;
-  const bottomMargin = 19;
+  const headerHeight = 36;
+  const topMargin = 40;
+  const bottomMargin = 20;
   const printableWidth = pageWidth - margin * 2;
   const navy: [number, number, number] = [23, 50, 77];
   const orange: [number, number, number] = [231, 145, 55];
@@ -138,6 +140,14 @@ export async function downloadReportFromObjects(
   const muted: [number, number, number] = [100, 116, 139];
   const border: [number, number, number] = [222, 229, 236];
   const pale: [number, number, number] = [247, 249, 251];
+  const pageBackground: [number, number, number] = [248, 250, 252];
+
+  const drawPageBackground = () => {
+    pdf.setFillColor(...pageBackground);
+    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+  };
+  drawPageBackground();
+  pdf.internal.events.subscribe('addPage', drawPageBackground);
 
   pdf.setProperties({
     title,
@@ -146,111 +156,127 @@ export async function downloadReportFromObjects(
     creator: 'e-Shopping Centre',
   });
 
-  let cursorY = 62;
-  const contextRows: string[][] = [];
-  if (options.period) contextRows.push(['Período analisado', options.period]);
-  options.filters?.forEach((filter) => contextRows.push([filter.label, String(filter.value ?? '—')]));
-  contextRows.push(['Gerado em', new Date().toLocaleString('pt-MZ')]);
-
-  if (contextRows.length) {
+  const tableMargin = { left: margin, right: margin, top: topMargin, bottom: bottomMargin };
+  const getFinalY = (fallback: number) =>
+    (pdf as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? fallback;
+  const sectionHeading = (label: string, startY: number) => {
+    let headingY = startY + 5;
+    if (headingY > pageHeight - bottomMargin - 12) {
+      pdf.addPage();
+      headingY = topMargin;
+    }
     pdf.setTextColor(...navy);
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(8);
-    pdf.text('ÂMBITO DO RELATÓRIO', margin, cursorY);
-    autoTable(pdf, {
-      body: contextRows,
-      startY: cursorY + 3,
-      margin: { left: margin, right: margin, top: topMargin, bottom: bottomMargin },
-      columnStyles: { 0: { cellWidth: printableWidth * 0.27, fontStyle: 'bold', textColor: navy } },
-      styles: {
-        font: 'helvetica',
-        fontSize: 8,
-        cellPadding: 3,
-        textColor: ink,
-        lineColor: border,
-        lineWidth: 0.2,
-        overflow: 'linebreak',
-      },
-      alternateRowStyles: { fillColor: pale },
-      theme: 'plain',
-    });
-    cursorY = (pdf as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? cursorY + 12;
-    cursorY += 7;
-  }
+    pdf.setFontSize(11);
+    pdf.text(label, margin, headingY);
+    return headingY + 2.5;
+  };
+  let cursorY = topMargin;
+  const generatedAt = new Date().toLocaleString('pt-MZ');
+  const metadataRows = [
+    ['Relatório', title, 'Período', options.period || 'Todo o histórico disponível'],
+    ['Gerado por', 'e-Shopping Centre', 'Gerado em', generatedAt],
+  ];
+  autoTable(pdf, {
+    body: metadataRows,
+    startY: cursorY,
+    margin: tableMargin,
+    columnStyles: {
+      0: { cellWidth: 30, fontStyle: 'bold', textColor: [71, 85, 105] },
+      1: { cellWidth: (printableWidth - 60) / 2 },
+      2: { cellWidth: 30, fontStyle: 'bold', textColor: [71, 85, 105] },
+    },
+    styles: {
+      font: 'helvetica',
+      fontSize: 8,
+      cellPadding: { top: 3, right: 2.5, bottom: 3, left: 2.5 },
+      textColor: ink,
+      lineColor: border,
+      lineWidth: 0.15,
+      overflow: 'linebreak',
+      valign: 'middle',
+    },
+    didParseCell: (cellData) => {
+      if (cellData.column.index === 0 || cellData.column.index === 2) {
+        cellData.cell.styles.fillColor = [241, 245, 249];
+      }
+    },
+    theme: 'grid',
+  });
+  cursorY = getFinalY(cursorY + 20);
 
   if (options.summary?.length) {
-    if (cursorY > pageHeight - 48) {
-      pdf.addPage();
-      cursorY = topMargin;
+    const headingY = sectionHeading('Resumo', cursorY);
+    const summaryGroups: ReportContextItem[][] = [];
+    for (let index = 0; index < options.summary.length; index += 4) {
+      summaryGroups.push(options.summary.slice(index, index + 4));
     }
-    pdf.setTextColor(...navy);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(8);
-    pdf.text('RESUMO', margin, cursorY);
-    const summaryRows: string[][] = [];
-    for (let index = 0; index < options.summary.length; index += 1) {
-      const item = options.summary[index];
-      summaryRows.push([item.label, String(item.value ?? '—')]);
+    for (const [groupIndex, group] of summaryGroups.entries()) {
+      const cells = [...group, ...Array.from(
+        { length: 4 - group.length },
+        () => ({ label: '', value: '' }),
+      )];
+      autoTable(pdf, {
+        body: [
+          cells.map((item) => item.label),
+          cells.map((item) => String(item.value ?? '—')),
+        ],
+        startY: groupIndex === 0 ? headingY : getFinalY(headingY) + 3,
+        margin: tableMargin,
+        styles: {
+          font: 'helvetica',
+          fontSize: 7,
+          cellPadding: { top: 2.5, right: 3, bottom: 2.5, left: 3 },
+          textColor: muted,
+          lineColor: border,
+          lineWidth: 0.2,
+          overflow: 'linebreak',
+          valign: 'middle',
+        },
+        didParseCell: (cellData) => {
+          if (cellData.row.index === 1) {
+            cellData.cell.styles.fontStyle = 'bold';
+            cellData.cell.styles.fontSize = 11;
+            cellData.cell.styles.textColor = navy;
+          }
+        },
+        theme: 'grid',
+      });
     }
+    cursorY = getFinalY(headingY) + 2;
+  }
+
+  const criteriaRows = [
+    ...(options.filters || []).map((filter) => [
+      filter.label,
+      String(filter.value ?? '—'),
+    ]),
+    ...(options.notes || []).map((note) => ['Nota', note]),
+  ];
+  if (criteriaRows.length) {
+    const headingY = sectionHeading('Critérios de apuramento', cursorY);
     autoTable(pdf, {
-      body: summaryRows,
-      startY: cursorY + 3,
-      margin: { left: margin, right: margin, top: topMargin, bottom: bottomMargin },
-      columnStyles: {
-        0: { cellWidth: printableWidth * 0.62, fontStyle: 'bold', textColor: navy },
-        1: { halign: 'right', fontStyle: 'bold', textColor: ink },
-      },
+      body: criteriaRows,
+      startY: headingY,
+      margin: tableMargin,
+      columnStyles: { 0: { cellWidth: 55, fontStyle: 'bold', textColor: [71, 85, 105] } },
       styles: {
         font: 'helvetica',
         fontSize: 8,
-        cellPadding: 3,
-        lineColor: border,
-        lineWidth: 0.2,
-      },
-      alternateRowStyles: { fillColor: pale },
-      theme: 'plain',
-    });
-    cursorY = (pdf as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? cursorY + 12;
-    cursorY += 7;
-  }
-
-  if (options.notes?.length) {
-    if (cursorY > pageHeight - 42) {
-      pdf.addPage();
-      cursorY = topMargin;
-    }
-    pdf.setTextColor(...navy);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(8);
-    pdf.text('CRITÉRIOS E NOTAS', margin, cursorY);
-    autoTable(pdf, {
-      body: options.notes.map((note) => [note]),
-      startY: cursorY + 3,
-      margin: { left: margin, right: margin, top: topMargin, bottom: bottomMargin },
-      styles: {
-        font: 'helvetica',
-        fontSize: 7.5,
-        cellPadding: 3,
-        textColor: muted,
+        cellPadding: { top: 2, right: 2.5, bottom: 2, left: 2.5 },
+        textColor: ink,
         lineColor: border,
         lineWidth: 0.15,
         overflow: 'linebreak',
+        valign: 'top',
       },
-      alternateRowStyles: { fillColor: pale },
-      theme: 'plain',
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      theme: 'grid',
     });
-    cursorY = (pdf as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? cursorY + 12;
-    cursorY += 7;
+    cursorY = getFinalY(headingY) + 2;
   }
 
-  if (cursorY > pageHeight - 35) {
-    pdf.addPage();
-    cursorY = topMargin;
-  }
-  pdf.setTextColor(...navy);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(8);
-  pdf.text('DETALHE DOS REGISTOS', margin, cursorY);
+  const detailHeadingY = sectionHeading('Detalhe dos registos', cursorY);
   const detailHeaders = options.columns?.length === headers.length
     ? options.columns
     : headers.map((header) => header.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()));
@@ -264,8 +290,8 @@ export async function downloadReportFromObjects(
     autoTable(pdf, {
       head: [detailHeaders],
       body: rows.map((row) => row.map((value) => String(value ?? '—'))),
-      startY: cursorY + 3,
-      margin: { left: margin, right: margin, top: topMargin, bottom: bottomMargin },
+      startY: detailHeadingY,
+      margin: tableMargin,
       styles: {
         font: 'helvetica',
         fontSize: headers.length > 8 ? 6.5 : 7.5,
@@ -285,8 +311,8 @@ export async function downloadReportFromObjects(
       },
       alternateRowStyles: { fillColor: pale },
       columnStyles,
-      horizontalPageBreak: headers.length > 8,
-      horizontalPageBreakRepeat: 0,
+      horizontalPageBreak: headers.length > 10,
+      horizontalPageBreakRepeat: [0],
       showHead: 'everyPage',
       theme: 'striped',
     });
@@ -294,59 +320,88 @@ export async function downloadReportFromObjects(
     const emptyMessage = 'Não existem registos para os filtros selecionados.';
     pdf.setFillColor(...pale);
     pdf.setDrawColor(...border);
-    pdf.roundedRect(margin, cursorY + 3, printableWidth, 14, 2, 2, 'FD');
+    pdf.roundedRect(margin, detailHeadingY, printableWidth, 14, 2, 2, 'FD');
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8);
     pdf.setTextColor(...muted);
-    pdf.text(emptyMessage, pageWidth / 2, cursorY + 11.5, { align: 'center' });
+    pdf.text(emptyMessage, pageWidth / 2, detailHeadingY + 8.5, { align: 'center' });
   }
 
   const pageCount = pdf.getNumberOfPages();
-  const generatedAt = new Date().toLocaleString('pt-MZ');
+  const reference = options.reference || filename.replace(/\.[^.]+$/, '');
   for (let page = 1; page <= pageCount; page += 1) {
     pdf.setPage(page);
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageWidth, headerHeight, 'F');
     pdf.setFillColor(...navy);
-    pdf.rect(0, 0, pageWidth, 54, 'F');
+    pdf.rect(0, 0, 3, headerHeight, 'F');
     pdf.setFillColor(...orange);
-    pdf.rect(0, 54, pageWidth, 1.4, 'F');
-    pdf.addImage(logoData, 'PNG', margin, 5, 11, 11);
-    pdf.setTextColor(255, 255, 255);
+    pdf.rect(margin, 37, 18, 1.2, 'F');
+    pdf.addImage(logoData, 'PNG', margin, 8, 12, 12);
+    pdf.setTextColor(...navy);
     pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text('E-SHOPPING CENTRE', 27, 12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(...muted);
     pdf.setFontSize(7.5);
-    pdf.text('E-SHOPPING CENTRE', margin + 14, 9);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(6);
-    pdf.text('MARKETPLACE EM MOÇAMBIQUE', margin + 14, 13);
+    pdf.text('MARKETPLACE EM MOÇAMBIQUE', 27, 17);
+
+    const metadataX = pageWidth - margin;
+    const metadataWidth = 78;
+    const titleWidth = printableWidth - metadataWidth - 12;
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(6.5);
-    pdf.text('RELATÓRIO', pageWidth - margin, 8, { align: 'right' });
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7);
-    const periodText = options.period ? `Período: ${options.period}` : 'Período: Todo o histórico disponível';
-    const periodLines = pdf.splitTextToSize(periodText, 75).slice(0, 2);
-    pdf.text(periodLines, pageWidth - margin, 14, { align: 'right' });
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(title.length > 65 ? 12 : 15);
-    const titleWidth = printableWidth - 48;
-    const titleLines = pdf.splitTextToSize(title, titleWidth).slice(0, 1);
-    pdf.text(titleLines, margin, 28);
+    pdf.setTextColor(...navy);
+    pdf.setFontSize(10);
+    pdf.text(pdf.splitTextToSize(title.toLocaleUpperCase('pt-MZ'), titleWidth).slice(0, 1), margin, 27);
     if (options.subtitle) {
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
-      const subtitleLines = pdf.splitTextToSize(options.subtitle, titleWidth).slice(0, 1);
-      pdf.text(subtitleLines, margin, 34);
+      pdf.setTextColor(...muted);
+      pdf.setFontSize(8);
+      pdf.text(pdf.splitTextToSize(options.subtitle, titleWidth).slice(0, 1), margin, 32);
     }
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(71, 85, 105);
+    pdf.setFontSize(7);
+    pdf.text('PERÍODO', metadataX, 11, { align: 'right' });
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(6.5);
-    pdf.text(`Gerado em ${generatedAt}`, margin, 46);
-    pdf.text(`Registos: ${data.length}`, pageWidth - margin, 46, { align: 'right' });
-    pdf.setDrawColor(...border);
-    pdf.line(margin, pageHeight - 13, pageWidth - margin, pageHeight - 13);
+    const periodText = options.period || 'Todo o histórico disponível';
+    const periodLines = pdf.splitTextToSize(periodText, metadataWidth).slice(0, 2);
+    pdf.setTextColor(...ink);
+    pdf.setFontSize(8);
+    pdf.text(periodLines, metadataX, 16, { align: 'right' });
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(71, 85, 105);
+    pdf.setFontSize(7);
+    pdf.text('GERADO EM', metadataX, 23, { align: 'right' });
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(...ink);
+    pdf.setFontSize(8);
+    pdf.text(generatedAt, metadataX, 28, { align: 'right' });
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
-    pdf.setTextColor(...muted);
-    pdf.text('Documento gerado pela plataforma e-Shopping Centre', margin, pageHeight - 7);
-    pdf.text(`Página ${page} de ${pageCount}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+    const referenceText = `Referência: ${reference}`;
+    const referenceLines = pdf.splitTextToSize(referenceText, metadataWidth).slice(0, 1);
+    pdf.text(referenceLines, metadataX, 33, { align: 'right' });
+
+    pdf.setDrawColor(...border);
+    pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(102, 113, 125);
+    const footerTitle = `Relatório: ${title}`;
+    pdf.setFontSize(7);
+    const footerTitleMaxWidth = printableWidth * 0.48;
+    const footerTitleFontSize = Math.min(7, 7 * footerTitleMaxWidth / pdf.getTextWidth(footerTitle));
+    pdf.setFontSize(footerTitleFontSize);
+    pdf.text(footerTitle, margin, pageHeight - 9);
+    const footerReference = `Ref. ${reference}  |  Página ${page}`;
+    const footerMaxWidth = printableWidth * 0.48;
+    const footerFontSize = Math.min(7, 7 * footerMaxWidth / pdf.getTextWidth(footerReference));
+    pdf.setFontSize(footerFontSize);
+    pdf.text(footerReference, pageWidth - margin, pageHeight - 9, { align: 'right' });
   }
   pdf.save(filename);
 }
