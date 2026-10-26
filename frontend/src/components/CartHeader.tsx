@@ -4,7 +4,8 @@ import { ShoppingCart } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 
 export default function CartHeader() {
-  const { totalItems, setIsCartOpen } = useCart();
+  const { getCartCount, setIsCartOpen } = useCart();
+  const totalItems = getCartCount();
 
   return (
     <button

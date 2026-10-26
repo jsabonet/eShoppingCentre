@@ -38,7 +38,14 @@ export default function ProductDetailAddToCart({
       image,
     };
 
-    addToCart(product, 1, selectedSize);
+    addToCart({
+      ...product,
+      slug: product.id,
+      description: '',
+      rating: 0,
+      reviewCount: 0,
+      inStock: true,
+    }, 1);
     setSuccess('Added to cart!');
     setSelectedSize('');
 

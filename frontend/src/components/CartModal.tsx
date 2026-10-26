@@ -8,9 +8,7 @@ interface CartModalProps {
 }
 
 export default function CartModal({ isOpen, onClose }: CartModalProps) {
-  const { cart, removeFromCart, updateQuantity, getTotalPrice } = useCart();
-
-  const total = getTotalPrice();
+  const { items, removeFromCart, updateQuantity, totalPrice } = useCart();
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -50,38 +48,31 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto p-6">
-          {cart.length === 0 ? (
+          {items.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
               Your bag is empty
             </p>
           ) : (
             <div className="space-y-6">
-              {cart.map((item) => (
+              {items.map(({ product, quantity }) => (
                 <div
-                  key={item.id}
+                  key={product.id}
                   className="flex gap-4 pb-6 border-b border-border last:border-b-0"
                 >
                   {/* Image */}
                   <div className="flex-shrink-0 w-20 h-20 bg-subtle rounded overflow-hidden">
                     <img
-                      src={item.image}
-                      alt={item.name}
+                      src={product.image}
+                      alt={product.name}
                       className="w-full h-full object-cover"
                     />
                   </div>
 
                   {/* Details */}
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-foreground mb-1">
-                      {item.name}
-                    </h3>
-                    {item.size && (
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Size: {item.size}
-                      </p>
-                    )}
+                    <h3 className="text-lg font-semibold text-foreground mb-1">{product.name}</h3>
                     <p className="text-sm font-medium text-accent mb-3">
-                      {formatPrice(item.price)}
+                      {formatPrice(product.price)}
                     </p>
 
                     {/* Quantity Control */}
@@ -89,8 +80,8 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                       <button
                         onClick={() =>
                           updateQuantity(
-                            item.productId,
-                            Math.max(1, item.quantity - 1)
+                            product.id,
+                            Math.max(1, quantity - 1)
                           )
                         }
                         className="p-1 hover:bg-subtle rounded transition-colors"
@@ -99,11 +90,11 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
                         <Minus size={16} />
                       </button>
                       <span className="w-6 text-center text-sm font-medium">
-                        {item.quantity}
+                        {quantity}
                       </span>
                       <button
                         onClick={() =>
-                          updateQuantity(item.productId, item.quantity + 1)
+                          updateQuantity(product.id, quantity + 1)
                         }
                         className="p-1 hover:bg-subtle rounded transition-colors"
                         aria-label="Increase quantity"
@@ -115,7 +106,7 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
 
                   {/* Remove Button */}
                   <button
-                    onClick={() => removeFromCart(item.productId)}
+                    onClick={() => removeFromCart(product.id)}
                     className="p-1 hover:text-red-500 transition-colors"
                     aria-label="Remove from cart"
                   >
@@ -128,11 +119,11 @@ export default function CartModal({ isOpen, onClose }: CartModalProps) {
         </div>
 
         {/* Footer */}
-        {cart.length > 0 && (
+        {items.length > 0 && (
           <div className="border-t border-border p-6 space-y-4">
             <div className="flex justify-between items-center text-lg font-semibold">
               <span>Total:</span>
-              <span className="text-accent">{formatPrice(total)}</span>
+              <span className="text-accent">{formatPrice(totalPrice)}</span>
             </div>
             <button
               onClick={onClose}

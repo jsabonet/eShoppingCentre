@@ -1,6 +1,9 @@
 from django.contrib import admin
+from django import forms
+from django.utils import timezone
 from .models import (
     Course, CourseModule, CourseLesson, Enrollment,
+    CourseCertificate, CourseCertificateEvent,
     Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
     CourseReview,
 )
@@ -22,6 +25,119 @@ class CourseAdmin(admin.ModelAdmin):
 @admin.register(Enrollment)
 class EnrollmentAdmin(admin.ModelAdmin):
     list_display = ('user', 'course', 'progress', 'completed')
+
+
+class CourseCertificateAdminForm(forms.ModelForm):
+    reason = forms.CharField(
+        label='Motivo da alteração',
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 3}),
+    )
+
+    class Meta:
+        model = CourseCertificate
+        fields = ('recipient_name', 'course_title', 'status', 'reason')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not self.instance.pk:
+            return cleaned_data
+        changed = any(
+            cleaned_data.get(field) != getattr(self.instance, field)
+            for field in ('recipient_name', 'course_title', 'status')
+        )
+        reason = cleaned_data.get('reason', '').strip()
+        if changed and not reason:
+            self.add_error('reason', 'Indique o motivo da correcção ou alteração de estado.')
+        if cleaned_data.get('status') == 'revoked' and not reason:
+            self.add_error('reason', 'O motivo é obrigatório para revogar um certificado.')
+        return cleaned_data
+
+
+class CourseCertificateEventInline(admin.TabularInline):
+    model = CourseCertificateEvent
+    extra = 0
+    can_delete = False
+    fields = ('created_at', 'action', 'actor', 'reason', 'changes')
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CourseCertificate)
+class CourseCertificateAdmin(admin.ModelAdmin):
+    form = CourseCertificateAdminForm
+    list_display = ('certificate_number', 'recipient_name', 'course_title', 'issued_at', 'status')
+    list_filter = ('status', 'issued_at')
+    search_fields = ('certificate_number', 'recipient_name', 'course_title')
+    readonly_fields = (
+        'enrollment', 'certificate_number', 'issued_at', 'revoked_at',
+        'revocation_reason',
+    )
+    inlines = [CourseCertificateEventInline]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        previous = CourseCertificate.objects.get(pk=obj.pk) if change else None
+        reason = form.cleaned_data.get('reason', '').strip()
+        old_status = previous.status if previous else None
+        changes = {}
+        if previous:
+            for field in ('recipient_name', 'course_title', 'status'):
+                old_value = getattr(previous, field)
+                new_value = getattr(obj, field)
+                if old_value != new_value:
+                    changes[field] = {'from': old_value, 'to': new_value}
+
+        if obj.status == 'revoked':
+            obj.revoked_at = obj.revoked_at or timezone.now()
+            obj.revocation_reason = reason or obj.revocation_reason
+        else:
+            obj.revoked_at = None
+            obj.revocation_reason = ''
+        super().save_model(request, obj, form, change)
+
+        if changes:
+            action = (
+                'revoked' if old_status != 'revoked' and obj.status == 'revoked'
+                else 'reinstated' if old_status == 'revoked' and obj.status == 'valid'
+                else 'corrected'
+            )
+            CourseCertificateEvent.objects.create(
+                certificate=obj,
+                actor=request.user,
+                action=action,
+                reason=reason or obj.revocation_reason,
+                changes=changes,
+            )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'enrollment__user', 'enrollment__course__product'
+        )
+
+
+@admin.register(CourseCertificateEvent)
+class CourseCertificateEventAdmin(admin.ModelAdmin):
+    list_display = ('certificate', 'action', 'actor', 'created_at')
+    list_filter = ('action', 'created_at')
+    search_fields = ('certificate__certificate_number', 'certificate__recipient_name', 'reason')
+    readonly_fields = ('certificate', 'actor', 'action', 'reason', 'changes', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 # ─── Quizzes ───

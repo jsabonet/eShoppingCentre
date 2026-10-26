@@ -58,7 +58,7 @@ export default function CourseBuilderPage() {
   const [error, setError] = useState('');
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
-  const apiHeaders = () => {
+  const apiHeaders = (): Record<string, string> => {
     const token = localStorage.getItem('access_token');
     return token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
   };
@@ -326,7 +326,7 @@ export default function CourseBuilderPage() {
                 <button onClick={() => toggleModule(mod.id)} className="p-0.5" title={expandedModules.has(mod.id) ? 'Recolher modulo' : 'Expandir modulo'}>
                   {expandedModules.has(mod.id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
-                <GripVertical size={16} className="text-muted-foreground" title="Arrastar para reordenar" />
+                <GripVertical size={16} className="text-muted-foreground" aria-label="Arrastar para reordenar" />
                 <input
                   type="text"
                   defaultValue={mod.title}
@@ -368,8 +368,8 @@ export default function CourseBuilderPage() {
                   {mod.lessons.map((lesson) => (
                     <div key={lesson.id} className="border border-border rounded-lg p-3 bg-background">
                       <div className="flex items-center gap-2 mb-2">
-                        <GripVertical size={14} className="text-muted-foreground" title="Arrastar para reordenar" />
-                        <Play size={14} className="text-muted-foreground" title="Aula com video" />
+                        <GripVertical size={14} className="text-muted-foreground" aria-label="Arrastar para reordenar" />
+                        <Play size={14} className="text-muted-foreground" aria-label="Aula com vídeo" />
                         <input
                           key={`lesson-title-${lesson.id}-${lesson.title}`}
                           type="text"

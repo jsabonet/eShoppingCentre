@@ -30,7 +30,7 @@ export function useAffiliate() {
       ]);
       setProfile(profileRes.data);
       setStats(statsRes.data);
-      setLinks(linksRes.data);
+      setLinks(linksRes.data.results);
     } catch (err) {
       console.error('Erro ao carregar dados do afiliado:', err);
     } finally {

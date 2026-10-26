@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
-import type { TooltipValueType } from "recharts"
+type TooltipValueType = number | string | Array<number | string>
 
 import { cn } from "@/src/lib/utils"
 

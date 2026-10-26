@@ -3,7 +3,6 @@ import {
   reCaptcha2,
   addReCaptchaTokenInput
 } from './recaptcha'
-import b12Context from '../b12Context.json'
 
 declare const __PRODUCT_URL__: string | undefined
 declare const grecaptcha: {
@@ -65,7 +64,7 @@ function setupForm(formEl: HTMLFormElement) {
 
   const url = formEl.getAttribute('action') || CONTACT_FORM_SUBMISSION_URL
   const formBtn = formEl.querySelector('button[type="submit"]') as HTMLButtonElement
-  const reCaptchaVersion = parseInt(b12Context.recaptcha_version)
+  const reCaptchaVersion = Number('3')
 
   // On form submit handler
   formEl.addEventListener('submit', function(e) {

@@ -26,7 +26,7 @@ export function useSeller() {
     try {
       const [storeRes, statsRes, ordersRes, earningsRes] = await Promise.all([
         storesAPI.myStore(),
-        storesAPI.myStats(),
+        storesAPI.dashboard(),
         ordersAPI.myOrders({ page_size: 10 }),
         storesAPI.myEarnings({ page_size: 20 }),
       ]);
@@ -42,7 +42,7 @@ export function useSeller() {
   };
 
   const updateOrderStatus = async (orderId: string, status: string, trackingCode?: string) => {
-    await ordersAPI.updateStatus(orderId, { status, tracking_code: trackingCode });
+    await ordersAPI.updateStoreOrderStatus(orderId, { status, tracking_code: trackingCode });
     await loadData();
   };
 

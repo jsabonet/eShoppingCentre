@@ -95,7 +95,7 @@ export default function AccountTicketsPage() {
                     {t.order_number} · {CATEGORY_LABELS[t.category]} · {new Date(t.created_at).toLocaleDateString('pt-MZ')}
                   </p>
                   <p className="text-sm text-foreground/80">{t.description}</p>
-                  {t.images?.length > 0 && (
+                  {t.images && t.images.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3">
                       {t.images.map(img => (
                         <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Anexo'} fill

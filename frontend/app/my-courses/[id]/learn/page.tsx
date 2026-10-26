@@ -87,7 +87,7 @@ export default function CourseLearnPage() {
   const [reviewError, setReviewError] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState('');
 
-  const apiHeaders = () => {
+  const apiHeaders = (): Record<string, string> => {
     const token = localStorage.getItem('access_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };

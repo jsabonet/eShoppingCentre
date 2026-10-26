@@ -46,6 +46,7 @@ interface OrderItem {
   buyer_email?: string; buyer_phone?: string; buyer_name?: string;
   store_phone?: string;
   items?: any[]; shipping_notes?: string; tracking_code?: string;
+  shipping_method?: string;
   shipping_evidence?: string;
   is_pickup?: boolean;
   has_physical_items?: boolean;
@@ -288,7 +289,7 @@ export default function SellerOrdersPage() {
                     const isExpanded = expanded.has(order.id);
                     const isDigital = order.is_digital_only === true;
                     const allowed = isDigital ? [] : (ALLOWED_OPTIONS[order.status] || []);
-                    const hasHistory = order.status_history?.length > 0;
+                    const hasHistory = (order.status_history?.length || 0) > 0;
 
                     return (
                       <React.Fragment key={order.id}>
@@ -489,11 +490,11 @@ export default function SellerOrdersPage() {
             </div>
 
             {/* Itens */}
-            {detail.items?.length > 0 && (
+            {(detail.items?.length || 0) > 0 && (
               <div className="mb-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Itens da Encomenda</h3>
                 <div className="space-y-2">
-                  {detail.items.map((item: any, idx: number) => (
+                  {(detail.items || []).map((item: any, idx: number) => (
                     <div key={item.id || idx} className="flex items-center gap-3 bg-muted/20 rounded-xl p-2.5">
                       {item.product_image ? (
                         <LightboxImage src={item.product_image} alt={item.product_name || 'Produto'} fill
@@ -530,11 +531,11 @@ export default function SellerOrdersPage() {
             )}
 
             {/* Histórico */}
-            {detail.status_history?.length > 0 && (
+            {(detail.status_history?.length || 0) > 0 && (
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Histórico de Status</h3>
                 <div className="space-y-2">
-                  {detail.status_history.map((h, i) => (
+                  {(detail.status_history || []).map((h, i) => (
                     <div key={h.id} className="flex gap-2 text-xs">
                       <div className="flex flex-col items-center">
                         <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-accent' : 'bg-muted-foreground/30'}`} />

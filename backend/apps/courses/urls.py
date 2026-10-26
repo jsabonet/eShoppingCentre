@@ -46,6 +46,8 @@ urlpatterns = [
     path('me/lessons/<uuid:lesson_id>/watch-progress/', views.WatchProgressView.as_view(), name='watch_progress'),
     # My enrollments
     path('me/enrollments/', views.MyEnrollmentsView.as_view(), name='my_enrollments'),
+    path('me/enrollments/<uuid:enrollment_id>/certificate/', views.CourseCertificateIssueView.as_view(), name='course_certificate_issue'),
+    path('certificates/<uuid:certificate_number>/verify/', views.CourseCertificateVerifyView.as_view(), name='course_certificate_verify'),
     # ─── Cloudflare Stream ───
     path('lessons/<uuid:lesson_id>/upload-url/', LessonUploadURLCreateView.as_view(), name='lesson-upload-url'),
     path('lessons/<uuid:lesson_id>/video-status/', LessonVideoStatusView.as_view(), name='lesson-video-status'),

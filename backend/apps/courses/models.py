@@ -1,4 +1,6 @@
+import uuid
 from django.db import models
+from django.utils import timezone
 from apps.core.models import BaseModel
 
 
@@ -116,6 +118,61 @@ class Enrollment(BaseModel):
 
     def __str__(self):
         return f'{self.user.email} - {self.course.product.name}'
+
+
+class CourseCertificate(BaseModel):
+    STATUS_CHOICES = [
+        ('valid', 'Válido'),
+        ('revoked', 'Revogado'),
+    ]
+
+    enrollment = models.OneToOneField(
+        Enrollment, on_delete=models.CASCADE, related_name='certificate'
+    )
+    certificate_number = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    recipient_name = models.CharField(max_length=255)
+    course_title = models.CharField(max_length=500)
+    issued_at = models.DateTimeField(default=timezone.now)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='valid')
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revocation_reason = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-issued_at']
+
+    def __str__(self):
+        return f'{self.course_title} — {self.recipient_name} ({self.certificate_number})'
+
+
+class CourseCertificateEvent(BaseModel):
+    ACTION_CHOICES = [
+        ('issued', 'Emitido'),
+        ('corrected', 'Corrigido'),
+        ('revoked', 'Revogado'),
+        ('reinstated', 'Revalidado'),
+    ]
+
+    certificate = models.ForeignKey(
+        CourseCertificate,
+        on_delete=models.PROTECT,
+        related_name='events',
+    )
+    actor = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='course_certificate_events',
+    )
+    action = models.CharField(max_length=12, choices=ACTION_CHOICES)
+    reason = models.TextField(blank=True)
+    changes = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_action_display()} — {self.certificate.certificate_number}'
 
 
 class LessonProgress(BaseModel):

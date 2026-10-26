@@ -1,10 +1,99 @@
 from rest_framework import serializers
 from django.db.models import Sum, Avg
 from .models import (
-    Course, CourseModule, CourseLesson, Enrollment, LessonProgress,
+    Course, CourseModule, CourseLesson, Enrollment, CourseCertificate, CourseCertificateEvent, LessonProgress,
     Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
     CourseReview,
 )
+
+
+class CourseCertificateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseCertificate
+        fields = (
+            'certificate_number', 'recipient_name', 'course_title',
+            'issued_at', 'status',
+        )
+
+
+class CourseCertificateEventSerializer(serializers.ModelSerializer):
+    actor_email = serializers.EmailField(source='actor.email', read_only=True, allow_null=True)
+    action_label = serializers.CharField(source='get_action_display', read_only=True)
+
+    class Meta:
+        model = CourseCertificateEvent
+        fields = ('id', 'action', 'action_label', 'actor_email', 'reason', 'changes', 'created_at')
+
+
+class AdminCourseCertificateSerializer(CourseCertificateSerializer):
+    student_email = serializers.EmailField(source='enrollment.user.email', read_only=True)
+    enrollment_id = serializers.UUIDField(read_only=True)
+    events = CourseCertificateEventSerializer(many=True, read_only=True)
+    reason = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    class Meta(CourseCertificateSerializer.Meta):
+        fields = CourseCertificateSerializer.Meta.fields + (
+            'id', 'enrollment_id', 'student_email', 'revoked_at',
+            'revocation_reason', 'events', 'reason',
+        )
+        read_only_fields = (
+            'id', 'certificate_number', 'enrollment_id', 'student_email',
+            'issued_at', 'revoked_at', 'revocation_reason', 'events',
+        )
+
+    def validate(self, attrs):
+        instance = self.instance
+        changes_identity = instance and any(
+            attrs.get(field, getattr(instance, field)) != getattr(instance, field)
+            for field in ('recipient_name', 'course_title')
+        )
+        changes_status = instance and attrs.get('status', instance.status) != instance.status
+        if (changes_identity or changes_status) and not attrs.get('reason', '').strip():
+            raise serializers.ValidationError({
+                'reason': 'Indique o motivo da correcção ou alteração de estado.'
+            })
+        if attrs.get('status') == 'revoked' and not attrs.get('reason', '').strip():
+            raise serializers.ValidationError({
+                'reason': 'O motivo é obrigatório para revogar um certificado.'
+            })
+        return attrs
+
+    def update(self, instance, validated_data):
+        from django.utils import timezone
+
+        reason = validated_data.pop('reason', '').strip()
+        old_status = instance.status
+        changes = {
+            field: {'from': getattr(instance, field), 'to': value}
+            for field, value in validated_data.items()
+            if field in ('recipient_name', 'course_title', 'status')
+            and value != getattr(instance, field)
+        }
+        new_status = validated_data.get('status', old_status)
+        if new_status == 'revoked':
+            validated_data['revoked_at'] = instance.revoked_at or timezone.now()
+            validated_data['revocation_reason'] = reason or instance.revocation_reason
+        elif old_status == 'revoked' and new_status == 'valid':
+            validated_data['revoked_at'] = None
+            validated_data['revocation_reason'] = ''
+
+        instance = super().update(instance, validated_data)
+        request = self.context.get('request')
+        actor = request.user if request and request.user.is_authenticated else None
+        if changes:
+            action = (
+                'revoked' if old_status != 'revoked' and new_status == 'revoked'
+                else 'reinstated' if old_status == 'revoked' and new_status == 'valid'
+                else 'corrected'
+            )
+            CourseCertificateEvent.objects.create(
+                certificate=instance,
+                actor=actor,
+                action=action,
+                reason=reason,
+                changes=changes,
+            )
+        return instance
 
 
 class CourseLessonSerializer(serializers.ModelSerializer):
@@ -187,13 +276,14 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     total_lessons = serializers.SerializerMethodField()
     progress = serializers.SerializerMethodField()
     access_duration_days = serializers.IntegerField(source='course.access_duration_days', read_only=True)
+    certificate_enabled = serializers.BooleanField(source='course.certificate_enabled', read_only=True)
     image = serializers.SerializerMethodField()
 
     class Meta:
         model = Enrollment
         fields = ('id', 'course_id', 'course_title', 'course_slug', 'total_lessons',
                   'image', 'progress', 'completed', 'completed_at', 'created_at',
-                  'access_expires_at', 'access_duration_days')
+                  'access_expires_at', 'access_duration_days', 'certificate_enabled')
 
     def get_image(self, obj):
         img = obj.course.product.images.filter(is_primary=True).first()

@@ -136,7 +136,7 @@ export default function SellerTicketsPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">{t.buyer_name} · {t.order_number} · {CATEGORY_LABELS[t.category]} · {new Date(t.created_at).toLocaleDateString('pt-MZ')}</p>
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{t.description}</p>
-                {t.images?.length > 0 && (
+                {t.images && t.images.length > 0 && (
                   <div className="flex gap-1.5 mt-2" onClick={e => e.stopPropagation()}>
                     {t.images.map(img => (
                       <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Anexo'} fill
@@ -158,7 +158,7 @@ export default function SellerTicketsPage() {
               <h2 className="text-lg font-bold mb-1">{selected.subject}</h2>
               <p className="text-sm text-muted-foreground mb-4">{selected.buyer_name} · {selected.order_number}</p>
               <p className="text-sm mb-4 p-3 bg-muted/30 rounded-xl">{selected.description}</p>
-              {selected.images?.length > 0 && (
+              {selected.images && selected.images.length > 0 && (
                 <div className="flex gap-2 mb-4">
                   {selected.images.map(img => (
                     <LightboxImage key={img.id} src={img.image} alt={img.caption || 'Anexo'} fill

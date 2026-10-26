@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard, Package, ShoppingCart, LogOut, Plus, Edit, Trash2,
   TrendingUp, Users, DollarSign, Eye, X, ChevronLeft, ChevronRight,
-  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw, LifeBuoy, TicketPercent, Wallet, ShieldCheck, Download
+  Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw, LifeBuoy, TicketPercent, Wallet, ShieldCheck, Download, Award
 } from 'lucide-react';
 import { adminAPI, productsAPI, ordersAPI, storesAPI, type Product as APIProduct } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -21,6 +21,7 @@ import AdminWallet from './admin/AdminWallet';
 import AdminBlogManagement from './admin/AdminBlogManagement';
 import AdminBlogCategories from './admin/AdminBlogCategories';
 import AdminAuditTrail from './admin/AdminAuditTrail';
+import AdminCertificates from './admin/AdminCertificates';
 import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const BACKEND_READY = true;
@@ -31,7 +32,7 @@ const PRODUCT_TYPE_LABELS: Record<string, string> = {
   course: 'Cursos',
 };
 
-type Tab = 'dashboard' | 'stores' | 'products' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet' | 'audit';
+type Tab = 'dashboard' | 'stores' | 'products' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet' | 'audit' | 'certificates';
 
 interface Product {
   id: string;
@@ -798,6 +799,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
             { id: 'carts', label: 'Carrinhos', icon: Clock },
             { id: 'affiliates', label: 'Afiliados', icon: Users },
             { id: 'wallet', label: 'Saques', icon: Wallet },
+            { id: 'certificates', label: 'Certificados', icon: Award },
             { id: 'categories', label: 'Categorias', icon: Filter },
             { id: 'blog', label: 'Blog', icon: Edit },
             { id: 'users', label: 'Utilizadores', icon: Users },
@@ -1555,6 +1557,9 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
 
         {/* Admin audit trail */}
         {activeTab === 'audit' && <AdminAuditTrail />}
+
+        {/* Course certificates */}
+        {activeTab === 'certificates' && <AdminCertificates />}
 
         {/* Confirm Action Modal */}
         {confirmModal && (

@@ -162,7 +162,7 @@ export default function OrderDetailPage() {
         fd.append('caption', 'Evidência da devolução');
         await fetch(API_URL + '/orders/returns/' + data.id + '/images/', {
           method: 'POST',
-          headers: { Authorization: apiHeaders().Authorization },
+          headers: apiHeaders(),
           body: fd,
         });
       }
@@ -226,7 +226,7 @@ export default function OrderDetailPage() {
         fd.append('caption', 'Anexo do ticket');
         await fetch(API_URL + '/orders/tickets/' + data.id + '/images/', {
           method: 'POST',
-          headers: { Authorization: apiHeaders().Authorization },
+          headers: apiHeaders(),
           body: fd,
         });
       }

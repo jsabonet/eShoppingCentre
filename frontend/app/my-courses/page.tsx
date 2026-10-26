@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { BookOpen, Clock, PlayCircle, Award, ChevronRight, AlertCircle, Star } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import QRCode from 'qrcode';
+import { BookOpen, Clock, PlayCircle, Award, ChevronRight, AlertCircle, Star, Download, Loader2 } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import ReviewForm from '@/src/components/ReviewForm';
 
@@ -21,6 +23,14 @@ interface EnrollmentData {
   created_at: string;
   access_expires_at: string | null;
   access_duration_days: number | null;
+  certificate_enabled: boolean;
+}
+
+interface CertificateData {
+  certificate_number: string;
+  recipient_name: string;
+  course_title: string;
+  issued_at: string;
 }
 
 function timeAgo(iso: string): string {
@@ -43,6 +53,78 @@ export default function MyCoursesPage() {
   const [reviewDone, setReviewDone] = useState<Set<string>>(new Set());
   const [reviewError, setReviewError] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState('');
+  const [issuingCertificate, setIssuingCertificate] = useState<string | null>(null);
+  const [certificateError, setCertificateError] = useState<{ enrollmentId: string; message: string } | null>(null);
+
+  const downloadCertificate = async (enrollment: EnrollmentData) => {
+    setIssuingCertificate(enrollment.id);
+    setCertificateError(null);
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(
+        `${API_URL}/courses/me/enrollments/${enrollment.id}/certificate/`,
+        {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.detail || 'Não foi possível emitir o certificado.');
+      }
+
+      const certificate = result as CertificateData;
+      const validationUrl = `${window.location.origin}/certificates/${certificate.certificate_number}`;
+      const qrCode = await QRCode.toDataURL(validationUrl, {
+        errorCorrectionLevel: 'H',
+        margin: 1,
+        width: 256,
+      });
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      pdf.setDrawColor(22, 101, 52);
+      pdf.setLineWidth(1.5);
+      pdf.rect(12, 12, 273, 186);
+      pdf.setTextColor(22, 101, 52);
+      pdf.setFontSize(16);
+      pdf.text('e-SHOPPING CENTRE', 148.5, 43, { align: 'center' });
+      pdf.addImage(qrCode, 'PNG', 258, 22, 24, 24);
+      pdf.setTextColor(30, 41, 59);
+      pdf.setFontSize(30);
+      pdf.text('Certificado de Conclusão', 148.5, 70, { align: 'center' });
+      pdf.setFontSize(15);
+      pdf.text('Certificamos que', 148.5, 91, { align: 'center' });
+      pdf.setFontSize(25);
+      pdf.text(certificate.recipient_name, 148.5, 108, { align: 'center', maxWidth: 240 });
+      pdf.setFontSize(15);
+      pdf.text('concluiu o curso', 148.5, 125, { align: 'center' });
+      pdf.setFontSize(21);
+      pdf.text(certificate.course_title, 148.5, 141, { align: 'center', maxWidth: 240 });
+      pdf.setFontSize(11);
+      pdf.text(
+        `Emitido em ${new Date(certificate.issued_at).toLocaleDateString('pt-MZ')} · Código ${certificate.certificate_number}`,
+        148.5,
+        163,
+        { align: 'center' },
+      );
+      pdf.setTextColor(37, 99, 235);
+      pdf.setFontSize(10);
+      pdf.textWithLink('Validar certificado', 148.5, 174, {
+        url: validationUrl,
+        align: 'center',
+      });
+      pdf.setFontSize(7);
+      pdf.text(validationUrl, 148.5, 182, { align: 'center', maxWidth: 245 });
+      pdf.save(`certificado-${certificate.certificate_number}.pdf`);
+    } catch (error) {
+      setCertificateError({
+        enrollmentId: enrollment.id,
+        message: error instanceof Error ? error.message : 'Erro ao descarregar o certificado.',
+      });
+    } finally {
+      setIssuingCertificate(null);
+    }
+  };
+
 
   const fetchEnrollments = useCallback(async () => {
     try {
@@ -155,6 +237,25 @@ export default function MyCoursesPage() {
                     {enr.completed ? 'Rever' : 'Continuar'} <PlayCircle size={14} />
                   </span>
                 </div>
+                {enr.completed && enr.certificate_enabled && (
+                  <button
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void downloadCertificate(enr);
+                    }}
+                    disabled={issuingCertificate === enr.id}
+                    className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-60 transition-colors"
+                  >
+                    {issuingCertificate === enr.id
+                      ? <Loader2 size={15} className="animate-spin" />
+                      : <Download size={15} />}
+                    Emitir / descarregar certificado
+                  </button>
+                )}
+                {certificateError?.enrollmentId === enr.id && (
+                  <p role="alert" className="mt-2 text-xs text-red-600">{certificateError.message}</p>
+                )}
                 {/* Review button for completed courses */}
                 {enr.completed && !reviewDone.has(enr.id) && (
                   <button

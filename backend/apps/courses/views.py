@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction, models
 from django.db.models import Count, Avg
 from .models import (
-    Course, CourseModule, CourseLesson, Enrollment, LessonProgress, LessonAttachment,
+    Course, CourseModule, CourseLesson, Enrollment, CourseCertificate, LessonProgress, LessonAttachment,
     Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
     CourseReview,
 )
@@ -15,10 +15,12 @@ from .serializers import (
     CourseModuleSerializer, CourseModuleWriteSerializer, CourseLessonWriteSerializer,
     QuizSerializer, QuizWriteSerializer, QuizListSerializer,
     QuizAttemptSerializer, QuizAttemptListSerializer, QuizSubmitSerializer,
+    CourseCertificateSerializer,
     CourseReviewSerializer, CourseReviewCreateSerializer,
     CourseReviewUpdateSerializer, SellerReplySerializer,
 )
 from apps.stores.permissions import CanManageProducts
+from .certificates import issue_course_certificate, refresh_enrollment_completion
 
 
 class CourseListView(generics.ListAPIView):
@@ -79,19 +81,8 @@ class CompleteLessonView(APIView):
             progress.completed = True
             progress.save()
 
-            # Atualizar progresso do curso (conta as aulas reais, não o campo
-            # total_lessons que pode estar desatualizado)
-            total = CourseLesson.objects.filter(module__course=enrollment.course).count()
-            completed_count = enrollment.lesson_progress.filter(completed=True).count()
-            enrollment.progress = (completed_count / total) * 100 if total > 0 else 0
             was_completed = enrollment.completed
-            if total > 0 and completed_count >= total:
-                enrollment.completed = True
-                enrollment.progress = 100
-                if not was_completed:
-                    from django.utils import timezone
-                    enrollment.completed_at = timezone.now()
-            enrollment.save()
+            refresh_enrollment_completion(enrollment)
 
             if enrollment.completed and not was_completed:
                 from apps.notifications import email_service
@@ -105,6 +96,31 @@ class CompleteLessonView(APIView):
         except (CourseLesson.DoesNotExist, Enrollment.DoesNotExist):
             return Response({'detail': 'Lição ou matrícula não encontrada.'},
                           status=status.HTTP_404_NOT_FOUND)
+
+
+class CourseCertificateIssueView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, enrollment_id):
+        enrollment = get_object_or_404(
+            Enrollment.objects.select_related('user', 'course__product'),
+            id=enrollment_id,
+            user=request.user,
+        )
+        certificate, error = issue_course_certificate(enrollment)
+        if error:
+            return Response({'detail': error}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(CourseCertificateSerializer(certificate).data)
+
+
+class CourseCertificateVerifyView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, certificate_number):
+        certificate = get_object_or_404(
+            CourseCertificate, certificate_number=certificate_number
+        )
+        return Response(CourseCertificateSerializer(certificate).data)
 
 
 class WatchProgressView(APIView):
@@ -889,6 +905,17 @@ class QuizSubmitView(APIView):
         attempt.completed_at = timezone.now()
         attempt.save()
 
+        was_completed = enrollment.completed
+        refresh_enrollment_completion(enrollment)
+        if enrollment.completed and not was_completed:
+            from apps.notifications import email_service
+            email_service.dispatch(
+                email_service.send_course_completion_email,
+                request.user.email, request.user.first_name,
+                enrollment.course.product.name,
+                f'/my-courses/{enrollment.course.id}',
+            )
+
         # Se passou e é required, podemos atualizar progresso do módulo
         if passed and quiz.is_required:
             # Marcar como "quiz concluído" — pode ser usado para desbloquear próximos módulos
@@ -901,6 +928,7 @@ class QuizSubmitView(APIView):
             'earned_points': earned_points,
             'total_points': total_points,
             'passed': passed,
+            'course_completed': enrollment.completed,
             'pass_percentage': quiz.pass_percentage,
             'completed_at': attempt.completed_at,
         })

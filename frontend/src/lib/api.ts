@@ -371,6 +371,30 @@ export interface Enrollment {
   completed_at: string | null;
 }
 
+export interface CourseCertificateAdminEvent {
+  id: string;
+  action: 'issued' | 'corrected' | 'revoked' | 'reinstated';
+  action_label: string;
+  actor_email: string | null;
+  reason: string;
+  changes: Record<string, { from: string; to: string }>;
+  created_at: string;
+}
+
+export interface CourseCertificateAdmin {
+  id: string;
+  certificate_number: string;
+  enrollment_id: string;
+  student_email: string;
+  recipient_name: string;
+  course_title: string;
+  issued_at: string;
+  status: 'valid' | 'revoked';
+  revoked_at: string | null;
+  revocation_reason: string;
+  events: CourseCertificateAdminEvent[];
+}
+
 export interface Review {
   id: string;
   user_name: string;
@@ -942,6 +966,12 @@ export const adminAPI = {
   createCourse: (data: any) => api.post('/admin/courses/', data),
   updateCourse: (id: string, data: any) => api.patch(`/admin/courses/${id}/`, data),
   deleteCourse: (id: string) => api.delete(`/admin/courses/${id}/`),
+  listCourseCertificates: (params?: Record<string, string>) =>
+    api.get<PaginatedResponse<CourseCertificateAdmin>>('/admin/courses/certificates/', { params }),
+  updateCourseCertificate: (
+    id: string,
+    data: { recipient_name: string; course_title: string; status: 'valid' | 'revoked'; reason: string },
+  ) => api.patch<CourseCertificateAdmin>(`/admin/courses/certificates/${id}/`, data),
 };
 
 export default api;
