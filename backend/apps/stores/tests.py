@@ -11,11 +11,39 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from apps.orders.models import Order, OrderItem
 from apps.products.models import Category, Product
 from apps.stores.models import Store, StoreReportExport
-from apps.stores.views_earnings import StoreEarningsReportView, StoreStatsView
+from apps.stores.views_earnings import (
+    StoreEarningsReportView,
+    StoreStatsView,
+    _build_pdf_report,
+)
 from apps.wallet.models import WalletTransaction
 from apps.wallet.services import get_wallet
 
 User = get_user_model()
+
+
+def test_store_earnings_pdf_report_renders_without_orders():
+    report = _build_pdf_report(
+        [['Encomenda', 'Produto']],
+        {
+            'order_count': 0,
+            'item_count': 0,
+            'gross_sales': Decimal('0.00'),
+            'refunds': Decimal('0.00'),
+            'net_sales': Decimal('0.00'),
+            'seller_gross': Decimal('0.00'),
+            'seller_refunds': Decimal('0.00'),
+            'seller_net': Decimal('0.00'),
+        },
+        'Loja sem vendas',
+        '2026-10-01 até 2026-10-26',
+        'seller@example.com',
+        '2026-10-26 19:00',
+        'audit-reference',
+        {'payment_status': 'completed'},
+    )
+
+    assert report.getvalue().startswith(b'%PDF-')
 
 
 @pytest.mark.django_db
@@ -225,7 +253,8 @@ def test_store_earnings_report_filters_dates_summarizes_and_audits():
     request = APIRequestFactory().get(
         '/api/v1/stores/me/earnings/report/',
         {'date_from': order_date.date().isoformat(),
-         'date_to': order_date.date().isoformat()},
+         'date_to': order_date.date().isoformat(),
+         'format': 'csv'},
         HTTP_USER_AGENT='report-test',
     )
     force_authenticate(request, user=seller)

@@ -47,6 +47,23 @@ export function downloadCsvFromObjects(filename: string, headers: string[], data
   downloadCsv(filename, rows);
 }
 
+async function loadBrandLogo() {
+  const response = await fetch('/icon.png');
+  if (!response.ok) {
+    throw new Error(`Não foi possível carregar o logótipo para o PDF (${response.status}).`);
+  }
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('Não foi possível preparar o logótipo para o PDF.'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Não foi possível ler o logótipo.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export async function downloadReportFromObjects(
   format: ReportFormat,
   filename: string,
@@ -103,11 +120,24 @@ export async function downloadReportFromObjects(
     return;
   }
 
-  const pdf = new jsPDF({ orientation: headers.length > 6 ? 'landscape' : 'portrait' });
+  const pdf = new jsPDF({
+    orientation: headers.length > 6 ? 'landscape' : 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+  const logoData = await loadBrandLogo();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 14;
+  const margin = 13;
+  const topMargin = 57;
+  const bottomMargin = 19;
   const printableWidth = pageWidth - margin * 2;
+  const navy: [number, number, number] = [23, 50, 77];
+  const orange: [number, number, number] = [231, 145, 55];
+  const ink: [number, number, number] = [35, 48, 61];
+  const muted: [number, number, number] = [100, 116, 139];
+  const border: [number, number, number] = [222, 229, 236];
+  const pale: [number, number, number] = [247, 249, 251];
 
   pdf.setProperties({
     title,
@@ -116,104 +146,205 @@ export async function downloadReportFromObjects(
     creator: 'e-Shopping Centre',
   });
 
-  pdf.setFillColor(23, 50, 77);
-  pdf.rect(0, 0, pageWidth, 36, 'F');
-  pdf.setFillColor(231, 145, 55);
-  pdf.rect(0, 36, pageWidth, 2, 'F');
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(8);
-  pdf.text('E-SHOPPING CENTRE  /  RELATÓRIO', margin, 10);
-  pdf.setFontSize(16);
-  const titleLines = pdf.splitTextToSize(title, printableWidth);
-  pdf.text(titleLines.slice(0, 2), margin, 20);
-  if (options.subtitle) {
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
-    pdf.text(pdf.splitTextToSize(options.subtitle, printableWidth)[0], margin, 32);
-  }
-  pdf.setTextColor(35, 48, 61);
-
-  let cursorY = 44;
+  let cursorY = 62;
   const contextRows: string[][] = [];
   if (options.period) contextRows.push(['Período analisado', options.period]);
   options.filters?.forEach((filter) => contextRows.push([filter.label, String(filter.value ?? '—')]));
   contextRows.push(['Gerado em', new Date().toLocaleString('pt-MZ')]);
 
   if (contextRows.length) {
+    pdf.setTextColor(...navy);
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(9);
+    pdf.setFontSize(8);
     pdf.text('ÂMBITO DO RELATÓRIO', margin, cursorY);
     autoTable(pdf, {
       body: contextRows,
       startY: cursorY + 3,
-      margin: { left: margin, right: margin },
-      columnStyles: { 0: { cellWidth: printableWidth * 0.28, fontStyle: 'bold' } },
-      styles: { font: 'helvetica', fontSize: 8, cellPadding: 2.5, textColor: [55, 65, 75], lineColor: [225, 230, 235], lineWidth: 0.2 },
-      alternateRowStyles: { fillColor: [247, 249, 251] },
-      theme: 'grid',
+      margin: { left: margin, right: margin, top: topMargin, bottom: bottomMargin },
+      columnStyles: { 0: { cellWidth: printableWidth * 0.27, fontStyle: 'bold', textColor: navy } },
+      styles: {
+        font: 'helvetica',
+        fontSize: 8,
+        cellPadding: 3,
+        textColor: ink,
+        lineColor: border,
+        lineWidth: 0.2,
+        overflow: 'linebreak',
+      },
+      alternateRowStyles: { fillColor: pale },
+      theme: 'plain',
     });
     cursorY = (pdf as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? cursorY + 12;
-    cursorY += 8;
+    cursorY += 7;
   }
 
   if (options.summary?.length) {
+    if (cursorY > pageHeight - 48) {
+      pdf.addPage();
+      cursorY = topMargin;
+    }
+    pdf.setTextColor(...navy);
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(9);
+    pdf.setFontSize(8);
     pdf.text('RESUMO', margin, cursorY);
+    const summaryRows: string[][] = [];
+    for (let index = 0; index < options.summary.length; index += 1) {
+      const item = options.summary[index];
+      summaryRows.push([item.label, String(item.value ?? '—')]);
+    }
     autoTable(pdf, {
-      head: [options.summary.map((item) => item.label)],
-      body: [options.summary.map((item) => String(item.value ?? '—'))],
+      body: summaryRows,
       startY: cursorY + 3,
-      margin: { left: margin, right: margin },
-      styles: { font: 'helvetica', fontSize: 8, cellPadding: 3, halign: 'center', textColor: [35, 48, 61], lineColor: [225, 230, 235], lineWidth: 0.2 },
-      headStyles: { fillColor: [239, 243, 247], textColor: [35, 48, 61], fontStyle: 'bold' },
-      theme: 'grid',
+      margin: { left: margin, right: margin, top: topMargin, bottom: bottomMargin },
+      columnStyles: {
+        0: { cellWidth: printableWidth * 0.62, fontStyle: 'bold', textColor: navy },
+        1: { halign: 'right', fontStyle: 'bold', textColor: ink },
+      },
+      styles: {
+        font: 'helvetica',
+        fontSize: 8,
+        cellPadding: 3,
+        lineColor: border,
+        lineWidth: 0.2,
+      },
+      alternateRowStyles: { fillColor: pale },
+      theme: 'plain',
     });
     cursorY = (pdf as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? cursorY + 12;
-    cursorY += 8;
+    cursorY += 7;
   }
 
   if (options.notes?.length) {
+    if (cursorY > pageHeight - 42) {
+      pdf.addPage();
+      cursorY = topMargin;
+    }
+    pdf.setTextColor(...navy);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
     pdf.text('CRITÉRIOS E NOTAS', margin, cursorY);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7);
-    const noteLines = options.notes.flatMap((note) => pdf.splitTextToSize(`- ${note}`, printableWidth));
-    pdf.text(noteLines, margin, cursorY + 4);
-    cursorY += 6 + noteLines.length * 3.5;
+    autoTable(pdf, {
+      body: options.notes.map((note) => [note]),
+      startY: cursorY + 3,
+      margin: { left: margin, right: margin, top: topMargin, bottom: bottomMargin },
+      styles: {
+        font: 'helvetica',
+        fontSize: 7.5,
+        cellPadding: 3,
+        textColor: muted,
+        lineColor: border,
+        lineWidth: 0.15,
+        overflow: 'linebreak',
+      },
+      alternateRowStyles: { fillColor: pale },
+      theme: 'plain',
+    });
+    cursorY = (pdf as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? cursorY + 12;
+    cursorY += 7;
   }
 
-  if (cursorY > pageHeight - 28) {
+  if (cursorY > pageHeight - 35) {
     pdf.addPage();
-    cursorY = margin;
+    cursorY = topMargin;
   }
+  pdf.setTextColor(...navy);
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(9);
+  pdf.setFontSize(8);
   pdf.text('DETALHE DOS REGISTOS', margin, cursorY);
-  autoTable(pdf, {
-    head: [options.columns?.length === headers.length ? options.columns : headers.map((header) => header.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()))],
-    body: rows.map((row) => row.map((value) => String(value ?? '—'))),
-    startY: cursorY + 3,
-    margin: { left: margin, right: margin, bottom: 18 },
-    styles: { font: 'helvetica', fontSize: headers.length > 8 ? 6.5 : 7.5, cellPadding: 2.5, overflow: 'linebreak', textColor: [45, 55, 65], lineColor: [225, 230, 235], lineWidth: 0.15 },
-    headStyles: { fillColor: [23, 50, 77], textColor: [255, 255, 255], fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [247, 249, 251] },
-    horizontalPageBreak: headers.length > 8,
-    horizontalPageBreakRepeat: 0,
-    showHead: 'everyPage',
-    theme: 'grid',
-  });
+  const detailHeaders = options.columns?.length === headers.length
+    ? options.columns
+    : headers.map((header) => header.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()));
+  const numericHeader = /(valor|price|amount|total|revenue|quantity|quantidade|preço|saldo|comissão)/i;
+  const columnStyles = Object.fromEntries(
+    headers.flatMap((header, index) => numericHeader.test(header)
+      ? [[index, { halign: 'right' as const }]]
+      : []),
+  );
+  if (rows.length) {
+    autoTable(pdf, {
+      head: [detailHeaders],
+      body: rows.map((row) => row.map((value) => String(value ?? '—'))),
+      startY: cursorY + 3,
+      margin: { left: margin, right: margin, top: topMargin, bottom: bottomMargin },
+      styles: {
+        font: 'helvetica',
+        fontSize: headers.length > 8 ? 6.5 : 7.5,
+        cellPadding: headers.length > 8 ? 2.2 : 3,
+        overflow: 'linebreak',
+        textColor: ink,
+        lineColor: border,
+        lineWidth: 0.15,
+        valign: 'middle',
+      },
+      headStyles: { fillColor: navy, textColor: [255, 255, 255], fontStyle: 'bold', cellPadding: 3.2 },
+      didParseCell: (cellData) => {
+        if (cellData.section === 'head') {
+          cellData.cell.styles.textColor = [255, 255, 255];
+          cellData.cell.styles.fillColor = navy;
+        }
+      },
+      alternateRowStyles: { fillColor: pale },
+      columnStyles,
+      horizontalPageBreak: headers.length > 8,
+      horizontalPageBreakRepeat: 0,
+      showHead: 'everyPage',
+      theme: 'striped',
+    });
+  } else {
+    const emptyMessage = 'Não existem registos para os filtros selecionados.';
+    pdf.setFillColor(...pale);
+    pdf.setDrawColor(...border);
+    pdf.roundedRect(margin, cursorY + 3, printableWidth, 14, 2, 2, 'FD');
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(...muted);
+    pdf.text(emptyMessage, pageWidth / 2, cursorY + 11.5, { align: 'center' });
+  }
 
   const pageCount = pdf.getNumberOfPages();
+  const generatedAt = new Date().toLocaleString('pt-MZ');
   for (let page = 1; page <= pageCount; page += 1) {
     pdf.setPage(page);
-    pdf.setDrawColor(225, 230, 235);
-    pdf.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+    pdf.setFillColor(...navy);
+    pdf.rect(0, 0, pageWidth, 54, 'F');
+    pdf.setFillColor(...orange);
+    pdf.rect(0, 54, pageWidth, 1.4, 'F');
+    pdf.addImage(logoData, 'PNG', margin, 5, 11, 11);
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.text('E-SHOPPING CENTRE', margin + 14, 9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6);
+    pdf.text('MARKETPLACE EM MOÇAMBIQUE', margin + 14, 13);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.text('RELATÓRIO', pageWidth - margin, 8, { align: 'right' });
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
-    pdf.setTextColor(110, 120, 130);
+    const periodText = options.period ? `Período: ${options.period}` : 'Período: Todo o histórico disponível';
+    const periodLines = pdf.splitTextToSize(periodText, 75).slice(0, 2);
+    pdf.text(periodLines, pageWidth - margin, 14, { align: 'right' });
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(title.length > 65 ? 12 : 15);
+    const titleWidth = printableWidth - 48;
+    const titleLines = pdf.splitTextToSize(title, titleWidth).slice(0, 1);
+    pdf.text(titleLines, margin, 28);
+    if (options.subtitle) {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      const subtitleLines = pdf.splitTextToSize(options.subtitle, titleWidth).slice(0, 1);
+      pdf.text(subtitleLines, margin, 34);
+    }
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6.5);
+    pdf.text(`Gerado em ${generatedAt}`, margin, 46);
+    pdf.text(`Registos: ${data.length}`, pageWidth - margin, 46, { align: 'right' });
+    pdf.setDrawColor(...border);
+    pdf.line(margin, pageHeight - 13, pageWidth - margin, pageHeight - 13);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(...muted);
     pdf.text('Documento gerado pela plataforma e-Shopping Centre', margin, pageHeight - 7);
     pdf.text(`Página ${page} de ${pageCount}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
   }
