@@ -108,6 +108,8 @@ export default function MyCoursesPage() {
       pdf.setDrawColor(...navy);
       pdf.setLineWidth(0.55);
       pdf.roundedRect(12, 12, 273, 186, 2, 2);
+      pdf.setFillColor(...green);
+      pdf.roundedRect(12.5, 12.5, 272, 2.5, 1, 1, 'F');
 
       pdf.addImage(logoDataUrl, 'PNG', 22, 19, 27, 27);
       pdf.setTextColor(...navy);
@@ -123,7 +125,7 @@ export default function MyCoursesPage() {
       pdf.setLineWidth(0.3);
       pdf.roundedRect(245, 17, 30, 34, 1.5, 1.5);
       pdf.addImage(qrCode, 'PNG', 251, 19, 18, 18);
-      pdf.setTextColor(...blue);
+      pdf.setTextColor(...green);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(6.5);
       pdf.text('VALIDAR', 260, 45, { align: 'center' });
@@ -140,9 +142,9 @@ export default function MyCoursesPage() {
       pdf.setLineWidth(0.75);
       pdf.line(center - 16, 75, center + 16, 75);
 
-      pdf.setFillColor(247, 249, 250);
-      pdf.setDrawColor(...border);
-      pdf.setLineWidth(0.3);
+      pdf.setFillColor(245, 249, 247);
+      pdf.setDrawColor(...green);
+      pdf.setLineWidth(0.45);
       pdf.roundedRect(29, 81, 239, 69, 2, 2, 'FD');
 
       pdf.setTextColor(...muted);
@@ -189,6 +191,8 @@ export default function MyCoursesPage() {
       pdf.setFillColor(255, 255, 255);
       pdf.setDrawColor(...border);
       pdf.roundedRect(29, 158, 239, 27, 2, 2, 'FD');
+      pdf.setDrawColor(...green);
+      pdf.setLineWidth(0.45);
       pdf.line(109, 162, 109, 181);
       pdf.line(219, 162, 219, 181);
 
@@ -209,7 +213,7 @@ export default function MyCoursesPage() {
       pdf.setFontSize(8);
       pdf.text(certificate.certificate_number, 118, 177, { maxWidth: 96 });
 
-      pdf.setTextColor(...blue);
+      pdf.setTextColor(...green);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.textWithLink('Abrir verificação', 228, 173, { url: validationUrl });
