@@ -22,7 +22,7 @@ from apps.wallet.services import (
     get_refundable_amount,
     InsufficientFunds,
 )
-from apps.wallet.views import AdminReconciliationView
+from apps.wallet.views import AdminReconciliationView, WalletPayoutView
 
 User = get_user_model()
 
@@ -66,6 +66,25 @@ def test_credit_debit_round_trip(user, ref_id):
 
     assert WalletTransaction.objects.count() == 2
     assert WalletEntry.objects.count() == 2
+
+
+@pytest.mark.django_db
+def test_unverified_user_can_list_payouts_but_cannot_request_one(user):
+    factory = APIRequestFactory()
+    view = WalletPayoutView.as_view()
+
+    get_request = factory.get('/api/v1/wallet/me/payouts/')
+    force_authenticate(get_request, user=user)
+    get_response = view(get_request)
+
+    assert get_response.status_code == 200
+    assert get_response.data == []
+
+    post_request = factory.post('/api/v1/wallet/me/payouts/', {}, format='json')
+    force_authenticate(post_request, user=user)
+    post_response = view(post_request)
+
+    assert post_response.status_code == 403
 
 
 @pytest.mark.django_db

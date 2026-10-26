@@ -26,7 +26,12 @@ class MyTransactionsView(generics.ListAPIView):
 
 class WalletPayoutView(APIView):
     """GET: listar os meus pedidos de saque; POST: solicitar saque (pagamento manual pelo admin)."""
-    permission_classes = [permissions.IsAuthenticated, IsVerified]
+
+    def get_permissions(self):
+        permission_classes = [permissions.IsAuthenticated]
+        if self.request.method == 'POST':
+            permission_classes.append(IsVerified)
+        return [permission() for permission in permission_classes]
 
     def get(self, request):
         payouts = PayoutRequest.objects.filter(user=request.user).order_by('-created_at')
