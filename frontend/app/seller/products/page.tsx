@@ -255,7 +255,7 @@ export default function SellerProductsPage() {
             <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
           </select>
           <button type="button" onClick={exportProducts} disabled={!filtered.length}
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
             <Download size={15} /> Exportar {reportFormat === 'excel' ? 'Excel' : reportFormat.toUpperCase()}
           </button>
         </div>

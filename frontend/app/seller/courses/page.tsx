@@ -208,7 +208,7 @@ export default function SellerCoursesPage() {
               <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
             </select>
             <button type="button" onClick={exportCourses} disabled={!filteredCourses.length}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
               <Download size={15} /> Exportar
             </button>
           </div>

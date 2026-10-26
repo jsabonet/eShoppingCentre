@@ -255,7 +255,7 @@ export default function SellerEarningsPage() {
               type="button"
               onClick={downloadReport}
               disabled={reportLoading || !reportDateFrom || !reportDateTo || reportDateFrom > reportDateTo}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
               {reportLoading
                 ? <Loader2 size={16} className="animate-spin" />
@@ -294,7 +294,7 @@ export default function SellerEarningsPage() {
                 <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
               </select>
               <button type="button" onClick={exportTransactions} disabled={!filteredTransactions.length}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+                className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
                 <Download size={15} /> Exportar
               </button>
             </div>
