@@ -81,39 +81,111 @@ export default function MyCoursesPage() {
         width: 256,
       });
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      pdf.setDrawColor(22, 101, 52);
-      pdf.setLineWidth(1.5);
+      const navy: [number, number, number] = [25, 45, 61];
+      const green: [number, number, number] = [37, 104, 78];
+      const gold: [number, number, number] = [185, 148, 83];
+      const pageWidth = 297;
+      const center = pageWidth / 2;
+
+      pdf.setFillColor(250, 249, 246);
+      pdf.rect(0, 0, pageWidth, 210, 'F');
+      pdf.setDrawColor(...gold);
+      pdf.setLineWidth(0.7);
       pdf.rect(12, 12, 273, 186);
-      pdf.setTextColor(22, 101, 52);
-      pdf.setFontSize(16);
-      pdf.text('e-SHOPPING CENTRE', 148.5, 43, { align: 'center' });
-      pdf.addImage(qrCode, 'PNG', 258, 22, 24, 24);
-      pdf.setTextColor(30, 41, 59);
-      pdf.setFontSize(30);
-      pdf.text('Certificado de Conclusão', 148.5, 70, { align: 'center' });
-      pdf.setFontSize(15);
-      pdf.text('Certificamos que', 148.5, 91, { align: 'center' });
-      pdf.setFontSize(25);
-      pdf.text(certificate.recipient_name, 148.5, 108, { align: 'center', maxWidth: 240 });
-      pdf.setFontSize(15);
-      pdf.text('concluiu o curso', 148.5, 125, { align: 'center' });
-      pdf.setFontSize(21);
-      pdf.text(certificate.course_title, 148.5, 141, { align: 'center', maxWidth: 240 });
+      pdf.setDrawColor(218, 215, 205);
+      pdf.setLineWidth(0.25);
+      pdf.rect(16, 16, 265, 178);
+
+      pdf.setFillColor(...green);
+      pdf.circle(31, 31, 8, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(11);
-      pdf.text(
-        `Emitido em ${new Date(certificate.issued_at).toLocaleDateString('pt-MZ')} · Código ${certificate.certificate_number}`,
-        148.5,
-        163,
-        { align: 'center' },
-      );
-      pdf.setTextColor(37, 99, 235);
-      pdf.setFontSize(10);
-      pdf.textWithLink('Validar certificado', 148.5, 174, {
-        url: validationUrl,
-        align: 'center',
-      });
+      pdf.text('e', 31, 34.5, { align: 'center' });
+      pdf.setTextColor(...navy);
+      pdf.setFontSize(11);
+      pdf.text('e-SHOPPING CENTRE', 43, 29);
+      pdf.setTextColor(110, 119, 124);
+      pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7);
-      pdf.text(validationUrl, 148.5, 182, { align: 'center', maxWidth: 245 });
+      pdf.text('APRENDIZAGEM ONLINE', 43, 34);
+
+      pdf.addImage(qrCode, 'PNG', 251, 21, 21, 21);
+      pdf.setTextColor(110, 119, 124);
+      pdf.setFontSize(6.5);
+      pdf.text('VALIDAR CERTIFICADO', 261.5, 46, { align: 'center' });
+
+      pdf.setTextColor(...green);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.text('RECONHECIMENTO DE CONCLUSÃO', center, 61, { align: 'center' });
+      pdf.setTextColor(...navy);
+      pdf.setFont('times', 'bold');
+      pdf.setFontSize(27);
+      pdf.text('Certificado de Conclusão', center, 76, { align: 'center' });
+      pdf.setDrawColor(...gold);
+      pdf.setLineWidth(0.8);
+      pdf.line(center - 18, 83, center + 18, 83);
+
+      pdf.setTextColor(91, 99, 105);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.text('Certificamos que', center, 96, { align: 'center' });
+
+      pdf.setTextColor(...navy);
+      pdf.setFont('times', 'bold');
+      pdf.setFontSize(28);
+      let recipientLines = pdf.splitTextToSize(certificate.recipient_name, 215);
+      const recipientFontSize = recipientLines.length > 1 ? 22 : 28;
+      pdf.setFontSize(recipientFontSize);
+      recipientLines = pdf.splitTextToSize(certificate.recipient_name, 215);
+      pdf.text(recipientLines, center, 108, {
+        align: 'center',
+        lineHeightFactor: 1.15,
+      });
+
+      const afterRecipientY = 108 + (recipientLines.length - 1) * recipientFontSize * 0.4;
+      const completionY = afterRecipientY + 10;
+      pdf.setTextColor(91, 99, 105);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.text('concluiu com êxito o curso', center, completionY, { align: 'center' });
+
+      pdf.setTextColor(...green);
+      pdf.setFont('times', 'bold');
+      pdf.setFontSize(20);
+      let courseLines = pdf.splitTextToSize(certificate.course_title, 220);
+      const courseFontSize = courseLines.length > 1 ? 16 : 20;
+      pdf.setFontSize(courseFontSize);
+      courseLines = pdf.splitTextToSize(certificate.course_title, 220);
+      pdf.text(courseLines, center, completionY + 11, {
+        align: 'center',
+        lineHeightFactor: 1.15,
+      });
+
+      pdf.setDrawColor(218, 215, 205);
+      pdf.setLineWidth(0.3);
+      pdf.line(28, 166, 269, 166);
+      pdf.setTextColor(91, 99, 105);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.text(
+        `Emitido em ${new Date(certificate.issued_at).toLocaleDateString('pt-MZ')}`,
+        30,
+        176,
+      );
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(...navy);
+      pdf.text('CÓDIGO DE AUTENTICIDADE', 30, 185);
+      pdf.setFont('courier', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.text(certificate.certificate_number, 30, 190);
+      pdf.setTextColor(...green);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.textWithLink('Verificar autenticidade online', 267, 181, {
+        url: validationUrl,
+      });
       pdf.save(`certificado-${certificate.certificate_number}.pdf`);
     } catch (error) {
       setCertificateError({
