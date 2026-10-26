@@ -1,9 +1,12 @@
+from datetime import timedelta
+
+from django.db import transaction, models
+from django.db.models import Count, Avg
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import generics, permissions, status, filters, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
-from django.db import transaction, models
-from django.db.models import Count, Avg
 from .models import (
     Course, CourseModule, CourseLesson, Enrollment, CourseCertificate, LessonProgress, LessonAttachment,
     Quiz, Question, AnswerOption, QuizAttempt, QuizAnswer,
@@ -488,6 +491,18 @@ class CourseUpdateView(APIView):
 
         course.save()
         product.save()
+
+        if 'access_duration_days' in request.data:
+            now = timezone.now()
+            new_expiration = (
+                now + timedelta(days=course.access_duration_days)
+                if course.access_duration_days is not None
+                else None
+            )
+            Enrollment.objects.filter(
+                course=course,
+                access_expires_at__lte=now,
+            ).update(access_expires_at=new_expiration)
 
         return Response({
             'course_id': str(course.id),
