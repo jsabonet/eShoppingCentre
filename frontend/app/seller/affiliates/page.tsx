@@ -57,7 +57,21 @@ export default function SellerAffiliatesPage() {
     }));
     const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
     downloadReportFromObjects(reportFormat, `afiliados-loja-${new Date().toISOString().slice(0, 10)}.${extension}`,
-      'Relatório de afiliados da loja', ['afiliado', 'email', 'cliques', 'vendas', 'conversao', 'comissao', 'estado'], rows);
+      'Relatório de afiliados da loja', ['afiliado', 'email', 'cliques', 'vendas', 'conversao', 'comissao', 'estado'], rows, {
+        subtitle: 'Desempenho acumulado dos afiliados que promovem esta loja.',
+        filters: [
+          { label: 'Estado', value: statusFilter === 'all' ? 'Todos' : statusFilter === 'true' ? 'Ativos' : 'Inativos' },
+          { label: 'Pesquisa', value: search || 'Sem pesquisa' },
+        ],
+        summary: [
+          { label: 'Afiliados', value: filteredAffiliates.length },
+          { label: 'Cliques', value: totalClicks },
+          { label: 'Vendas atribuídas', value: totalSales },
+          { label: 'Comissões (MZN)', value: totalCommission.toFixed(2) },
+        ],
+        columns: ['Afiliado', 'Email', 'Cliques', 'Vendas', 'Conversão', 'Comissão (MZN)', 'Estado'],
+        notes: ['Cliques e vendas são totais acumulados fornecidos pela API; a conversão é calculada como vendas divididas por cliques.'],
+      });
   };
 
   return (

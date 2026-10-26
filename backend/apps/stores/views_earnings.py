@@ -239,38 +239,136 @@ def _build_excel_report(rows, summary_data, title, period_label, generated_by, g
     return buffer
 
 
-def _build_pdf_report(rows, summary_data, title, period_label, generated_by, generated_at, audit_id):
+def _build_pdf_report(rows, summary_data, title, period_label, generated_by, generated_at, audit_id, criteria):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), title='Relatório financeiro do vendedor')
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        title='Relatório financeiro do vendedor',
+        author='e-Shopping Centre',
+        leftMargin=10 * mm,
+        rightMargin=10 * mm,
+        topMargin=29 * mm,
+        bottomMargin=18 * mm,
+    )
     styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name='StoreReportTitle', parent=styles['Heading1'], fontName='Helvetica-Bold',
+        fontSize=16, leading=19, textColor=colors.HexColor('#17324d'), spaceAfter=3 * mm,
+    ))
+    styles.add(ParagraphStyle(
+        name='StoreReportSection', parent=styles['Heading2'], fontName='Helvetica-Bold',
+        fontSize=9, leading=11, textColor=colors.HexColor('#17324d'), spaceBefore=3 * mm, spaceAfter=2 * mm,
+    ))
+    styles.add(ParagraphStyle(
+        name='StoreReportCell', parent=styles['BodyText'], fontName='Helvetica',
+        fontSize=6.5, leading=8, textColor=colors.HexColor('#2d3741'),
+    ))
+
+    def draw_page(canvas, document):
+        page_width, page_height = landscape(A4)
+        canvas.saveState()
+        canvas.setFillColor(colors.HexColor('#17324d'))
+        canvas.rect(0, page_height - 22 * mm, page_width, 22 * mm, fill=1, stroke=0)
+        canvas.setFillColor(colors.HexColor('#e79137'))
+        canvas.rect(0, page_height - 23 * mm, page_width, 1.2 * mm, fill=1, stroke=0)
+        canvas.setFillColor(colors.white)
+        canvas.setFont('Helvetica-Bold', 8)
+        canvas.drawString(10 * mm, page_height - 9 * mm, 'E-SHOPPING CENTRE')
+        canvas.setFont('Helvetica', 7)
+        canvas.drawRightString(page_width - 10 * mm, page_height - 9 * mm, 'RELATÓRIO FINANCEIRO DO VENDEDOR')
+        canvas.setStrokeColor(colors.HexColor('#dfe5eb'))
+        canvas.line(10 * mm, 13 * mm, page_width - 10 * mm, 13 * mm)
+        canvas.setFillColor(colors.HexColor('#66717d'))
+        canvas.setFont('Helvetica', 7)
+        canvas.drawString(10 * mm, 8 * mm, f'Loja: {title}  |  Auditoria: {audit_id}')
+        canvas.drawRightString(page_width - 10 * mm, 8 * mm, f'Página {document.page}')
+        canvas.restoreState()
+
     story = []
-    story.append(Paragraph('Relatório financeiro do vendedor', styles['Title']))
-    story.append(Paragraph(f'Loja: {escape(str(title))}', styles['BodyText']))
-    story.append(Paragraph(f'Período: {escape(str(period_label))}', styles['BodyText']))
-    story.append(Paragraph(f'Gerado por: {escape(str(generated_by))}', styles['BodyText']))
-    story.append(Paragraph(f'Gerado em: {escape(str(generated_at))}', styles['BodyText']))
-    story.append(Paragraph(f'Referência de auditoria: {escape(str(audit_id))}', styles['BodyText']))
-    story.append(Spacer(1, 8 * mm))
+    story.append(Paragraph('Vendas, reembolsos e receita líquida', styles['StoreReportTitle']))
+    story.append(Paragraph(
+        'Encomendas pagas no período selecionado, detalhadas por encomenda e produto.',
+        styles['BodyText'],
+    ))
+    story.append(Spacer(1, 3 * mm))
+    details = [
+        ['Loja', escape(str(title)), 'Período', escape(str(period_label))],
+        ['Gerado por', escape(str(generated_by)), 'Gerado em', escape(str(generated_at))],
+    ]
+    details_table = Table(details, colWidths=[27 * mm, 91 * mm, 27 * mm, 91 * mm])
+    details_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f3f6')),
+        ('BACKGROUND', (2, 0), (2, -1), colors.HexColor('#f0f3f6')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#17324d')),
+        ('TEXTCOLOR', (2, 0), (2, -1), colors.HexColor('#17324d')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTNAME', (3, 0), (3, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 7),
+        ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#dfe5eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(details_table)
+    story.append(Paragraph('Resumo financeiro', styles['StoreReportSection']))
     summary_rows = _serialize_report_summary_rows(summary_data)
-    summary_table = Table(summary_rows, colWidths=[120 * mm, 40 * mm])
+    summary_table = Table(summary_rows, colWidths=[150 * mm, 45 * mm], repeatRows=0)
     summary_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.whitesmoke),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f7f9fb')),
+        ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#dfe5eb')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#17324d')),
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTSIZE', (0, 0), (-1, -1), 7),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ]))
     story.append(summary_table)
-    story.append(Spacer(1, 8 * mm))
+    story.append(Paragraph('Critérios de apuramento', styles['StoreReportSection']))
+    criteria_labels = {
+        'date_basis': 'Data usada para o período',
+        'payment_status': 'Estado do pagamento',
+        'excluded_order_statuses': 'Estados de encomenda excluídos',
+        'refund_basis': 'Critério de reembolsos',
+        'line_amount_basis': 'Critério do valor por produto',
+        'period_inclusive': 'Limites do período',
+    }
+    criteria_rows = [
+        [escape(criteria_labels.get(key, key.replace('_', ' ').capitalize())), escape(str(value))]
+        for key, value in criteria.items()
+    ]
+    criteria_table = Table(criteria_rows, colWidths=[53 * mm, 142 * mm])
+    criteria_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#e3e8ed')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 6.5),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(criteria_table)
+    story.append(Paragraph('Detalhe das encomendas', styles['StoreReportSection']))
     data_rows = rows
     if data_rows:
         cell_style = ParagraphStyle(
-            'ReportCell', parent=styles['BodyText'], fontSize=5.5, leading=6.5,
+            'ReportCell', parent=styles['StoreReportCell'], fontSize=5.5, leading=6.5,
         )
         printable_width = landscape(A4)[0] - 20 * mm
         column_width = printable_width / len(data_rows[0])
         pdf_rows = [
-            [Paragraph(escape(str(value or '')), cell_style) for value in row]
+            [Paragraph(escape('' if value is None else str(value)), cell_style) for value in row]
             for row in data_rows
         ]
         table = LongTable(
@@ -280,9 +378,10 @@ def _build_pdf_report(rows, summary_data, title, period_label, generated_by, gen
         )
         table.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#17324d')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('ALIGN', (1, 1), (-1, -1), 'LEFT'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f7f9fb')]),
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEFTPADDING', (0, 0), (-1, -1), 2),
@@ -291,7 +390,9 @@ def _build_pdf_report(rows, summary_data, title, period_label, generated_by, gen
             ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ]))
         story.append(table)
-    doc.build(story)
+    else:
+        story.append(Paragraph('Não existem registos para o período selecionado.', styles['BodyText']))
+    doc.build(story, onFirstPage=draw_page, onLaterPages=draw_page)
     buffer.seek(0)
     return buffer
 
@@ -540,7 +641,7 @@ class StoreEarningsReportView(APIView):
             response['X-Content-Type-Options'] = 'nosniff'
             return response
 
-        pdf_buffer = _build_pdf_report(rows, summary, store.name, period_label, request.user.email, generated_at, str(audit.id))
+        pdf_buffer = _build_pdf_report(rows, summary, store.name, period_label, request.user.email, generated_at, str(audit.id), criteria)
         response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="relatorio-vendas-{date_from}-{date_to}.pdf"'
         response['X-Report-Audit-Id'] = str(audit.id)

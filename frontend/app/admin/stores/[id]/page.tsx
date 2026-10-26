@@ -96,7 +96,17 @@ export default function AdminStoreDetailPage() {
     }));
     const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
     downloadReportFromObjects(reportFormat, `vendas-loja-${store.id}.${extension}`, `Vendas mensais - ${store.name}`,
-      ['periodo', 'mes', 'encomendas', 'receita'], rows);
+      ['periodo', 'mes', 'encomendas', 'receita'], rows, {
+        subtitle: 'Série mensal agregada pela API de administração da loja.',
+        period: monthFrom || monthTo ? `${monthFrom || 'Início'} a ${monthTo || 'Mais recente'}` : 'Últimos seis meses disponíveis',
+        summary: [
+          { label: 'Meses', value: monthlySales.length },
+          { label: 'Encomendas', value: monthlySales.reduce((sum: number, entry: any) => sum + Number(entry.orders || 0), 0) },
+          { label: 'Receita (MZN)', value: monthlySales.reduce((sum: number, entry: any) => sum + Number(entry.total || 0), 0).toFixed(2) },
+        ],
+        columns: ['Período', 'Mês', 'Encomendas', 'Receita (MZN)'],
+        notes: ['A API disponibiliza apenas os seis meses mais recentes; os valores são agregados por mês.'],
+      });
   };
 
   const openConversation = async (convId: string) => {

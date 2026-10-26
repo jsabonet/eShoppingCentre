@@ -163,7 +163,18 @@ export default function SellerEarningsPage() {
     }));
     const extension = transactionFormat === 'excel' ? 'xlsx' : transactionFormat;
     downloadReportFromObjects(transactionFormat, `transacoes-carteira-${new Date().toISOString().slice(0, 10)}.${extension}`,
-      'Relatório de transações da carteira', ['tipo', 'descricao', 'valor', 'estado', 'data'], rows);
+      'Relatório de transações da carteira', ['tipo', 'descricao', 'valor', 'estado', 'data'], rows, {
+        subtitle: 'Movimentos registados na carteira do vendedor.',
+        period: transactionDateFrom || transactionDateTo ? `${transactionDateFrom || 'Início'} a ${transactionDateTo || 'Hoje'}` : 'Todo o histórico disponível',
+        filters: [{ label: 'Tipo', value: transactionType === 'all' ? 'Todos' : transactionType }],
+        summary: [
+          { label: 'Transações', value: filteredTransactions.length },
+          { label: 'Créditos (MZN)', value: filteredTransactions.filter((transaction) => ['sale', 'deposit', 'refund'].includes(transaction.type)).reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0).toFixed(2) },
+          { label: 'Débitos (MZN)', value: filteredTransactions.filter((transaction) => !['sale', 'deposit', 'refund'].includes(transaction.type)).reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0).toFixed(2) },
+        ],
+        columns: ['Tipo', 'Descrição', 'Valor (MZN)', 'Estado', 'Data'],
+        notes: ['Este extrato apresenta movimentos da carteira. Para vendas por encomenda, use o relatório de vendas acima.'],
+      });
   };
 
   return (

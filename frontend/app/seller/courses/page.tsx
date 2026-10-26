@@ -134,7 +134,20 @@ export default function SellerCoursesPage() {
     }));
     const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
     downloadReportFromObjects(reportFormat, `cursos-${new Date().toISOString().slice(0, 10)}.${extension}`,
-      'Relatório de cursos', ['curso', 'estado', 'preco', 'alunos', 'aulas', 'identificador'], rows);
+      'Relatório de cursos', ['curso', 'estado', 'preco', 'alunos', 'aulas', 'identificador'], rows, {
+        subtitle: 'Oferta formativa, preço, alunos e conteúdo publicado.',
+        filters: [
+          { label: 'Estado', value: statusFilter === 'all' ? 'Todos' : statusLabel[statusFilter] || statusFilter },
+          { label: 'Pesquisa', value: search || 'Sem pesquisa' },
+        ],
+        summary: [
+          { label: 'Cursos', value: filteredCourses.length },
+          { label: 'Alunos registados', value: filteredCourses.reduce((sum, course) => sum + Number(course.sales_count || 0), 0) },
+          { label: 'Aulas', value: filteredCourses.reduce((sum, course) => sum + Number(course.total_lessons || 0), 0) },
+        ],
+        columns: ['Curso', 'Estado', 'Preço (MZN)', 'Alunos', 'Aulas', 'Identificador'],
+        notes: ['A contagem de alunos corresponde ao indicador acumulado do produto; o progresso individual é exportado na secção Alunos.'],
+      });
   };
 
   if (loading) {

@@ -144,7 +144,22 @@ export default function AffiliateEarningsPage() {
     }));
     const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
     downloadReportFromObjects(reportFormat, `comissoes-${new Date().toISOString().slice(0, 10)}.${extension}`, 'Relatório de comissões',
-      ['produto', 'encomenda', 'valor', 'data', 'estado'], rows);
+      ['produto', 'encomenda', 'valor', 'data', 'estado'], rows, {
+        subtitle: 'Comissões atribuídas às vendas realizadas pelos seus links.',
+        period: dateFrom || dateTo ? `${dateFrom || 'Início'} a ${dateTo || 'Hoje'}` : 'Todo o período disponível',
+        filters: [
+          { label: 'Estado', value: statusFilter === 'all' ? 'Todos' : STATUS_LABEL[statusFilter] || statusFilter },
+          { label: 'Pesquisa', value: search || 'Sem pesquisa' },
+        ],
+        summary: [
+          { label: 'Comissões', value: filteredCommissions.length },
+          { label: 'Pendentes/aprovadas (MZN)', value: pendingTotal.toFixed(2) },
+          { label: 'Pagas (MZN)', value: paidTotal.toFixed(2) },
+          { label: 'Total filtrado (MZN)', value: filteredCommissions.reduce((sum, commission) => sum + Number(commission.amount || 0), 0).toFixed(2) },
+        ],
+        columns: ['Produto', 'N.º encomenda', 'Comissão (MZN)', 'Data', 'Estado'],
+        notes: ['Os totais refletem as comissões recebidas da API e os filtros selecionados; o saldo disponível é um indicador atual e não está limitado ao período.'],
+      });
   };
 
   const filteredPayouts = payouts.filter((payout) => {
@@ -165,7 +180,21 @@ export default function AffiliateEarningsPage() {
     }));
     const extension = payoutFormat === 'excel' ? 'xlsx' : payoutFormat;
     downloadReportFromObjects(payoutFormat, `saques-afiliado-${new Date().toISOString().slice(0, 10)}.${extension}`,
-      'Relatório de saques do afiliado', ['valor', 'metodo', 'data', 'estado'], rows);
+      'Relatório de saques do afiliado', ['valor', 'metodo', 'data', 'estado'], rows, {
+        subtitle: 'Pedidos de levantamento de comissões e respetivo estado.',
+        period: payoutDateFrom || payoutDateTo ? `${payoutDateFrom || 'Início'} a ${payoutDateTo || 'Hoje'}` : 'Todo o período disponível',
+        filters: [
+          { label: 'Estado', value: payoutStatusFilter === 'all' ? 'Todos' : STATUS_LABEL[payoutStatusFilter] || payoutStatusFilter },
+          { label: 'Método', value: payoutSearch || 'Todos' },
+        ],
+        summary: [
+          { label: 'Saques', value: filteredPayouts.length },
+          { label: 'Valor solicitado (MZN)', value: filteredPayouts.reduce((sum, payout) => sum + Number(payout.amount || 0), 0).toFixed(2) },
+          { label: 'Pendentes', value: filteredPayouts.filter((payout) => payout.status === 'pending').length },
+        ],
+        columns: ['Valor (MZN)', 'Método', 'Data', 'Estado'],
+        notes: ['Este relatório não inclui dados bancários ou de contacto do destinatário.'],
+      });
   };
 
   return (

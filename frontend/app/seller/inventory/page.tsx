@@ -112,6 +112,20 @@ export default function InventoryPage() {
       'Relatório de inventário',
       ['produto', 'sku', 'stock', 'estado', 'preco', 'vendas'],
       rows,
+      {
+        subtitle: 'Posição atual de stock e desempenho dos produtos físicos.',
+        filters: [
+          { label: 'Nível de stock', value: stockFilter === 'all' ? 'Todos' : stockFilter === 'out' ? 'Esgotado' : stockFilter === 'low' ? 'Baixo' : 'Normal' },
+          { label: 'Pesquisa', value: search || 'Sem pesquisa' },
+        ],
+        summary: [
+          { label: 'Produtos', value: filtered.length },
+          { label: 'Unidades em stock', value: filtered.reduce((sum, product) => sum + Number(product.stock || 0), 0) },
+          { label: 'Stock baixo/esgotado', value: filtered.filter((product) => product.stock <= 5).length },
+        ],
+        columns: ['Produto', 'SKU', 'Unidades', 'Nível de stock', 'Preço (MZN)', 'Vendas'],
+        notes: ['O stock e as vendas são valores atuais devolvidos pelo catálogo; este relatório não representa um histórico de movimentos.'],
+      },
     );
   };
 

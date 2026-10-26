@@ -164,7 +164,21 @@ export default function SellerCouponsPage() {
     }));
     const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
     downloadReportFromObjects(reportFormat, `utilizacao-cupons-${new Date().toISOString().slice(0, 10)}.${extension}`,
-      'Relatório de cupões', ['codigo', 'tipo_desconto', 'valor_desconto', 'compra_minima', 'utilizacoes', 'limite_utilizacoes', 'estado', 'inicio', 'fim', 'criado_em'], rows);
+      'Relatório de cupões', ['codigo', 'tipo_desconto', 'valor_desconto', 'compra_minima', 'utilizacoes', 'limite_utilizacoes', 'estado', 'inicio', 'fim', 'criado_em'], rows, {
+        subtitle: 'Descontos configurados e respetivas utilizações.',
+        period: dateFrom || dateTo ? `${dateFrom || 'Início'} a ${dateTo || 'Hoje'}` : 'Todo o período disponível',
+        filters: [
+          { label: 'Validade', value: statusFilter === 'all' ? 'Todos' : statusFilter === 'valid' ? 'Válidos' : 'Inativos/expirados' },
+          { label: 'Código', value: search || 'Todos' },
+        ],
+        summary: [
+          { label: 'Cupões', value: filteredCoupons.length },
+          { label: 'Utilizações', value: filteredCoupons.reduce((sum, coupon) => sum + Number(coupon.used_count || 0), 0) },
+          { label: 'Válidos', value: filteredCoupons.filter((coupon) => coupon.is_valid).length },
+        ],
+        columns: ['Código', 'Tipo de desconto', 'Valor', 'Compra mínima (MZN)', 'Utilizações', 'Limite', 'Estado', 'Início', 'Fim', 'Criado em'],
+        notes: ['As utilizações são a contagem atual registada em cada cupão; não representam uma lista de encomendas.'],
+      });
   };
 
   return (

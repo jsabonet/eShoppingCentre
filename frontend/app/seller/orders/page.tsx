@@ -183,6 +183,21 @@ export default function SellerOrdersPage() {
       'Relatório de encomendas',
       ['id', 'cliente', 'email', 'telefone', 'status', 'pagamento', 'total', 'data', 'itens'],
       rows,
+      {
+        subtitle: 'Encomendas e respetivos valores dentro dos filtros selecionados.',
+        period: dateFrom || dateTo ? `${dateFrom || 'Início'} a ${dateTo || 'Hoje'}` : 'Todo o período disponível',
+        filters: [
+          { label: 'Estado', value: statusFilter === 'all' ? 'Todos' : STATUS_CONFIG[statusFilter]?.label || statusFilter },
+          { label: 'Pesquisa', value: search || 'Sem pesquisa' },
+        ],
+        summary: [
+          { label: 'Encomendas', value: filtered.length },
+          { label: 'Valor total (MZN)', value: filtered.reduce((sum, order) => sum + Number(order.total || 0), 0).toFixed(2) },
+          { label: 'Itens', value: filtered.reduce((sum, order) => sum + (order.items?.length || 0), 0) },
+        ],
+        columns: ['N.º encomenda', 'Cliente', 'Email', 'Telefone', 'Estado', 'Pagamento', 'Total (MZN)', 'Data', 'Itens'],
+        notes: ['Os dados exportados correspondem às encomendas visíveis após aplicação dos filtros.'],
+      },
     );
   };
 

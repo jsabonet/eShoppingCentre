@@ -236,6 +236,21 @@ export default function SellerReturnsPage() {
       'Relatório de devoluções',
       ['id', 'encomenda', 'cliente', 'email', 'telefone', 'motivo', 'status', 'valor_reembolso', 'data'],
       rows,
+      {
+        subtitle: 'Pedidos de devolução e valores de reembolso registados.',
+        period: dateFrom || dateTo ? `${dateFrom || 'Início'} a ${dateTo || 'Hoje'}` : 'Todo o período disponível',
+        filters: [
+          { label: 'Estado', value: statusFilter === 'all' ? 'Todos' : STATUS_CONFIG[statusFilter]?.label || statusFilter },
+          { label: 'Pesquisa', value: search || 'Sem pesquisa' },
+        ],
+        summary: [
+          { label: 'Devoluções', value: filtered.length },
+          { label: 'Reembolsos (MZN)', value: filtered.reduce((sum, item) => sum + Number(item.refund_amount || 0), 0).toFixed(2) },
+          { label: 'Em aberto', value: filtered.filter((item) => !['refunded', 'rejected'].includes(item.status)).length },
+        ],
+        columns: ['RMA', 'N.º encomenda', 'Cliente', 'Email', 'Telefone', 'Motivo', 'Estado', 'Reembolso (MZN)', 'Data'],
+        notes: ['O valor de reembolso reflete o montante registado para cada pedido no momento da exportação.'],
+      },
     );
   };
 

@@ -176,8 +176,53 @@ export default function AdminAffiliates() {
       }));
     }
     const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
+    const datePeriod = dateFrom || dateTo ? `${dateFrom || 'Início'} a ${dateTo || 'Hoje'}` : 'Todo o período disponível';
+    const selectedStatus = statusFilter === 'all'
+      ? 'Todos'
+      : view === 'affiliates'
+        ? statusFilter === 'active' ? 'Ativos' : statusFilter === 'suspended' ? 'Suspensos' : 'Pendentes'
+        : STATUS_LABEL[statusFilter] || statusFilter;
+    const contextFilters = [
+      { label: 'Estado', value: selectedStatus },
+      { label: 'Pesquisa', value: search || 'Sem pesquisa' },
+    ];
+    const reportPeriod = view === 'affiliates' ? undefined : datePeriod;
+    const summary = view === 'affiliates'
+      ? [
+          { label: 'Afiliados', value: filteredAffiliates.length },
+          { label: 'Cliques', value: filteredAffiliates.reduce((sum, affiliate) => sum + affiliate.total_clicks, 0) },
+          { label: 'Vendas', value: filteredAffiliates.reduce((sum, affiliate) => sum + affiliate.total_sales, 0) },
+          { label: 'Comissões (MZN)', value: filteredAffiliates.reduce((sum, affiliate) => sum + Number(affiliate.total_commission), 0).toFixed(2) },
+        ]
+      : view === 'commissions'
+        ? [
+            { label: 'Comissões', value: filteredCommissions.length },
+            { label: 'Valor (MZN)', value: filteredCommissions.reduce((sum, commission) => sum + Number(commission.amount || 0), 0).toFixed(2) },
+            { label: 'Revertido (MZN)', value: filteredCommissions.reduce((sum, commission) => sum + Number(commission.reversed_amount || 0), 0).toFixed(2) },
+          ]
+        : [
+            { label: 'Saques', value: filteredPayouts.length },
+            { label: 'Solicitado (MZN)', value: filteredPayouts.reduce((sum, payout) => sum + Number(payout.amount || 0), 0).toFixed(2) },
+            { label: 'Taxas (MZN)', value: filteredPayouts.reduce((sum, payout) => sum + Number(payout.fee || 0), 0).toFixed(2) },
+          ];
+    const columns = view === 'affiliates'
+      ? ['Afiliado', 'Email', 'Código de referência', 'Nível', 'Cliques', 'Vendas', 'Comissão (MZN)', 'Estado']
+      : view === 'commissions'
+        ? ['N.º encomenda', 'Afiliado', 'Produto', 'Valor (MZN)', 'Revertido (MZN)', 'Taxa (%)', 'Estado', 'Data']
+        : ['Afiliado', 'Valor (MZN)', 'Taxa (MZN)', 'Valor líquido (MZN)', 'Método', 'Estado', 'Data'];
     downloadReportFromObjects(reportFormat, `admin-${view}-${new Date().toISOString().slice(0, 10)}.${extension}`,
-      title, headers, rows);
+      title, headers, rows, {
+        subtitle: view === 'affiliates'
+          ? 'Desempenho acumulado dos afiliados registados na plataforma.'
+          : view === 'commissions'
+            ? 'Comissões atribuídas, estados e reversões no período selecionado.'
+            : 'Pedidos de saque, taxas e valores líquidos no período selecionado.',
+        period: reportPeriod,
+        filters: contextFilters,
+        summary,
+        columns,
+        notes: ['Dados bancários, telefones, NUIT e documentos KYC não são incluídos neste relatório.'],
+      });
   };
 
   const activeRows = view === 'affiliates' ? filteredAffiliates

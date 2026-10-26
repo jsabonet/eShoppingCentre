@@ -92,7 +92,18 @@ export default function AffiliateLinksPage() {
     }));
     const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
     downloadReportFromObjects(reportFormat, `links-afiliado-${new Date().toISOString().slice(0, 10)}.${extension}`,
-      'Relatório de links de afiliado', ['produto', 'codigo', 'url', 'cliques', 'vendas', 'conversao'], rows);
+      'Relatório de links de afiliado', ['produto', 'codigo', 'url', 'cliques', 'vendas', 'conversao'], rows, {
+        subtitle: 'Alcance e conversões acumulados por link de referência.',
+        filters: [{ label: 'Pesquisa', value: search || 'Sem pesquisa' }],
+        summary: [
+          { label: 'Links', value: filteredLinks.length },
+          { label: 'Cliques', value: totalClicks },
+          { label: 'Vendas atribuídas', value: totalConversions },
+          { label: 'Conversão global', value: totalClicks ? `${((totalConversions / totalClicks) * 100).toFixed(1)}%` : '0%' },
+        ],
+        columns: ['Produto', 'Código', 'URL de referência', 'Cliques', 'Vendas', 'Conversão'],
+        notes: ['Cliques e vendas são contagens acumuladas por link. A conversão global é calculada a partir dos totais apresentados.'],
+      });
   };
 
   return (

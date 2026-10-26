@@ -245,7 +245,18 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
     const period = statsDateFrom && statsDateTo ? `${statsDateFrom}-${statsDateTo}` : 'acumulado';
     downloadReportFromObjects(statsReportFormat, `indicadores-plataforma-${period}.${extension}`,
       `Indicadores da plataforma (${statsDateFrom && statsDateTo ? `${statsDateFrom} a ${statsDateTo}` : 'acumulado'})`,
-      ['indicador', 'valor'], rows);
+      ['indicador', 'valor'], rows, {
+        subtitle: 'Resumo administrativo de utilizadores, lojas, produtos, pedidos e taxas.',
+        period: statsDateFrom && statsDateTo ? `${statsDateFrom} a ${statsDateTo}` : 'Acumulado até ao momento',
+        summary: [
+          { label: 'Produtos', value: stats.totalProducts },
+          { label: 'Pedidos', value: stats.totalOrders },
+          { label: 'Receita de taxas (MZN)', value: stats.totalRevenue.toFixed(2) },
+          { label: 'Utilizadores', value: stats.totalUsers },
+        ],
+        columns: ['Indicador', 'Valor'],
+        notes: ['O intervalo filtra datas de criação. Receita inclui apenas taxas concluídas no período.'],
+      });
   };
 
   const loadProducts = async () => {

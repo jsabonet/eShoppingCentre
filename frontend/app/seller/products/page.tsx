@@ -192,7 +192,22 @@ export default function SellerProductsPage() {
     });
     const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
     downloadReportFromObjects(reportFormat, `produtos-${new Date().toISOString().slice(0, 10)}.${extension}`,
-      'Relatório de produtos e desempenho', ['produto', 'tipo', 'preco', 'stock', 'vendas_downloads', 'estado', 'afiliacao', 'comissao_percentual'], rows);
+      'Relatório de produtos e desempenho', ['produto', 'tipo', 'preco', 'stock', 'vendas_downloads', 'estado', 'afiliacao', 'comissao_percentual'], rows, {
+        subtitle: 'Catálogo, vendas/downloads e configuração de afiliação.',
+        filters: [
+          { label: 'Estado', value: statusFilter === 'all' ? 'Todos' : statusLabel[statusFilter] || statusFilter },
+          { label: 'Pesquisa', value: search || 'Sem pesquisa' },
+          { label: 'Tipo de loja', value: storeType },
+        ],
+        summary: [
+          { label: 'Produtos', value: filtered.length },
+          { label: 'Vendas/downloads', value: filtered.reduce((sum, product) => sum + Number((product as any).digital_downloads ?? product.sales_count ?? 0), 0) },
+          { label: 'Ativos', value: filtered.filter((product) => product.status === 'active').length },
+          { label: 'Afiliação ativa', value: filtered.filter((product) => product.affiliate_enabled !== false).length },
+        ],
+        columns: ['Produto', 'Tipo', 'Preço (MZN)', 'Stock', 'Vendas/downloads', 'Estado', 'Afiliação', 'Comissão (%)'],
+        notes: ['Vendas e downloads são contagens acumuladas do produto, não uma série temporal.'],
+      });
   };
 
   if (loading) {

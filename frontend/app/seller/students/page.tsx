@@ -103,7 +103,22 @@ export default function SellerStudentsPage() {
     }));
     const extension = reportFormat === 'excel' ? 'xlsx' : reportFormat;
     downloadReportFromObjects(reportFormat, `alunos-${new Date().toISOString().slice(0, 10)}.${extension}`,
-      'Relatório de alunos e progresso', ['aluno', 'email', 'curso', 'progresso', 'estado', 'inscricao', 'aulas_concluidas'], rows);
+      'Relatório de alunos e progresso', ['aluno', 'email', 'curso', 'progresso', 'estado', 'inscricao', 'aulas_concluidas'], rows, {
+        subtitle: 'Inscrições e progresso individual dos alunos nos cursos.',
+        period: dateFrom || dateTo ? `${dateFrom || 'Início'} a ${dateTo || 'Hoje'}` : 'Todas as inscrições disponíveis',
+        filters: [
+          { label: 'Curso', value: courseFilter === 'all' ? 'Todos' : courseFilter },
+          { label: 'Conclusão', value: completionFilter === 'all' ? 'Todos' : completionFilter === 'completed' ? 'Concluídos' : 'Em curso' },
+          { label: 'Pesquisa', value: search || 'Sem pesquisa' },
+        ],
+        summary: [
+          { label: 'Inscrições', value: filtered.length },
+          { label: 'Concluídos', value: completedCount },
+          { label: 'Progresso médio', value: `${avgProgress}%` },
+        ],
+        columns: ['Aluno', 'Email', 'Curso', 'Progresso', 'Estado', 'Inscrição', 'Aulas concluídas'],
+        notes: ['O progresso médio é calculado sobre os alunos que correspondem aos filtros aplicados.'],
+      });
   };
 
   if (loading) {
