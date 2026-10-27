@@ -46,9 +46,8 @@ class WalletPayoutView(APIView):
         if role not in ('seller', 'affiliate'):
             return Response({'detail': 'Indique um perfil de saque válido.'}, status=400)
 
-        from apps.affiliates.models import AffiliateKYC, AffiliateProfile
+        from apps.affiliates.models import AffiliateProfile
         affiliate = AffiliateProfile.objects.filter(user=request.user).first()
-        kyc = None
         if role == 'seller':
             from apps.stores.models import Store
             if 'seller' not in (request.user.roles or []) or not Store.objects.filter(owner=request.user).exists():
@@ -56,26 +55,22 @@ class WalletPayoutView(APIView):
         elif not affiliate or not affiliate.is_active or affiliate.status != 'active':
             return Response({'detail': 'Não existe uma conta de afiliado ativa para este utilizador.'}, status=403)
 
-        if affiliate:
-            kyc = AffiliateKYC.objects.filter(affiliate=affiliate, status='approved').first()
-            if not kyc:
-                return Response(
-                    {'detail': 'É necessária a verificação da conta (KYC) antes de solicitar saques.'},
-                    status=400,
-                )
-
         method = request.data.get('method', 'mpesa')
         account_details = request.data.get('account_details', {})
         if method not in ('mpesa', 'emola', 'bank') or not isinstance(account_details, dict):
             return Response({'detail': 'Método ou dados de pagamento inválidos.'}, status=400)
         if role == 'affiliate':
-            account_details = (
-                {'bank_name': kyc.bank_name, 'bank_account': kyc.bank_account}
-                if method == 'bank' else {'phone': kyc.payout_phone}
-            )
-        required_fields = ('bank_name', 'bank_account') if method == 'bank' else ('phone',)
-        if any(not str(account_details.get(field, '')).strip() for field in required_fields):
-            return Response({'detail': 'Preencha os dados da conta de destino do saque.'}, status=400)
+            from apps.affiliates.services import get_affiliate_payout_account_details
+            try:
+                account_details = get_affiliate_payout_account_details(
+                    affiliate, method, account_details,
+                )
+            except ValueError as exc:
+                return Response({'detail': str(exc)}, status=400)
+        else:
+            required_fields = ('bank_name', 'bank_account') if method == 'bank' else ('phone',)
+            if any(not str(account_details.get(field, '')).strip() for field in required_fields):
+                return Response({'detail': 'Preencha os dados da conta de destino do saque.'}, status=400)
 
         try:
             payout = request_payout(

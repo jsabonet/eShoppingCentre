@@ -11,6 +11,7 @@ from django.utils import timezone
 from .models import AffiliateProfile, AffiliateLink, AffiliateCommission, AffiliateSettings, AffiliatePayout, AffiliateKYC
 from .serializers import (AffiliateProfileSerializer, AffiliateLinkSerializer, AffiliateCommissionSerializer,
                           AffiliateSettingsSerializer, AffiliatePayoutSerializer, AffiliateKYCSerializer)
+from .services import get_affiliate_payout_account_details, has_verified_seller_account
 from apps.products.models import Product
 from apps.users.permissions import IsVerified
 from apps.notifications import email_service
@@ -130,14 +131,6 @@ class AffiliatePayoutView(APIView):
             return Response({'detail': 'A conta de afiliado não está ativa para solicitar saques.'}, status=403)
         settings_obj = AffiliateSettings.get_settings()
 
-        # Gate: verificação KYC obrigatória antes do 1º saque
-        kyc = AffiliateKYC.objects.filter(affiliate=profile).first()
-        if not kyc or kyc.status != 'approved':
-            return Response(
-                {'detail': 'É necessária a verificação da conta (KYC) antes de solicitar saques. Complete a verificação.'},
-                status=400,
-            )
-
         try:
             amount = Decimal(str(request.data.get('amount')))
             rounded_amount = amount.quantize(Decimal('0.01'))
@@ -154,15 +147,12 @@ class AffiliatePayoutView(APIView):
         method = request.data.get('method', 'mpesa')
         if method not in ('mpesa', 'emola', 'bank'):
             return Response({'detail': 'Método de saque inválido.'}, status=400)
-        account_details = (
-            {'bank_name': kyc.bank_name, 'bank_account': kyc.bank_account}
-            if method == 'bank' else {'phone': kyc.payout_phone}
-        )
-        if any(not value for value in account_details.values()):
-            return Response(
-                {'detail': 'Os dados de pagamento do seu KYC não incluem uma conta para este método.'},
-                status=400,
+        try:
+            account_details = get_affiliate_payout_account_details(
+                profile, method, request.data.get('account_details', {}),
             )
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=400)
 
         wallet = wallet_services.get_wallet(request.user)
         wallet = wallet.__class__.objects.select_for_update().get(pk=wallet.pk)
@@ -417,9 +407,9 @@ class AdminAffiliatePayoutActionView(APIView):
         if action == 'approve' and payout.status == 'pending':
             profile = AffiliateProfile.objects.select_for_update().get(pk=payout.affiliate_id)
             kyc = AffiliateKYC.objects.filter(affiliate=profile, status='approved').first()
-            if not kyc:
+            if not kyc and not has_verified_seller_account(profile.user):
                 return Response(
-                    {'detail': 'O KYC do afiliado deve permanecer aprovado para autorizar o saque.'},
+                    {'detail': 'O KYC do afiliado deve estar aprovado ou a conta de vendedor deve estar verificada.'},
                     status=400,
                 )
             payout.status = 'approved'

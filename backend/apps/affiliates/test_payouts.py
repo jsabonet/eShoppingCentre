@@ -6,7 +6,11 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.affiliates.models import AffiliateKYC, AffiliatePayout, AffiliateProfile
-from apps.affiliates.views import AffiliatePayoutView, AdminAffiliatePayoutActionView
+from apps.affiliates.views import (
+    AffiliatePayoutView,
+    AdminAffiliatePayoutActionView,
+)
+from apps.stores.models import Store
 from apps.wallet.models import WalletTransaction
 from apps.wallet.services import credit, get_wallet
 
@@ -72,6 +76,99 @@ def test_affiliate_payout_deducts_five_percent_and_reserves_gross(affiliate_user
     assert payout.account_details == {'phone': '840000001'}
     assert wallet.payout_balance == Decimal('1500.00')
     assert wallet.reserved_balance == Decimal('1000.00')
+
+
+@pytest.mark.django_db
+def test_verified_seller_affiliate_can_request_and_approve_payout_without_kyc(admin):
+    user = User.objects.create_user(
+        email='verified-seller-affiliate@example.com',
+        username='verified-seller-affiliate',
+        password='SenhaForte123!',
+        is_verified=True,
+        roles=['affiliate', 'seller'],
+    )
+    profile = AffiliateProfile.objects.create(user=user, referral_code='VERIFIED-SELLER')
+    Store.objects.create(
+        owner=user,
+        name='Loja de vendedor verificado',
+        description='Loja aprovada para testar saques',
+        category='geral',
+        phone='840000010',
+        email=user.email,
+        location='Maputo',
+        status='active',
+    )
+    wallet = get_wallet(user)
+    credit(
+        wallet,
+        Decimal('1500.00'),
+        kind='payout',
+        ref_type='system',
+        ref_id=uuid.uuid4(),
+        description='Comissões aprovadas',
+        txn_type='affiliate_commission',
+    )
+    payout_request = APIRequestFactory().post(
+        '/api/v1/affiliates/me/payouts/',
+        {
+            'amount': '1000.00',
+            'method': 'mpesa',
+            'account_details': {'phone': '849999998'},
+        },
+        format='json',
+    )
+    force_authenticate(payout_request, user=user)
+
+    response = AffiliatePayoutView.as_view()(payout_request)
+
+    payout = AffiliatePayout.objects.get(affiliate=profile)
+    wallet.refresh_from_db()
+    assert response.status_code == 201
+    assert payout.account_details == {'phone': '849999998'}
+    assert wallet.reserved_balance == Decimal('1000.00')
+
+    approve_request = APIRequestFactory().patch(
+        f'/api/v1/affiliates/admin/affiliates/payouts/{payout.id}/',
+        {'action': 'approve'},
+        format='json',
+    )
+    force_authenticate(approve_request, user=admin)
+    approve_response = AdminAffiliatePayoutActionView.as_view()(
+        approve_request, pk=payout.id,
+    )
+
+    assert approve_response.status_code == 200
+    payout.refresh_from_db()
+    assert payout.status == 'approved'
+
+
+@pytest.mark.django_db
+def test_verified_seller_affiliate_bank_payout_requires_bank_details(affiliate_user):
+    user, profile, _ = affiliate_user
+    user.roles = ['affiliate', 'seller']
+    user.save(update_fields=['roles'])
+    Store.objects.create(
+        owner=user,
+        name='Loja bancária verificada',
+        description='Loja aprovada para testar dados bancários',
+        category='geral',
+        phone='840000011',
+        email=user.email,
+        location='Maputo',
+        status='active',
+    )
+    AffiliateKYC.objects.filter(affiliate=profile).delete()
+    request = APIRequestFactory().post(
+        '/api/v1/affiliates/me/payouts/',
+        {'amount': '500.00', 'method': 'bank', 'account_details': {'bank_name': 'BIM'}},
+        format='json',
+    )
+    force_authenticate(request, user=user)
+
+    response = AffiliatePayoutView.as_view()(request)
+
+    assert response.status_code == 400
+    assert not AffiliatePayout.objects.filter(affiliate=profile).exists()
 
 
 @pytest.mark.django_db

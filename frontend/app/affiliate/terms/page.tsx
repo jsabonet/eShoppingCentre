@@ -84,7 +84,7 @@ export default function AffiliateTermsPage() {
           <ul className="list-disc list-inside space-y-1">
             <li>O valor mínimo de saque é de 500 MZN.</li>
             <li>Os saques podem ser efetuados via M-Pesa, e-Mola ou Transferência Bancária.</li>
-            <li>A verificação de identidade (KYC) é obrigatória antes do primeiro saque.</li>
+            <li>O KYC aprovado ou uma conta de vendedor verificada é obrigatório antes do primeiro saque.</li>
             <li>O processamento do saque está sujeito a revisão pela equipa do E-SHOPPING CENTRE.</li>
           </ul>
         </section>

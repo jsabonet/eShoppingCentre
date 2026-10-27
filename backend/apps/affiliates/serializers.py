@@ -6,17 +6,23 @@ class AffiliateProfileSerializer(serializers.ModelSerializer):
     user_email = serializers.CharField(source='user.email', read_only=True)
     user_name = serializers.SerializerMethodField()
     available_commission = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    seller_verified = serializers.SerializerMethodField()
 
     class Meta:
         model = AffiliateProfile
         fields = ('id', 'user_email', 'user_name', 'referral_code', 'total_clicks',
                   'total_sales', 'total_commission', 'total_withdrawn', 'available_commission',
-                  'is_active', 'status', 'commission_tier')
+                  'is_active', 'status', 'commission_tier', 'seller_verified')
         read_only_fields = ('total_clicks', 'total_sales', 'total_commission', 'total_withdrawn',
                            'is_active', 'referral_code', 'commission_tier')
 
     def get_user_name(self, obj):
         return obj.user.get_full_name() or obj.user.email
+
+    def get_seller_verified(self, obj):
+        from .services import has_verified_seller_account
+
+        return has_verified_seller_account(obj.user)
 
 
 class AffiliateLinkSerializer(serializers.ModelSerializer):

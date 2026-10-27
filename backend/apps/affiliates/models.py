@@ -136,7 +136,7 @@ class AffiliatePayout(BaseModel):
 
 
 class AffiliateKYC(BaseModel):
-    """Verificação de identidade (KYC) do afiliado — obrigatória antes do 1º saque."""
+    """Verificação de identidade usada para saques de afiliados sem loja verificada."""
     STATUS_CHOICES = [
         ('pending', 'Pendente'),
         ('approved', 'Aprovado'),

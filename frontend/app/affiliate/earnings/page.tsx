@@ -40,6 +40,9 @@ export default function AffiliateEarningsPage() {
   const [kycForm, setKycForm] = useState({
     document_type: 'bi', document_number: '', nuit: '', payout_phone: '', bank_name: '', bank_account: '',
   });
+  const [payoutPhone, setPayoutPhone] = useState('');
+  const [payoutBankName, setPayoutBankName] = useState('');
+  const [payoutBankAccount, setPayoutBankAccount] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,13 +77,15 @@ export default function AffiliateEarningsPage() {
   useEffect(() => { load(); }, [load]);
 
   const kycVerified = kyc?.status === 'approved';
+  const sellerVerified = Boolean(profile?.seller_verified);
+  const payoutVerified = kycVerified || sellerVerified;
   const availablePayout = Number(wallet?.available_payout ?? profile?.available_commission ?? 0);
   const requestedAmount = Number(amount) || 0;
   const withdrawalFee = Math.round(requestedAmount * 5) / 100;
   const transferAmount = Math.max(requestedAmount - withdrawalFee, 0);
 
   const openPayout = () => {
-    if (!kycVerified) { setShowKYC(true); return; }
+    if (!payoutVerified) { setShowKYC(true); return; }
     setShowPayout(true);
   };
 
@@ -110,7 +115,9 @@ export default function AffiliateEarningsPage() {
       await affiliatesAPI.requestPayout({
         amount: Number(amount),
         method,
-        account_details: {},
+        account_details: kycVerified ? {} : method === 'bank'
+          ? { bank_name: payoutBankName, bank_account: payoutBankAccount }
+          : { phone: payoutPhone },
       });
       setToast({ type: 'success', text: 'Pedido de saque enviado para aprovação.' });
       setShowPayout(false);
@@ -224,7 +231,7 @@ export default function AffiliateEarningsPage() {
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-semibold">Taxa de saque para afiliados: 5%</p>
           <p className="mt-1 text-amber-900/80">
-            A taxa é descontada do valor solicitado. O pedido exige KYC aprovado e aprovação administrativa; a transferência é manual e não é executada automaticamente pelo gateway.
+            A taxa é descontada do valor solicitado. O pedido exige KYC aprovado ou uma conta de vendedor verificada, além de aprovação administrativa; a transferência é manual e não é executada automaticamente pelo gateway.
           </p>
         </div>
 
@@ -232,8 +239,8 @@ export default function AffiliateEarningsPage() {
           <div className="bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 rounded-xl p-6">
             <p className="text-sm text-muted-foreground mb-1">Saldo Disponível</p>
             <p className="text-3xl font-bold text-accent">{availablePayout.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</p>
-            {kycVerified ? (
-              <span className="inline-flex items-center gap-1 mt-2 text-xs text-green-600 font-medium"><ShieldCheck size={13} /> Conta verificada</span>
+            {payoutVerified ? (
+              <span className="inline-flex items-center gap-1 mt-2 text-xs text-green-600 font-medium"><ShieldCheck size={13} /> {kycVerified ? 'Conta verificada' : 'Vendedor verificado'}</span>
             ) : (
               <span className="inline-flex items-center gap-1 mt-2 text-xs text-amber-600 font-medium"><FileText size={13} /> Verificação pendente</span>
             )}
@@ -486,6 +493,26 @@ export default function AffiliateEarningsPage() {
                   <option value="bank">Transferência Bancária</option>
                 </select>
               </div>
+              {sellerVerified && !kycVerified && (method === 'bank' ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5">Banco</label>
+                    <input type="text" value={payoutBankName} onChange={e => setPayoutBankName(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-border rounded-xl text-sm" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5">Nº de conta / IBAN</label>
+                    <input type="text" value={payoutBankAccount} onChange={e => setPayoutBankAccount(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-border rounded-xl text-sm" required />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5">Telefone de pagamento</label>
+                  <input type="tel" value={payoutPhone} onChange={e => setPayoutPhone(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-border rounded-xl text-sm" required />
+                </div>
+              ))}
               <button type="submit" disabled={submitting}
                 className="w-full px-4 py-2.5 bg-accent text-accent-foreground rounded-xl font-semibold hover:bg-accent/90 disabled:opacity-50 flex items-center justify-center gap-2">
                 {submitting ? <Loader2 size={15} className="animate-spin" /> : null} Confirmar Pedido

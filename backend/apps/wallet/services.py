@@ -262,15 +262,15 @@ def request_payout(user, *, role, amount, method, account_details):
 
     from apps.affiliates.models import AffiliateKYC, AffiliateProfile
     affiliate_profile = AffiliateProfile.objects.filter(user=user).first()
-    if affiliate_profile:
-        if not affiliate_profile.is_active or affiliate_profile.status != 'active':
-            raise ValueError('A conta de afiliado não está ativa para solicitar saques.')
-        kyc = AffiliateKYC.objects.filter(affiliate=affiliate_profile, status='approved').first()
-        if not kyc:
-            raise ValueError('É necessária a verificação aprovada da conta (KYC) antes de solicitar saques.')
     if role == 'affiliate':
         if not affiliate_profile:
             raise ValueError('Não existe uma conta de afiliado para este utilizador.')
+        if not affiliate_profile.is_active or affiliate_profile.status != 'active':
+            raise ValueError('A conta de afiliado não está ativa para solicitar saques.')
+        kyc = AffiliateKYC.objects.filter(affiliate=affiliate_profile, status='approved').first()
+        from apps.affiliates.services import has_verified_seller_account
+        if not kyc and not has_verified_seller_account(user):
+            raise ValueError('É necessária a verificação aprovada da conta (KYC) antes de solicitar saques.')
         from apps.affiliates.models import AffiliateSettings
         settings_obj = AffiliateSettings.get_settings()
         if amount < settings_obj.min_payout_amount:

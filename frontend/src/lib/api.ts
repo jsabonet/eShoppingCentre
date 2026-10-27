@@ -218,6 +218,7 @@ export interface AffiliateProfile {
   id: string;
   user_email: string;
   user_name?: string;
+  seller_verified?: boolean;
   referral_code: string;
   total_clicks: number;
   total_sales: number;

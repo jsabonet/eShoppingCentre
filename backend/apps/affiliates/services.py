@@ -13,6 +13,44 @@ TIER_SALES_THRESHOLDS = {
 }
 
 
+def has_verified_seller_account(user):
+    from apps.stores.models import Store
+
+    return (
+        'seller' in (user.roles or [])
+        and Store.objects.filter(owner=user, status='active').exists()
+    )
+
+
+def get_affiliate_payout_account_details(profile, method, submitted_details):
+    from .models import AffiliateKYC
+
+    kyc = AffiliateKYC.objects.filter(affiliate=profile, status='approved').first()
+    if kyc:
+        details = (
+            {'bank_name': kyc.bank_name, 'bank_account': kyc.bank_account}
+            if method == 'bank' else {'phone': kyc.payout_phone}
+        )
+    else:
+        if not has_verified_seller_account(profile.user):
+            raise ValueError(
+                'É necessária a verificação da conta (KYC) antes de solicitar saques.'
+            )
+        if not isinstance(submitted_details, dict):
+            raise ValueError('Dados da conta de destino inválidos.')
+        fields = ('bank_name', 'bank_account') if method == 'bank' else ('phone',)
+        details = {
+            field: str(submitted_details.get(field, '')).strip()
+            for field in fields
+        }
+
+    if any(not value for value in details.values()):
+        raise ValueError(
+            'Os dados de pagamento não incluem uma conta para este método.'
+        )
+    return details
+
+
 def get_tier_multiplier(profile):
     """Multiplicador de comissão conforme o tier do afiliado."""
     return TIER_MULTIPLIERS.get(profile.commission_tier, Decimal('1.0'))

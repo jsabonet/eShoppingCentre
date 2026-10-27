@@ -355,6 +355,50 @@ def test_wallet_affiliate_payout_uses_kyc_destination_and_five_percent(db):
 
 
 @pytest.mark.django_db
+def test_wallet_affiliate_payout_allows_verified_seller_without_kyc(db):
+    from apps.affiliates.models import AffiliateProfile
+    from apps.stores.models import Store
+
+    affiliate = User.objects.create_user(
+        email='seller-payout-affiliate@example.com',
+        username='seller-payout-affiliate',
+        password='SenhaForte123!',
+        is_verified=True,
+        roles=['affiliate', 'seller'],
+    )
+    AffiliateProfile.objects.create(user=affiliate, referral_code='SELLER-PAYOUT')
+    Store.objects.create(
+        owner=affiliate,
+        name='Loja aprovada wallet',
+        description='Loja ativa para saque de afiliado',
+        category='geral',
+        phone='840000012',
+        email=affiliate.email,
+        location='Maputo',
+        status='active',
+    )
+    wallet = get_wallet(affiliate)
+    credit(wallet, 1000, kind='payout', ref_type='system', ref_id=uuid.uuid4(),
+           description='Comissões', txn_type='affiliate_commission')
+    request = APIRequestFactory().post(
+        '/api/v1/wallet/me/payouts/',
+        {
+            'role': 'affiliate',
+            'amount': '500.00',
+            'method': 'mpesa',
+            'account_details': {'phone': '849999997'},
+        },
+        format='json',
+    )
+    force_authenticate(request, user=affiliate)
+
+    response = WalletPayoutView.as_view()(request)
+
+    assert response.status_code == 201
+    assert response.data['account_details'] == {'phone': '849999997'}
+
+
+@pytest.mark.django_db
 def test_admin_reconciliation_uses_paid_totals_and_does_not_double_count_reservations(
     user, admin, ref_id,
 ):
