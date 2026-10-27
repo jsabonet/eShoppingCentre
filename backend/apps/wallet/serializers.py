@@ -28,7 +28,8 @@ class PayoutRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PayoutRequest
-        fields = ('id', 'user', 'user_email', 'user_name', 'role', 'amount', 'method',
+        fields = ('id', 'user', 'user_email', 'user_name', 'role', 'amount',
+                  'fee_percent', 'fee', 'net_amount', 'method',
                   'method_display', 'account_details', 'status', 'status_display',
                   'admin_reference', 'approved_at', 'paid_at', 'rejection_reason', 'notes', 'created_at')
         read_only_fields = ('status', 'approved_by', 'paid_by', 'approved_at', 'paid_at',

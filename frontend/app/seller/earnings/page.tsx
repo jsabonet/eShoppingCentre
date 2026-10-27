@@ -76,6 +76,9 @@ export default function SellerEarningsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [payoutError, setPayoutError] = useState('');
   const [payoutSuccess, setPayoutSuccess] = useState('');
+  const requestedAmount = Number(payoutAmount) || 0;
+  const withdrawalFee = Math.round(requestedAmount * 11) / 100;
+  const transferAmount = Math.max(requestedAmount - withdrawalFee, 0);
 
   const requestPayout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,6 +191,13 @@ export default function SellerEarningsPage() {
           <button onClick={fetch} className="p-2 hover:bg-muted rounded-lg transition-colors" title="Actualizar">
             <RefreshCw size={16} />
           </button>
+        </div>
+
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-semibold">Taxa de saque para vendedores: 11%</p>
+          <p className="mt-1 text-amber-900/80">
+            A taxa é descontada do valor solicitado. O pedido fica sujeito à aprovação e a transferência é feita manualmente; o gateway não envia o saque automaticamente.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -369,8 +379,12 @@ export default function SellerEarningsPage() {
                     </div>
                     <div>
                       <p className="font-medium text-sm">
-                        {Number(p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN
+                        Pedido: {Number(p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN
                         <span className="text-muted-foreground font-normal"> · {methodLabels[p.method] || p.method_display || p.method}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Taxa: {Number(p.fee || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN
+                        {' · '}Transferência: {Number(p.net_amount ?? p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN
                       </p>
                       <p className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
@@ -396,12 +410,23 @@ export default function SellerEarningsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Disponível: <span className="font-bold text-foreground">{available.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</span>
             </p>
+            <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-950">
+              <p className="font-semibold">Taxa de saque: 11%</p>
+              <p className="mt-1">O valor solicitado será reservado. Após aprovação, o administrador transferirá manualmente o valor líquido abaixo.</p>
+            </div>
             <form onSubmit={requestPayout} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold mb-1">Valor (MZN)</label>
                 <input type="number" min="1" value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)}
                   className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" required autoFocus />
               </div>
+              {requestedAmount > 0 && (
+                <dl className="space-y-1 rounded-lg border border-border p-3 text-sm">
+                  <div className="flex justify-between"><dt>Valor solicitado</dt><dd>{requestedAmount.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</dd></div>
+                  <div className="flex justify-between text-muted-foreground"><dt>Taxa (11%)</dt><dd>−{withdrawalFee.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</dd></div>
+                  <div className="flex justify-between border-t border-border pt-1 font-semibold"><dt>Transferência manual</dt><dd>{transferAmount.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</dd></div>
+                </dl>
+              )}
               <div>
                 <label className="block text-xs font-semibold mb-1">Método</label>
                 <select value={payoutMethod} onChange={e => setPayoutMethod(e.target.value)}

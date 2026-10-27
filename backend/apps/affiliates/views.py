@@ -126,6 +126,8 @@ class AffiliatePayoutView(APIView):
             AffiliateProfile.objects.select_for_update(),
             user=request.user,
         )
+        if not profile.is_active or profile.status != 'active':
+            return Response({'detail': 'A conta de afiliado não está ativa para solicitar saques.'}, status=403)
         settings_obj = AffiliateSettings.get_settings()
 
         # Gate: verificação KYC obrigatória antes do 1º saque
@@ -138,32 +140,49 @@ class AffiliatePayoutView(APIView):
 
         try:
             amount = Decimal(str(request.data.get('amount')))
+            rounded_amount = amount.quantize(Decimal('0.01'))
         except (ValueError, InvalidOperation, TypeError):
             return Response({'detail': 'Valor inválido.'}, status=400)
+        if not amount.is_finite() or amount != rounded_amount or amount <= 0:
+            return Response({'detail': 'Indique um valor válido com até duas casas decimais.'}, status=400)
 
         if amount < settings_obj.min_payout_amount:
             return Response(
                 {'detail': f'O valor mínimo de saque é {settings_obj.min_payout_amount} MZN.'},
                 status=400,
             )
-        pending_amount = profile.payouts.filter(
-            status__in=['pending', 'approved'],
-        ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
-        available = profile.available_commission - pending_amount
+        method = request.data.get('method', 'mpesa')
+        if method not in ('mpesa', 'emola', 'bank'):
+            return Response({'detail': 'Método de saque inválido.'}, status=400)
+        account_details = (
+            {'bank_name': kyc.bank_name, 'bank_account': kyc.bank_account}
+            if method == 'bank' else {'phone': kyc.payout_phone}
+        )
+        if any(not value for value in account_details.values()):
+            return Response(
+                {'detail': 'Os dados de pagamento do seu KYC não incluem uma conta para este método.'},
+                status=400,
+            )
+
+        wallet = wallet_services.get_wallet(request.user)
+        wallet = wallet.__class__.objects.select_for_update().get(pk=wallet.pk)
+        available = wallet.payout_balance - wallet.reserved_balance
         if amount > available:
             return Response(
                 {'detail': f'Saldo insuficiente. Disponível: {max(available, Decimal("0.00"))} MZN.'},
                 status=400,
             )
 
-        fee = (amount * settings_obj.payout_fee_percent / Decimal('100')).quantize(Decimal('0.01'))
+        fee = (amount * Decimal('5.00') / Decimal('100')).quantize(Decimal('0.01'))
         payout = AffiliatePayout.objects.create(
             affiliate=profile,
             amount=amount,
             fee=fee,
-            method=request.data.get('method', 'mpesa'),
-            account_details=request.data.get('account_details', {}) or {},
+            method=method,
+            account_details=account_details,
         )
+        wallet.reserved_balance += amount
+        wallet.save(update_fields=['reserved_balance'])
 
         # Notificar admins sobre o novo pedido de saque
         from apps.notifications.models import Notification
@@ -172,14 +191,14 @@ class AffiliatePayoutView(APIView):
             Notification.objects.create(
                 user=admin,
                 title='Novo pedido de saque',
-                message=f'{profile.user.email} solicitou um saque de {amount} MZN.',
+                message=f'{profile.user.email} solicitou {amount} MZN. Taxa: {fee} MZN; transferência manual: {amount - fee} MZN.',
                 notification_type='affiliate',
                 link='/admin?tab=affiliates',
             )
         email_service.dispatch(
             email_service.send_admin_alert_email,
             'Novo pedido de saque de afiliado',
-            f'{profile.user.email} solicitou um saque de {amount} MZN.',
+            f'{profile.user.email} solicitou {amount} MZN. Taxa: {fee} MZN; transferência manual: {amount - fee} MZN.',
         )
 
         return Response(AffiliatePayoutSerializer(payout).data, status=201)
@@ -396,46 +415,87 @@ class AdminAffiliatePayoutActionView(APIView):
         )
         action = request.data.get('action')
         if action == 'approve' and payout.status == 'pending':
-            from apps.wallet.models import Wallet
-            try:
-                with transaction.atomic():
-                    profile = AffiliateProfile.objects.select_for_update().get(
-                        pk=payout.affiliate_id,
-                    )
-                    payout = AffiliatePayout.objects.select_for_update().get(pk=payout.pk)
-                    if payout.status != 'pending':
-                        return Response(AffiliatePayoutSerializer(payout).data)
-                    # Circuito de dinheiro unificado: debita a carteira do afiliado.
-                    wallet_services.debit(
-                        wallet_services.get_wallet(payout.affiliate.user),
-                        payout.amount, kind='payout',
-                        ref_type='affiliate_payout', ref_id=payout.id,
-                        description=f'Saque de afiliado ({payout.get_method_display()})',
-                        txn_type='withdrawal',
-                        idempotency_key=f'affiliate_payout:{payout.id}:debit',
-                        counterparty='external',
-                    )
-                    Wallet.objects.filter(user=payout.affiliate.user).update(
-                        total_withdrawn=F('total_withdrawn') + payout.amount
-                    )
-                    profile.total_withdrawn += payout.amount
-                    profile.save(update_fields=['total_withdrawn'])
-                    payout.status = 'paid'
-                    payout.paid_at = timezone.now()
-                    payout.approved_by = request.user
-                    payout.save(update_fields=['status', 'paid_at', 'approved_by'])
-            except wallet_services.InsufficientFunds as e:
-                return Response({'detail': str(e)}, status=400)
+            profile = AffiliateProfile.objects.select_for_update().get(pk=payout.affiliate_id)
+            kyc = AffiliateKYC.objects.filter(affiliate=profile, status='approved').first()
+            if not kyc:
+                return Response(
+                    {'detail': 'O KYC do afiliado deve permanecer aprovado para autorizar o saque.'},
+                    status=400,
+                )
+            payout.status = 'approved'
+            payout.approved_by = request.user
+            payout.save(update_fields=['status', 'approved_by'])
 
             from apps.notifications.models import Notification
             Notification.objects.create(
                 user=payout.affiliate.user,
-                title='Saque aprovado',
-                message=f'O seu saque de {payout.amount} MZN foi aprovado.',
+                title='Pedido de saque aprovado',
+                message=f'O pedido foi aprovado. A transferência manual será de {payout.net_amount} MZN, após a taxa de {payout.fee} MZN.',
                 notification_type='affiliate',
                 link='/affiliate/earnings',
             )
-        elif action == 'reject' and payout.status == 'pending':
+        elif action == 'pay' and payout.status == 'approved':
+            reference = str(request.data.get('reference', '')).strip()
+            if not reference:
+                return Response({'detail': 'Indique a referência da transferência manual.'}, status=400)
+            profile = AffiliateProfile.objects.select_for_update().get(pk=payout.affiliate_id)
+            wallet = wallet_services.get_wallet(payout.affiliate.user)
+            wallet = wallet.__class__.objects.select_for_update().get(pk=wallet.pk)
+            if wallet.reserved_balance < payout.amount:
+                return Response({'detail': 'A reserva do saque não corresponde ao saldo reservado.'}, status=400)
+            if wallet.payout_balance < payout.amount:
+                return Response({'detail': 'Saldo insuficiente para concluir o saque.'}, status=400)
+
+            wallet.reserved_balance -= payout.amount
+            wallet.save(update_fields=['reserved_balance'])
+            try:
+                wallet_services.debit(
+                    wallet, payout.net_amount, kind='payout',
+                    ref_type='affiliate_payout', ref_id=payout.id,
+                    description=f'Transferência manual de saque ({payout.get_method_display()})',
+                    txn_type='withdrawal',
+                    idempotency_key=f'affiliate_payout:{payout.id}:transfer',
+                    counterparty='external',
+                )
+                if payout.fee:
+                    wallet_services.debit(
+                        wallet, payout.fee, kind='payout',
+                        ref_type='affiliate_payout', ref_id=payout.id,
+                        description='Taxa de saque (5%)',
+                        txn_type='fee',
+                        idempotency_key=f'affiliate_payout:{payout.id}:fee',
+                        counterparty='platform',
+                    )
+            except wallet_services.InsufficientFunds as exc:
+                transaction.set_rollback(True)
+                return Response({'detail': str(exc)}, status=400)
+
+            from apps.wallet.models import Wallet
+            Wallet.objects.filter(pk=wallet.pk).update(
+                total_withdrawn=F('total_withdrawn') + payout.amount,
+            )
+            profile.total_withdrawn += payout.amount
+            profile.save(update_fields=['total_withdrawn'])
+            payout.status = 'paid'
+            payout.paid_at = timezone.now()
+            payout.paid_by = request.user
+            payout.admin_reference = reference
+            payout.save(update_fields=['status', 'paid_at', 'paid_by', 'admin_reference'])
+            from apps.notifications.models import Notification
+            Notification.objects.create(
+                user=payout.affiliate.user,
+                title='Saque transferido',
+                message=f'A transferência manual de {payout.net_amount} MZN foi registada. Referência: {reference}.',
+                notification_type='affiliate',
+                link='/affiliate/earnings',
+            )
+        elif action == 'reject' and payout.status in ('pending', 'approved'):
+            wallet = wallet_services.get_wallet(payout.affiliate.user)
+            wallet = wallet.__class__.objects.select_for_update().get(pk=wallet.pk)
+            if wallet.reserved_balance < payout.amount:
+                return Response({'detail': 'A reserva do saque não corresponde ao saldo reservado.'}, status=400)
+            wallet.reserved_balance -= payout.amount
+            wallet.save(update_fields=['reserved_balance'])
             payout.status = 'rejected'
             payout.notes = request.data.get('notes', '')
             payout.save(update_fields=['status', 'notes'])

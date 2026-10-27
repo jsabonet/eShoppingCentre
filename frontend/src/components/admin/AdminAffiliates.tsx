@@ -89,9 +89,15 @@ export default function AdminAffiliates() {
   };
 
   const payoutAction = async (id: string, action: string) => {
+    const reference = action === 'pay'
+      ? prompt('Introduza a referência da transferência manual já realizada:')
+      : undefined;
+    if (action === 'pay' && !reference?.trim()) return;
     try {
-      await affiliatesAPI.adminPayoutAction(id, { action });
-      showToast('success', action === 'approve' ? 'Saque aprovado.' : 'Saque rejeitado.');
+      await affiliatesAPI.adminPayoutAction(id, { action, reference: reference?.trim() });
+      showToast('success', action === 'approve'
+        ? 'Saque aprovado; falta registar a transferência manual.'
+        : action === 'pay' ? 'Transferência manual registada.' : 'Saque rejeitado.');
       load();
     } catch { showToast('error', 'Erro ao actualizar.'); }
   };
@@ -351,7 +357,7 @@ export default function AdminAffiliates() {
                   <thead><tr className="border-b-2 border-border bg-muted/20">
                     <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Encomenda</th>
                     <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Afiliado</th>
-                    <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Valor</th>
+                    <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Bruto / taxa / líquido</th>
                     <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Taxa</th>
                     <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Estado</th>
                     <th className="text-right py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase w-28">Acção</th>
@@ -397,7 +403,10 @@ export default function AdminAffiliates() {
                     {filteredPayouts.map(p => (
                       <tr key={p.id} className="hover:bg-muted/20">
                         <td className="py-2.5 px-3 text-xs">{p.affiliate_email}</td>
-                        <td className="py-2.5 px-3 text-xs font-semibold">{Number(p.amount).toLocaleString('pt-MZ')} MZN</td>
+                        <td className="py-2.5 px-3 text-xs">
+                          <span className="font-semibold">{Number(p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN bruto</span>
+                          <span className="block text-muted-foreground">−{Number(p.fee || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} taxa · {Number(p.net_amount || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN a transferir</span>
+                        </td>
                         <td className="py-2.5 px-3 text-xs uppercase">{p.method}</td>
                         <td className="py-2.5 px-3">
                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-700'}`}>{STATUS_LABEL[p.status] || p.status}</span>
@@ -409,6 +418,13 @@ export default function AdminAffiliates() {
                               <button onClick={() => payoutAction(p.id, 'reject')} className="px-2 py-1 rounded text-[11px] font-semibold bg-red-100 text-red-700 hover:bg-red-200">Rejeitar</button>
                             </div>
                           )}
+                          {p.status === 'approved' && (
+                            <div className="flex justify-end gap-1">
+                              <button onClick={() => payoutAction(p.id, 'pay')} className="px-2 py-1 rounded text-[11px] font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200">Registar transferência</button>
+                              <button onClick={() => payoutAction(p.id, 'reject')} className="px-2 py-1 rounded text-[11px] font-semibold bg-red-100 text-red-700 hover:bg-red-200">Rejeitar</button>
+                            </div>
+                          )}
+                          {p.admin_reference && <span className="text-[10px] text-muted-foreground">Ref: {p.admin_reference}</span>}
                         </td>
                       </tr>
                     ))}
@@ -505,11 +521,9 @@ export default function AdminAffiliates() {
                 <input type="number" min="0" value={settings.clawback_days} onChange={e => setSettings({ ...settings, clawback_days: Number(e.target.value) })}
                   className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1">Taxa de saque (%)</label>
-                <input type="number" step="0.01" min="0" value={settings.payout_fee_percent} onChange={e => setSettings({ ...settings, payout_fee_percent: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
-              </div>
+              <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+                A taxa de saque de afiliados é fixa em 5% e é apresentada ao afiliado antes da confirmação.
+              </p>
               <div>
                 <label className="block text-xs font-semibold mb-1">Termos de serviço globais</label>
                 <textarea rows={4} value={settings.terms_of_service || ''} onChange={e => setSettings({ ...settings, terms_of_service: e.target.value })}

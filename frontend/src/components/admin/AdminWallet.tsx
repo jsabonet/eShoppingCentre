@@ -70,8 +70,12 @@ export default function AdminWallet() {
     catch { showToast('error', 'Erro ao aprovar.'); }
   };
   const pay = async (id: string) => {
-    const ref = prompt('Referência do pagamento manual (opcional):');
+    const ref = prompt('Referência da transferência manual já realizada:');
     if (ref === null) return;
+    if (!ref.trim()) {
+      showToast('error', 'A referência da transferência é obrigatória.');
+      return;
+    }
     try { await walletAPI.adminPayoutPay(id, ref); showToast('success', 'Pagamento manual registado.'); load(); }
     catch { showToast('error', 'Erro ao registar pagamento.'); }
   };
@@ -106,7 +110,9 @@ export default function AdminWallet() {
       utilizador: p.user_name || '',
       email: p.user_email || '',
       papel: p.role || '',
-      valor_mzn: Number(p.amount || 0),
+      valor_bruto_mzn: Number(p.amount || 0),
+      taxa_mzn: Number(p.fee || 0),
+      valor_transferido_mzn: Number(p.net_amount ?? p.amount ?? 0),
       metodo: p.method_display || p.method || '',
       conta: formatAccount(p.account_details),
       estado: STATUS_LABEL[p.status] || p.status,
@@ -120,7 +126,7 @@ export default function AdminWallet() {
       reportFormat,
       `relatorio-saques-${new Date().toISOString().slice(0, 10)}.${reportFormat === 'excel' ? 'xlsx' : reportFormat}`,
       'Relatório de saques',
-      ['utilizador', 'email', 'papel', 'valor_mzn', 'metodo', 'conta', 'estado', 'referencia', 'criado_em', 'aprovado_em', 'pago_em', 'motivo_rejeicao'],
+      ['utilizador', 'email', 'papel', 'valor_bruto_mzn', 'taxa_mzn', 'valor_transferido_mzn', 'metodo', 'conta', 'estado', 'referencia', 'criado_em', 'aprovado_em', 'pago_em', 'motivo_rejeicao'],
       rows,
       {
         period: dateFrom || dateTo ? `${dateFrom || 'Início'} a ${dateTo || 'Hoje'}` : 'Todo o período',
@@ -132,7 +138,9 @@ export default function AdminWallet() {
         ],
         summary: [
           { label: 'Pedidos', value: rows.length },
-          { label: 'Valor total (MZN)', value: rows.reduce((sum, payout) => sum + payout.valor_mzn, 0).toFixed(2) },
+          { label: 'Valor bruto (MZN)', value: rows.reduce((sum, payout) => sum + payout.valor_bruto_mzn, 0).toFixed(2) },
+          { label: 'Taxas (MZN)', value: rows.reduce((sum, payout) => sum + payout.taxa_mzn, 0).toFixed(2) },
+          { label: 'Valor transferido (MZN)', value: rows.reduce((sum, payout) => sum + payout.valor_transferido_mzn, 0).toFixed(2) },
           { label: 'Pendentes', value: filteredPayouts.filter((p) => p.status === 'pending').length },
           { label: 'Pagos', value: filteredPayouts.filter((p) => p.status === 'paid').length },
         ],
@@ -278,7 +286,12 @@ export default function AdminWallet() {
                       <p className="text-xs text-muted-foreground">{p.user_email}</p>
                     </td>
                     <td className="py-3 px-4 capitalize">{p.role}</td>
-                    <td className="py-3 px-4 font-semibold">{Number(p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</td>
+                    <td className="py-3 px-4">
+                      <p className="font-semibold">{Number(p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN bruto</p>
+                      <p className="text-xs text-muted-foreground">
+                        Taxa {Number(p.fee || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN · transferir {Number(p.net_amount ?? p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN
+                      </p>
+                    </td>
                     <td className="py-3 px-4">{p.method_display}</td>
                     <td className="py-3 px-4 text-xs text-muted-foreground max-w-[180px] truncate">{formatAccount(p.account_details)}</td>
                     <td className="py-3 px-4">

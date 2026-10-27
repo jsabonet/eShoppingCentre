@@ -56,6 +56,7 @@ class AffiliateSettingsSerializer(serializers.ModelSerializer):
         fields = ('id', 'cookie_window_days', 'default_commission_rate',
                   'min_payout_amount', 'approve_after_days', 'clawback_days', 'payout_fee_percent',
                   'affiliate_program_active', 'min_commission_rate', 'max_commission_rate', 'terms_of_service')
+        read_only_fields = ('payout_fee_percent',)
 
 
 class AffiliatePayoutSerializer(serializers.ModelSerializer):
@@ -65,8 +66,12 @@ class AffiliatePayoutSerializer(serializers.ModelSerializer):
     class Meta:
         model = AffiliatePayout
         fields = ('id', 'affiliate', 'affiliate_email', 'amount', 'fee', 'net_amount', 'method',
-                  'account_details', 'status', 'notes', 'created_at', 'paid_at')
-        read_only_fields = ('affiliate', 'fee', 'status', 'created_at', 'paid_at')
+                  'account_details', 'status', 'notes', 'admin_reference', 'approved_by',
+                  'paid_by', 'created_at', 'paid_at')
+        read_only_fields = (
+            'affiliate', 'fee', 'status', 'admin_reference', 'approved_by',
+            'paid_by', 'created_at', 'paid_at',
+        )
 
 
 class AffiliateKYCSerializer(serializers.ModelSerializer):

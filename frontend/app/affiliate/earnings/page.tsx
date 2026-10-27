@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, ArrowUp, RefreshCw, Loader2, Wallet, X, ShieldCheck, FileText, Search, Download } from 'lucide-react';
 import AffiliateLayout from '@/src/components/AffiliateLayout';
-import { affiliatesAPI, type AffiliateProfile } from '@/src/lib/api';
+import { affiliatesAPI, walletAPI, type AffiliateProfile, type WalletInfo } from '@/src/lib/api';
 import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -16,6 +16,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function AffiliateEarningsPage() {
   const [profile, setProfile] = useState<AffiliateProfile | null>(null);
+  const [wallet, setWallet] = useState<WalletInfo | null>(null);
   const [commissions, setCommissions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +44,7 @@ export default function AffiliateEarningsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c, k, w] = await Promise.all([
+      const [p, c, k, w, walletResponse] = await Promise.all([
         affiliatesAPI.myProfile(),
         (async () => {
           const results: any[] = [];
@@ -59,18 +60,24 @@ export default function AffiliateEarningsPage() {
         })(),
         affiliatesAPI.myKYC(),
         affiliatesAPI.myPayouts(),
+        walletAPI.myWallet(),
       ]);
       setProfile(p.data);
+      setWallet(walletResponse.data);
       setCommissions(c);
       setKyc(k.data?.status && k.data.status !== 'none' ? k.data : null);
       setPayouts(Array.isArray(w.data) ? w.data : []);
-    } catch { setProfile(null); setCommissions([]); setKyc(null); setPayouts([]); }
+    } catch { setProfile(null); setWallet(null); setCommissions([]); setKyc(null); setPayouts([]); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const kycVerified = kyc?.status === 'approved';
+  const availablePayout = Number(wallet?.available_payout ?? profile?.available_commission ?? 0);
+  const requestedAmount = Number(amount) || 0;
+  const withdrawalFee = Math.round(requestedAmount * 5) / 100;
+  const transferAmount = Math.max(requestedAmount - withdrawalFee, 0);
 
   const openPayout = () => {
     if (!kycVerified) { setShowKYC(true); return; }
@@ -214,10 +221,17 @@ export default function AffiliateEarningsPage() {
           <button onClick={load} className="p-2 hover:bg-muted rounded-lg"><RefreshCw size={16} /></button>
         </div>
 
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-semibold">Taxa de saque para afiliados: 5%</p>
+          <p className="mt-1 text-amber-900/80">
+            A taxa é descontada do valor solicitado. O pedido exige KYC aprovado e aprovação administrativa; a transferência é manual e não é executada automaticamente pelo gateway.
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 rounded-xl p-6">
             <p className="text-sm text-muted-foreground mb-1">Saldo Disponível</p>
-            <p className="text-3xl font-bold text-accent">{Number(profile?.available_commission || 0).toLocaleString('pt-MZ')} MZN</p>
+            <p className="text-3xl font-bold text-accent">{availablePayout.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</p>
             {kycVerified ? (
               <span className="inline-flex items-center gap-1 mt-2 text-xs text-green-600 font-medium"><ShieldCheck size={13} /> Conta verificada</span>
             ) : (
@@ -287,7 +301,7 @@ export default function AffiliateEarningsPage() {
                   <tr className="border-b border-border bg-muted/50">
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Produto</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Encomenda</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Valor</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Pedido / líquido</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                   </tr>
@@ -361,7 +375,12 @@ export default function AffiliateEarningsPage() {
                 <tbody className="divide-y divide-border">
                   {filteredPayouts.map((p) => (
                     <tr key={p.id} className="hover:bg-muted/30">
-                      <td className="py-3 px-4 font-medium">{Number(p.amount).toLocaleString('pt-MZ')} MZN</td>
+                      <td className="py-3 px-4 font-medium">
+                        <span>{Number(p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</span>
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          Taxa {Number(p.fee || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN · recebe {Number(p.net_amount ?? (p.amount - (p.fee || 0))).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN
+                        </span>
+                      </td>
                       <td className="py-3 px-4 uppercase text-xs">{p.method}</td>
                       <td className="py-3 px-4 text-muted-foreground">{new Date(p.created_at).toLocaleDateString('pt-MZ')}</td>
                       <td className="py-3 px-4">
@@ -440,13 +459,24 @@ export default function AffiliateEarningsPage() {
               <h2 className="text-lg font-bold flex items-center gap-2"><Wallet size={18} /> Solicitar Saque</h2>
               <button onClick={() => setShowPayout(false)} className="p-1 hover:bg-muted rounded"><X size={18} /></button>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">Disponível: {Number(profile?.available_commission || 0).toLocaleString('pt-MZ')} MZN</p>
+            <p className="text-sm text-muted-foreground mb-4">Disponível: {availablePayout.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</p>
+            <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-950">
+              <p className="font-semibold">Taxa de saque: 5%</p>
+              <p className="mt-1">O valor solicitado será reservado. Após aprovação, o administrador fará a transferência manual do valor líquido.</p>
+            </div>
             <form onSubmit={requestPayout} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold mb-1.5">Valor (MZN)</label>
                 <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)}
                   className="w-full px-4 py-2.5 border border-border rounded-xl text-sm" required />
               </div>
+              {requestedAmount > 0 && (
+                <dl className="space-y-1 rounded-lg border border-border p-3 text-sm">
+                  <div className="flex justify-between"><dt>Valor solicitado</dt><dd>{requestedAmount.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</dd></div>
+                  <div className="flex justify-between text-muted-foreground"><dt>Taxa (5%)</dt><dd>−{withdrawalFee.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</dd></div>
+                  <div className="flex justify-between border-t border-border pt-1 font-semibold"><dt>Transferência manual</dt><dd>{transferAmount.toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</dd></div>
+                </dl>
+              )}
               <div>
                 <label className="block text-sm font-semibold mb-1.5">Método de recebimento</label>
                 <select value={method} onChange={e => setMethod(e.target.value)}

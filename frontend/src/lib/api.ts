@@ -743,7 +743,7 @@ export const affiliatesAPI = {
     api.patch(`/affiliates/admin/affiliates/commissions/${id}/`, data),
   adminPayouts: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<any>>('/affiliates/admin/affiliates/payouts/', { params }),
-  adminPayoutAction: (id: string, data: { action: string; notes?: string }) =>
+  adminPayoutAction: (id: string, data: { action: string; notes?: string; reference?: string }) =>
     api.patch(`/affiliates/admin/affiliates/payouts/${id}/`, data),
 };
 

@@ -76,7 +76,7 @@ class AffiliateSettings(BaseModel):
     min_payout_amount = models.DecimalField(max_digits=12, decimal_places=2, default=500)
     approve_after_days = models.PositiveIntegerField(default=7)
     clawback_days = models.PositiveIntegerField(default=30, help_text='Dias para reverter comissões após aprovação')
-    payout_fee_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text='Taxa da plataforma sobre cada saque (%)')
+    payout_fee_percent = models.DecimalField(max_digits=5, decimal_places=2, default=5, help_text='Taxa da plataforma sobre cada saque (%)')
     affiliate_program_active = models.BooleanField(default=True, help_text='Interruptor geral do programa de afiliados')
     min_commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=1.00, help_text='Percentagem mínima permitida por produto')
     max_commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=50.00, help_text='Percentagem máxima permitida por produto')
@@ -118,6 +118,8 @@ class AffiliatePayout(BaseModel):
     account_details = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     approved_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_payouts')
+    paid_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='paid_affiliate_payouts')
+    admin_reference = models.CharField(max_length=255, blank=True, help_text='Referência da transferência manual')
     paid_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
 

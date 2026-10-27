@@ -187,6 +187,9 @@ def test_request_payout_reserves_balance(user, ref_id):
     assert payout.status == 'pending'
     assert wallet.payout_balance == 1000
     assert wallet.reserved_balance == 300
+    assert payout.fee_percent == Decimal('11.00')
+    assert payout.fee == Decimal('33.00')
+    assert payout.net_amount == Decimal('267.00')
 
 
 @pytest.mark.django_db
@@ -234,11 +237,32 @@ def test_pay_payout_full_flow(user, admin, ref_id):
     assert wallet.total_withdrawn == 300
 
     txn = WalletTransaction.objects.get(idempotency_key=f'payout:{payout.id}:pay')
-    assert txn.amount == -300
+    assert txn.amount == -267
     assert txn.type == 'withdrawal'
     entry = txn.entries.get()
     assert entry.counterparty == 'external'
     assert entry.direction == 'debit'
+    fee_txn = WalletTransaction.objects.get(idempotency_key=f'payout:{payout.id}:fee')
+    assert fee_txn.amount == -33
+    assert fee_txn.type == 'fee'
+    assert fee_txn.entries.get().counterparty == 'platform'
+
+
+@pytest.mark.django_db
+def test_pay_payout_requires_manual_transfer_reference(user, admin, ref_id):
+    wallet = get_wallet(user)
+    credit(wallet, 1000, kind='payout', ref_type='order', ref_id=ref_id,
+           description='Venda', txn_type='sale')
+    payout = request_payout(user, role='seller', amount=300, method='mpesa',
+                            account_details={'phone': '840000000'})
+    approve_payout(payout, admin)
+
+    with pytest.raises(ValueError, match='referência'):
+        pay_payout(payout, admin)
+
+    wallet.refresh_from_db()
+    assert wallet.payout_balance == 1000
+    assert wallet.reserved_balance == 300
 
 
 @pytest.mark.django_db
@@ -256,6 +280,78 @@ def test_reject_payout_releases_reservation(user, admin, ref_id):
     assert payout.status == 'rejected'
     assert wallet.reserved_balance == 0
     assert wallet.payout_balance == 1000
+
+
+@pytest.mark.django_db
+def test_wallet_payout_requires_explicit_role_and_affiliate_kyc(db):
+    from apps.affiliates.models import AffiliateProfile
+
+    affiliate = User.objects.create_user(
+        email='payout-affiliate@example.com',
+        username='payout-affiliate',
+        password='SenhaForte123!',
+        is_verified=True,
+        roles=['affiliate'],
+    )
+    AffiliateProfile.objects.create(user=affiliate, referral_code='PAYOUT-AFFILIATE')
+    factory = APIRequestFactory()
+
+    missing_role = factory.post('/api/v1/wallet/me/payouts/', {'amount': 300}, format='json')
+    force_authenticate(missing_role, user=affiliate)
+    missing_role_response = WalletPayoutView.as_view()(missing_role)
+    assert missing_role_response.status_code == 400
+
+    affiliate_role = factory.post(
+        '/api/v1/wallet/me/payouts/',
+        {'role': 'affiliate', 'amount': 300, 'account_details': {'phone': '840000000'}},
+        format='json',
+    )
+    force_authenticate(affiliate_role, user=affiliate)
+    affiliate_response = WalletPayoutView.as_view()(affiliate_role)
+    assert affiliate_response.status_code == 400
+    assert 'KYC' in affiliate_response.data['detail']
+
+
+@pytest.mark.django_db
+def test_wallet_affiliate_payout_uses_kyc_destination_and_five_percent(db):
+    from apps.affiliates.models import AffiliateKYC, AffiliateProfile
+
+    affiliate = User.objects.create_user(
+        email='verified-payout-affiliate@example.com',
+        username='verified-payout-affiliate',
+        password='SenhaForte123!',
+        is_verified=True,
+        roles=['affiliate'],
+    )
+    profile = AffiliateProfile.objects.create(user=affiliate, referral_code='VERIFIED-PAYOUT')
+    AffiliateKYC.objects.create(
+        affiliate=profile,
+        document_number='DOC-456',
+        payout_phone='840000002',
+        status='approved',
+    )
+    wallet = get_wallet(affiliate)
+    credit(wallet, 1000, kind='payout', ref_type='system', ref_id=uuid.uuid4(),
+           description='Comissões', txn_type='affiliate_commission')
+    request = APIRequestFactory().post(
+        '/api/v1/wallet/me/payouts/',
+        {
+            'role': 'affiliate',
+            'amount': '500.00',
+            'method': 'mpesa',
+            'account_details': {'phone': '849999999'},
+        },
+        format='json',
+    )
+    force_authenticate(request, user=affiliate)
+
+    response = WalletPayoutView.as_view()(request)
+
+    assert response.status_code == 201
+    assert response.data['fee_percent'] == '5.00'
+    assert response.data['fee'] == '25.00'
+    assert response.data['net_amount'] == Decimal('475.00')
+    assert response.data['account_details'] == {'phone': '840000002'}
 
 
 @pytest.mark.django_db

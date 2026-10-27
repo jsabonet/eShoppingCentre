@@ -1,5 +1,5 @@
 """Serviço da Carteira — operações atómicas sobre saldos + ledger (W1)."""
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.db import transaction
 from django.utils import timezone
 from .models import Wallet, WalletTransaction, WalletEntry, EscrowHolding
@@ -246,11 +246,40 @@ def get_available_balance(wallet):
 
 @transaction.atomic
 def request_payout(user, *, role, amount, method, account_details):
-    """Cria um pedido de saque e reserva o valor no saldo de saque."""
+    """Cria um pedido de saque, reserva o valor bruto e fixa a taxa aplicada."""
     from .models import PayoutRequest
-    amount = Decimal(str(amount))
-    if amount <= 0:
+    try:
+        amount = Decimal(str(amount))
+        rounded_amount = amount.quantize(Decimal('0.01'))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError('Valor de saque inválido.') from exc
+    if not amount.is_finite() or amount != rounded_amount or amount <= 0:
         raise ValueError('Valor de saque inválido.')
+    if role not in ('seller', 'affiliate'):
+        raise ValueError('Perfil de saque inválido.')
+    if method not in ('mpesa', 'emola', 'bank'):
+        raise ValueError('Método de saque inválido.')
+
+    from apps.affiliates.models import AffiliateKYC, AffiliateProfile
+    affiliate_profile = AffiliateProfile.objects.filter(user=user).first()
+    if affiliate_profile:
+        if not affiliate_profile.is_active or affiliate_profile.status != 'active':
+            raise ValueError('A conta de afiliado não está ativa para solicitar saques.')
+        kyc = AffiliateKYC.objects.filter(affiliate=affiliate_profile, status='approved').first()
+        if not kyc:
+            raise ValueError('É necessária a verificação aprovada da conta (KYC) antes de solicitar saques.')
+    if role == 'affiliate':
+        if not affiliate_profile:
+            raise ValueError('Não existe uma conta de afiliado para este utilizador.')
+        from apps.affiliates.models import AffiliateSettings
+        settings_obj = AffiliateSettings.get_settings()
+        if amount < settings_obj.min_payout_amount:
+            raise ValueError(f'O valor mínimo de saque é {settings_obj.min_payout_amount} MZN.')
+        fee_percent = Decimal('5.00')
+    else:
+        fee_percent = Decimal('11.00')
+
+    fee = (amount * fee_percent / Decimal('100')).quantize(Decimal('0.01'))
 
     wallet = Wallet.objects.select_for_update().get(pk=get_wallet(user).pk)
     available = get_available_balance(wallet)
@@ -260,7 +289,7 @@ def request_payout(user, *, role, amount, method, account_details):
         )
 
     payout = PayoutRequest.objects.create(
-        user=user, role=role, amount=amount, method=method,
+        user=user, role=role, amount=amount, fee_percent=fee_percent, fee=fee, method=method,
         account_details=account_details or {},
     )
     wallet.reserved_balance += amount
@@ -270,7 +299,8 @@ def request_payout(user, *, role, amount, method, account_details):
         lambda: email_service.dispatch(
             email_service.send_admin_alert_email,
             'Novo pedido de saque',
-            f'{user.email} solicitou um saque de {amount} MZN ({role}).',
+            f'{user.email} solicitou um saque bruto de {amount} MZN ({role}). '
+            f'Taxa: {fee} MZN; valor líquido para transferência manual: {amount - fee} MZN.',
         )
     )
     return payout
@@ -300,6 +330,9 @@ def pay_payout(payout, admin, reference=''):
     payout = PayoutRequest.objects.select_for_update().get(pk=payout.pk)
     if payout.status != 'approved':
         raise ValueError('O saque deve ser aprovado antes de ser marcado como pago.')
+    reference = reference.strip()
+    if not reference:
+        raise ValueError('Indique a referência da transferência manual antes de marcar o saque como pago.')
 
     wallet = Wallet.objects.select_for_update().get(pk=get_wallet(payout.user).pk)
 
@@ -307,27 +340,43 @@ def pay_payout(payout, admin, reference=''):
     if WalletTransaction.objects.filter(idempotency_key=idem_key).exists():
         return payout
 
-    wallet.reserved_balance = max(wallet.reserved_balance - payout.amount, Decimal('0'))
+    if wallet.reserved_balance < payout.amount:
+        raise ValueError('A reserva deste saque não corresponde ao saldo reservado da carteira.')
     if wallet.payout_balance < payout.amount:
         raise InsufficientFunds('Saldo de saque insuficiente.')
     balance_before = wallet.payout_balance
     wallet.payout_balance -= payout.amount
+    wallet.reserved_balance -= payout.amount
     wallet.total_withdrawn += payout.amount
     wallet.save(update_fields=['reserved_balance', 'payout_balance', 'total_withdrawn'])
-    balance_after = wallet.payout_balance
+    transfer_balance_after = balance_before - payout.net_amount
 
     txn = WalletTransaction.objects.create(
-        wallet=wallet, type='withdrawal', amount=-payout.amount,
-        balance_before=balance_before, balance_after=balance_after,
+        wallet=wallet, type='withdrawal', amount=-payout.net_amount,
+        balance_before=balance_before, balance_after=transfer_balance_after,
         reference_type='payout', reference_id=payout.id,
-        description=f'Saque ({payout.get_method_display()})', status='completed',
+        description=f'Transferência manual de saque ({payout.get_method_display()})', status='completed',
         idempotency_key=idem_key,
     )
     WalletEntry.objects.create(
-        wallet=wallet, transaction=txn, direction='debit', amount=payout.amount,
-        balance_before=balance_before, balance_after=balance_after, kind='payout',
+        wallet=wallet, transaction=txn, direction='debit', amount=payout.net_amount,
+        balance_before=balance_before, balance_after=transfer_balance_after, kind='payout',
         counterparty='external',
     )
+    if payout.fee:
+        fee_balance_after = transfer_balance_after - payout.fee
+        fee_txn = WalletTransaction.objects.create(
+            wallet=wallet, type='fee', amount=-payout.fee,
+            balance_before=transfer_balance_after, balance_after=fee_balance_after,
+            reference_type='payout', reference_id=payout.id,
+            description=f'Taxa de saque ({payout.fee_percent}%)', status='completed',
+            idempotency_key=f'payout:{payout.id}:fee',
+        )
+        WalletEntry.objects.create(
+            wallet=wallet, transaction=fee_txn, direction='debit', amount=payout.fee,
+            balance_before=transfer_balance_after, balance_after=fee_balance_after,
+            kind='payout', counterparty='platform',
+        )
 
     payout.status = 'paid'
     payout.paid_by = admin
@@ -349,7 +398,9 @@ def reject_payout(payout, admin, reason=''):
         return payout
 
     wallet = Wallet.objects.select_for_update().get(pk=get_wallet(payout.user).pk)
-    wallet.reserved_balance = max(wallet.reserved_balance - payout.amount, Decimal('0'))
+    if wallet.reserved_balance < payout.amount:
+        raise ValueError('A reserva deste saque não corresponde ao saldo reservado da carteira.')
+    wallet.reserved_balance -= payout.amount
     wallet.save(update_fields=['reserved_balance'])
 
     payout.status = 'rejected'

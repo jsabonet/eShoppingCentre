@@ -124,6 +124,8 @@ class PayoutRequest(BaseModel):
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='payout_requests')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='seller')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    fee_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    fee = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     method = models.CharField(max_length=20, choices=METHOD_CHOICES, default='mpesa')
     account_details = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -140,3 +142,7 @@ class PayoutRequest(BaseModel):
 
     def __str__(self):
         return f'{self.role} {self.user.email} — {self.amount} MZN ({self.status})'
+
+    @property
+    def net_amount(self):
+        return self.amount - self.fee
