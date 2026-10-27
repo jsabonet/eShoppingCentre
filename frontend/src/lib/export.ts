@@ -17,6 +17,7 @@ export interface ReportOptions {
   reference?: string;
   filters?: ReportContextItem[];
   summary?: ReportContextItem[];
+  pdfSections?: Array<{ title: string; items: ReportContextItem[] }>;
   notes?: string[];
   columns?: string[];
 }
@@ -205,11 +206,11 @@ export async function downloadReportFromObjects(
   });
   cursorY = getFinalY(cursorY + 20);
 
-  if (options.summary?.length) {
-    const headingY = sectionHeading('Resumo', cursorY);
+  const renderSummarySection = (label: string, items: ReportContextItem[]) => {
+    const headingY = sectionHeading(label, cursorY);
     const summaryGroups: ReportContextItem[][] = [];
-    for (let index = 0; index < options.summary.length; index += 4) {
-      summaryGroups.push(options.summary.slice(index, index + 4));
+    for (let index = 0; index < items.length; index += 4) {
+      summaryGroups.push(items.slice(index, index + 4));
     }
     for (const [groupIndex, group] of summaryGroups.entries()) {
       const cells = [...group, ...Array.from(
@@ -244,7 +245,11 @@ export async function downloadReportFromObjects(
       });
     }
     cursorY = getFinalY(headingY) + 2;
-  }
+  };
+  options.pdfSections?.forEach((section) => {
+    if (section.items.length) renderSummarySection(section.title, section.items);
+  });
+  if (options.summary?.length) renderSummarySection('Resumo', options.summary);
 
   const criteriaRows = [
     ...(options.filters || []).map((filter) => [
