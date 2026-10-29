@@ -18,6 +18,28 @@ docker compose exec backend python manage.py review_test_data_cleanup
 O comando imprime um relatório JSON no terminal. É estritamente de leitura:
 não possui modo de exclusão ou atualização e não requer migrações.
 
+Para listar as lojas e as dependências antes de escolher quais devem ser
+removidas:
+
+```bash
+docker compose exec backend python manage.py inventory_stores_for_review
+```
+
+O relatório identifica cada loja pelo ID e nome, inclui o estado e apresenta
+contagens de produtos, pedidos, avaliações, pagamentos e relações do
+proprietário. Também indica encomendas do proprietário como comprador noutras
+lojas, que poderiam ser afetadas pela eliminação da conta. Não inclui emails ou
+outros dados pessoais.
+
+Para fazer o inventário das métricas antes de definir o reset:
+
+```bash
+docker compose exec backend python manage.py inventory_metrics_for_reset
+```
+
+Este relatório resume eventos de views/pesquisas, contadores de vendas,
+afiliados, ratings e campanhas. Não altera contadores nem remove eventos.
+
 ## O que o relatório mostra
 
 - IDs e referências das encomendas com `payment_method=test`, estado, valor e
@@ -53,3 +75,6 @@ incluídos apenas para permitir uma revisão administrativa autorizada.
 6. Antes de qualquer limpeza futura, obter backup verificável, produzir um
    plano com contagens/IDs, rever o plano e definir uma estratégia reversível
    ou compensatória. Este comando não executa essa limpeza.
+7. Eliminar uma conta proprietária pode afetar compras e dados dessa pessoa
+   noutras lojas. Obter uma decisão explícita depois de revisar as dependências
+   por loja; não assumir que “dados relacionados à loja” são exclusivos dela.
