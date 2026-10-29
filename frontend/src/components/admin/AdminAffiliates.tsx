@@ -235,14 +235,14 @@ export default function AdminAffiliates() {
     : view === 'commissions' ? filteredCommissions : filteredPayouts;
 
   return (
-    <div>
+    <div className="w-full min-w-0">
       {toast && (
         <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-2 ${toast.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
           {toast.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.text}
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold">Gestão de Afiliados</h2>
           <p className="text-sm text-muted-foreground">{affiliates.length} afiliados · {payouts.filter(p => p.status === 'pending').length} saques pendentes</p>
@@ -251,7 +251,7 @@ export default function AdminAffiliates() {
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex gap-1 mb-4 bg-white rounded-lg p-1 border border-border w-fit">
+      <div className="mb-4 flex w-full gap-1 overflow-x-auto rounded-lg border border-border bg-white p-1 sm:w-fit">
         {([
           { id: 'affiliates', label: 'Afiliados', icon: Users },
           { id: 'commissions', label: 'Comissões', icon: DollarSign },
@@ -260,31 +260,31 @@ export default function AdminAffiliates() {
           { id: 'settings', label: 'Configurações', icon: Settings },
         ] as const).map(t => (
           <button key={t.id} onClick={() => { setView(t.id); setStatusFilter('all'); }}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${view === t.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${view === t.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
             <t.icon size={16} /> {t.label}
           </button>
         ))}
       </div>
 
       {view !== 'kyc' && view !== 'settings' && (
-        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-white p-4 lg:flex-row lg:items-end">
+        <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-border bg-white p-3 sm:grid-cols-2 sm:p-4 lg:flex lg:items-end">
           <label className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar afiliado, encomenda ou produto"
               className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm" />
           </label>
           {view !== 'affiliates' && <>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">De
+            <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">De
               <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)}
-                className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+                className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
             </label>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">Até
+            <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">Até
               <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)}
-                className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
+                className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground" />
             </label>
           </>}
           <select aria-label="Filtrar por estado" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+            className="w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm lg:w-auto">
             <option value="all">Todos os estados</option>
             {(view === 'affiliates' ? ['active', 'pending', 'suspended'] : ['pending', 'approved', 'paid', 'rejected'])
               .map((status) => <option key={status} value={status}>
@@ -292,11 +292,11 @@ export default function AdminAffiliates() {
               </option>)}
           </select>
           <select aria-label="Formato do relatório" value={reportFormat} onChange={(event) => setReportFormat(event.target.value as ReportFormat)}
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+            className="w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm lg:w-auto">
             <option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="pdf">PDF</option>
           </select>
           <button type="button" onClick={exportCurrentReport} disabled={!activeRows.length || Boolean(dateFrom) !== Boolean(dateTo)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50 lg:w-auto">
             <Download size={15} /> Exportar
           </button>
         </div>
@@ -308,7 +308,7 @@ export default function AdminAffiliates() {
         <>
           {view === 'affiliates' && (
             <div className="bg-white rounded-xl border border-border overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b-2 border-border bg-muted/20">
                     <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Afiliado</th>
@@ -347,12 +347,39 @@ export default function AdminAffiliates() {
                   </tbody>
                 </table>
               </div>
+              <div className="divide-y divide-border lg:hidden">
+                {filteredAffiliates.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-muted-foreground">Nenhum afiliado encontrado.</p>
+                ) : filteredAffiliates.map((a) => (
+                  <article key={a.id} className="space-y-3 p-4">
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold">{a.user_name || a.user_email}</p>
+                        <p className="break-all font-mono text-xs text-muted-foreground">{a.referral_code}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${a.status === 'active' ? 'bg-green-100 text-green-700' : a.status === 'suspended' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {a.status === 'active' ? 'Activo' : a.status === 'suspended' ? 'Suspenso' : 'Pendente'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/20 p-3 text-xs">
+                      <div><p className="text-muted-foreground">Nível</p><p className="mt-1 font-medium capitalize">{a.commission_tier}</p></div>
+                      <div><p className="text-muted-foreground">Cliques</p><p className="mt-1 font-medium">{a.total_clicks}</p></div>
+                      <div><p className="text-muted-foreground">Vendas</p><p className="mt-1 font-medium">{a.total_sales}</p></div>
+                      <div><p className="text-muted-foreground">Comissão</p><p className="mt-1 font-semibold">{Number(a.total_commission).toLocaleString('pt-MZ')} MZN</p></div>
+                    </div>
+                    <button onClick={() => updateStatus(a.id, a.status === 'active' ? 'suspended' : 'active')}
+                      className={`min-h-10 w-full rounded-lg px-3 py-2 text-sm font-semibold ${a.status === 'active' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
+                      {a.status === 'active' ? <><Ban size={14} className="mr-1 inline" />Suspender</> : <><ShieldCheck size={14} className="mr-1 inline" />Activar</>}
+                    </button>
+                  </article>
+                ))}
+              </div>
             </div>
           )}
 
           {view === 'commissions' && (
             <div className="bg-white rounded-xl border border-border overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b-2 border-border bg-muted/20">
                     <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Encomenda</th>
@@ -385,12 +412,37 @@ export default function AdminAffiliates() {
                   </tbody>
                 </table>
               </div>
+              <div className="divide-y divide-border lg:hidden">
+                {filteredCommissions.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma comissão encontrada.</p>
+                ) : filteredCommissions.map((c) => (
+                  <article key={c.id} className="space-y-3 p-4">
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs font-semibold">{c.order_number || 'Encomenda sem referência'}</p>
+                        <p className="mt-1 break-all text-xs text-muted-foreground">{c.affiliate_email || '—'}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_COLOR[c.status] || 'bg-gray-100 text-gray-700'}`}>{STATUS_LABEL[c.status] || c.status}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/20 p-3 text-xs">
+                      <div><p className="text-muted-foreground">Comissão</p><p className="mt-1 font-semibold">{Number(c.amount).toLocaleString('pt-MZ')} MZN</p></div>
+                      <div><p className="text-muted-foreground">Taxa</p><p className="mt-1 font-medium">{Number(c.commission_rate)}%</p></div>
+                    </div>
+                    {c.status === 'pending' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => commissionAction(c.id, 'approve')} className="min-h-10 rounded-lg bg-green-100 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-200">Aprovar</button>
+                        <button onClick={() => commissionAction(c.id, 'reject')} className="min-h-10 rounded-lg bg-red-100 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-200">Rejeitar</button>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
             </div>
           )}
 
           {view === 'payouts' && (
             <div className="bg-white rounded-xl border border-border overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b-2 border-border bg-muted/20">
                     <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Afiliado</th>
@@ -431,12 +483,41 @@ export default function AdminAffiliates() {
                   </tbody>
                 </table>
               </div>
+              <div className="divide-y divide-border lg:hidden">
+                {filteredPayouts.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-muted-foreground">Nenhum saque encontrado.</p>
+                ) : filteredPayouts.map((p) => (
+                  <article key={p.id} className="space-y-3 p-4">
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <p className="min-w-0 break-all text-xs font-medium">{p.affiliate_email || 'Afiliado sem email'}</p>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-700'}`}>{STATUS_LABEL[p.status] || p.status}</span>
+                    </div>
+                    <div className="space-y-2 rounded-lg bg-muted/20 p-3 text-xs">
+                      <div className="flex justify-between gap-2"><span className="text-muted-foreground">Valor bruto</span><span className="text-right font-semibold">{Number(p.amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</span></div>
+                      <div className="flex justify-between gap-2"><span className="text-muted-foreground">Taxa</span><span className="text-right">{Number(p.fee || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</span></div>
+                      <div className="flex justify-between gap-2"><span className="text-muted-foreground">A transferir</span><span className="text-right font-semibold">{Number(p.net_amount || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</span></div>
+                      <div className="flex justify-between gap-2"><span className="text-muted-foreground">Método</span><span className="text-right uppercase">{p.method}</span></div>
+                    </div>
+                    {(p.status === 'pending' || p.status === 'approved') && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {p.status === 'pending' ? (
+                          <button onClick={() => payoutAction(p.id, 'approve')} className="min-h-10 rounded-lg bg-green-100 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-200">Aprovar</button>
+                        ) : (
+                          <button onClick={() => payoutAction(p.id, 'pay')} className="min-h-10 rounded-lg bg-blue-100 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-200">Registar transferência</button>
+                        )}
+                        <button onClick={() => payoutAction(p.id, 'reject')} className="min-h-10 rounded-lg bg-red-100 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-200">Rejeitar</button>
+                      </div>
+                    )}
+                    {p.admin_reference && <p className="break-all text-xs text-muted-foreground">Referência: {p.admin_reference}</p>}
+                  </article>
+                ))}
+              </div>
             </div>
           )}
 
           {view === 'kyc' && (
             <div className="bg-white rounded-xl border border-border overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b-2 border-border bg-muted/20">
                     <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase">Afiliado</th>
@@ -473,11 +554,36 @@ export default function AdminAffiliates() {
                   </tbody>
                 </table>
               </div>
+              <div className="divide-y divide-border lg:hidden">
+                {kycList.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma verificação pendente.</p>
+                ) : kycList.map((k) => (
+                  <article key={k.id} className="space-y-3 p-4">
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <p className="min-w-0 break-all text-xs font-medium">{k.affiliate_email}</p>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${k.status === 'approved' ? 'bg-green-100 text-green-700' : k.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {k.status === 'approved' ? 'Aprovado' : k.status === 'rejected' ? 'Rejeitado' : 'Pendente'}
+                      </span>
+                    </div>
+                    <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted/20 p-3 text-xs">
+                      <div><dt className="text-muted-foreground">Documento</dt><dd className="mt-1 break-words font-medium">{k.document_number}</dd></div>
+                      <div><dt className="text-muted-foreground">NUIT</dt><dd className="mt-1 break-words font-medium">{k.nuit || '—'}</dd></div>
+                      <div className="col-span-2"><dt className="text-muted-foreground">Telefone</dt><dd className="mt-1 break-words font-medium">{k.payout_phone}</dd></div>
+                    </dl>
+                    {k.status === 'pending' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => kycAction(k.id, 'approve')} className="min-h-10 rounded-lg bg-green-100 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-200">Aprovar</button>
+                        <button onClick={() => kycAction(k.id, 'reject')} className="min-h-10 rounded-lg bg-red-100 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-200">Rejeitar</button>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
             </div>
           )}
 
           {view === 'settings' && settings && (
-            <form onSubmit={saveSettings} className="bg-white rounded-xl border border-border p-6 max-w-md space-y-4">
+            <form onSubmit={saveSettings} className="w-full max-w-md space-y-4 rounded-xl border border-border bg-white p-4 sm:p-6">
               <div className="flex items-center gap-2 mb-2"><Percent size={16} className="text-accent" /><h3 className="font-bold">Configurações do Programa</h3></div>
               <div>
                 <label className="block text-xs font-semibold mb-1">Janela de atribuição (dias)</label>
