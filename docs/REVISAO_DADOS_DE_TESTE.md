@@ -71,6 +71,25 @@ separada sobre o seu escopo.
 Ficheiros em armazenamento externo e relações não incluídas no relatório
 precisam de inventário e revisão separados.
 
+### Inventário do impacto de encomendas ligadas
+
+Para mapear encomendas e transações partilhadas, incluindo ligações em cadeia,
+execute o inventário adicional:
+
+```bash
+docker compose exec backend python manage.py inventory_store_purge_impact \
+  7595e91f-964c-44af-8479-9b3d368f3b7f \
+  2f7b76a7-c89f-4bdd-815e-e925b753cb51 \
+  4f8388f9-f9e0-4a38-8d6e-f41695a87bd7 \
+  b5f693a9-e200-48eb-b545-03a3bbdb874d
+```
+
+O comando percorre recursivamente todas as encomendas ligadas por tentativas
+de pagamento e apresenta IDs, lojas, estados, compradores (somente IDs),
+transações e um hash do escopo. É somente de leitura. O hash não autoriza nem
+executa uma eliminação; qualquer operação destrutiva exige uma ferramenta
+separada, revisão do relatório completo e confirmação específica.
+
 ## O que o relatório mostra
 
 - IDs e referências das encomendas com `payment_method=test`, estado, valor e
