@@ -3,6 +3,16 @@ from django.utils.text import slugify
 from apps.core.models import BaseModel
 
 
+class StoreQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        updated_count = super().update(**kwargs)
+        if updated_count and 'status' in kwargs:
+            from apps.stores.featured import invalidate_featured_stores_cache
+
+            invalidate_featured_stores_cache(using=self.db)
+        return updated_count
+
+
 class Store(BaseModel):
     STATUS_CHOICES = [
         ('pending', 'Pendente'),
@@ -20,6 +30,7 @@ class Store(BaseModel):
     ]
 
     owner = models.OneToOneField('users.User', on_delete=models.CASCADE, related_name='store')
+    objects = StoreQuerySet.as_manager()
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     description = models.TextField()

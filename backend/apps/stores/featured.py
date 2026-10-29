@@ -6,6 +6,7 @@ Sem machine learning — mesma filosofia de apps/products/scoring.py.
 import logging
 
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Count, Q
 
 from .models import Store
@@ -99,3 +100,11 @@ def get_featured_stores():
     else:
         logger.info('[featured] cache hit: %d lojas', len(data))
     return data
+
+
+def invalidate_featured_stores_cache(using='default'):
+    """Remove a lista em cache após alterações confirmadas nas lojas."""
+    transaction.on_commit(
+        lambda: cache.delete(FEATURED_STORES_CACHE_KEY),
+        using=using,
+    )
