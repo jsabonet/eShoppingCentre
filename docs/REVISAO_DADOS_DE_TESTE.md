@@ -206,3 +206,45 @@ não elimina os dados. Guarde o JSON final e verifique
 `external_asset_cleanup.results`: falhas de remoção de ficheiros ou vídeos
 externos são reportadas depois da transação da base de dados, com a referência
 do ativo que falhou, e exigem intervenção operacional.
+
+## Reset de Saques & Reconciliação
+
+Os valores do painel não são contadores isolados. São agregados diretamente
+de `Order`, `PaymentTransaction`, `WalletTransaction`, `WalletEntry`,
+`AffiliateCommission`, `AffiliatePayout`, `PayoutRequest`, `EscrowHolding` e
+dos campos monetários de `Wallet`. O comando abaixo apaga os registos de origem
+em todos os períodos e coloca os campos monetários das carteiras a zero; não
+apaga contas de utilizador, lojas nem produtos.
+
+**Isto apaga também encomendas reais e os respetivos itens, tentativas de
+pagamento, downloads, devoluções e tickets que dependam delas.** Relações com
+`SET_NULL` podem manter reviews/conversas, mas sem a encomenda. Não é uma
+limpeza exclusiva de métricas e não deve ser executada se for necessário
+preservar histórico financeiro, prova de pagamentos, pedidos de saque ou
+reconciliação contabilística. Os ficheiros/media não são removidos.
+
+O comando é somente de leitura por padrão. No servidor, primeiro gere e reveja
+o manifesto:
+
+```bash
+docker compose exec backend python manage.py reset_wallet_reconciliation_data
+```
+
+O JSON apresenta contagens por modelo, total de encomendas pagas e um hash
+SHA-256 do escopo atual. Crie e valide um backup restaurável fora do servidor
+antes de prosseguir. Só depois de confirmar que a eliminação de todo o
+histórico está autorizada, use o hash exato do dry-run:
+
+```bash
+IMPACT_HASH='cole_aqui_o_hash_sha256_do_dry_run'
+docker compose exec backend python manage.py reset_wallet_reconciliation_data \
+  --execute \
+  --backup-verified \
+  --confirm-financial-history-erasure \
+  --confirm-impact "$IMPACT_HASH"
+```
+
+Os três argumentos de confirmação são obrigatórios. Se qualquer dado mudar
+entre a revisão e a execução, o hash deixa de corresponder e a transação é
+abortada. O comando não foi executado em produção durante a preparação desta
+documentação.
