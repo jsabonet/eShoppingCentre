@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from django.db.models import Count, Sum
+from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
@@ -11,6 +12,7 @@ from django.db.models import Q
 from apps.notifications import email_service
 from apps.users.models import User
 from apps.stores.models import Store
+from apps.stores.serializers import StoreDetailSerializer
 from apps.orders.models import Order
 from apps.wallet.models import WalletTransaction, Wallet
 from apps.affiliates.models import AffiliateProfile
@@ -155,6 +157,105 @@ class AdminAllStoresView(generics.ListAPIView):
         return AdminStoreReportSerializer
 
 
+class AdminStoreOwnerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserModel
+        fields = ('id', 'email', 'first_name', 'last_name', 'phone', 'roles')
+
+
+class AdminStoreOwnerListView(generics.ListAPIView):
+    """Admin: utilizadores activos ainda sem loja, para atribuir uma nova loja."""
+    permission_classes = [permissions.IsAdminUser]
+    serializer_class = AdminStoreOwnerSerializer
+
+    def get_queryset(self):
+        queryset = UserModel.objects.filter(
+            store__isnull=True,
+            is_active=True,
+            deleted_at__isnull=True,
+        ).order_by('email')
+        search = self.request.query_params.get('search', '').strip()
+        if len(search) > 100:
+            raise ValidationError({'search': 'A pesquisa não pode exceder 100 caracteres.'})
+        if search:
+            queryset = queryset.filter(
+                Q(email__icontains=search) |
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search)
+            )
+        return queryset
+
+
+class AdminStoreCreateSerializer(StoreDetailSerializer):
+    owner = serializers.PrimaryKeyRelatedField(queryset=UserModel.objects.filter(
+        is_active=True,
+        deleted_at__isnull=True,
+        store__isnull=True,
+    ))
+    product_type = serializers.ChoiceField(choices=Store.PRODUCT_TYPE_CHOICES)
+    status = serializers.ChoiceField(choices=Store.STATUS_CHOICES, default='pending')
+    default_affiliate_commission = serializers.DecimalField(
+        max_digits=5, decimal_places=2, required=False,
+    )
+    low_stock_threshold = serializers.IntegerField(required=False, min_value=0)
+
+    def validate_owner(self, owner):
+        if not owner.is_active or owner.deleted_at is not None:
+            raise serializers.ValidationError('O utilizador seleccionado não está activo.')
+        if Store.objects.filter(owner=owner).exists():
+            raise serializers.ValidationError('Este utilizador já tem uma loja.')
+        return owner
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        defaults = {
+            'physical': (10, 5),
+            'digital': (15, 0),
+            'course': (20, 0),
+        }
+        commission, stock_threshold = defaults[attrs['product_type']]
+        attrs.setdefault('default_affiliate_commission', commission)
+        attrs.setdefault('low_stock_threshold', stock_threshold)
+        self.validate_default_affiliate_commission(attrs['default_affiliate_commission'])
+        return attrs
+
+    def create(self, validated_data):
+        owner = UserModel.objects.select_for_update().get(pk=validated_data['owner'].pk)
+        if not owner.is_active or owner.deleted_at is not None:
+            raise serializers.ValidationError({'owner': 'O utilizador seleccionado não está activo.'})
+        if Store.objects.filter(owner=owner).exists():
+            raise serializers.ValidationError({'owner': 'Este utilizador já tem uma loja.'})
+        validated_data['owner'] = owner
+        roles = list(owner.roles or [])
+        if 'seller' not in roles:
+            owner.roles = [*roles, 'seller']
+            owner.save(update_fields=['roles'])
+        return super().create(validated_data)
+
+
+class AdminStoreUpdateSerializer(StoreDetailSerializer):
+    admin_notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class AdminStoreCreateView(generics.CreateAPIView):
+    """Admin: criar loja para um utilizador sem loja associada."""
+    permission_classes = [permissions.IsAdminUser]
+    serializer_class = AdminStoreCreateSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {'detail': 'A loja ou proprietário foi alterado por outro pedido. Actualize e tente novamente.'},
+                status=409,
+            )
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        serializer.save()
+
+
 class AdminStoreManageView(APIView):
     """Admin: gerir loja (aprovar, rejeitar, suspender, reactivar, actualizar, eliminar)"""
     permission_classes = [permissions.IsAdminUser]
@@ -165,7 +266,6 @@ class AdminStoreManageView(APIView):
             store = Store.objects.select_related('owner__profile').prefetch_related('moderation_logs').get(id=pk)
         except Store.DoesNotExist:
             return Response({'detail': 'Loja não encontrada.'}, status=404)
-        from apps.stores.serializers import StoreDetailSerializer
         return Response(StoreDetailSerializer(store).data)
 
     def _log_moderation(self, store, action, reason='', previous_status=''):
@@ -219,6 +319,8 @@ class AdminStoreManageView(APIView):
 
     def patch(self, request, pk):
         action = request.data.get('action', '')
+        if not isinstance(action, str):
+            return Response({'detail': 'A acção deve ser uma string.'}, status=400)
 
         try:
             store = Store.objects.get(id=pk)
@@ -244,15 +346,23 @@ class AdminStoreManageView(APIView):
             if action == 'clear_documents':
                 docs_to_clear = request.data.get('documents', [])
                 doc_fields = ['identity_document', 'tax_document', 'address_proof', 'additional_documents']
+                if (
+                    not isinstance(docs_to_clear, list)
+                    or not docs_to_clear
+                    or any(not isinstance(doc, str) or doc not in doc_fields for doc in docs_to_clear)
+                    or len(set(docs_to_clear)) != len(docs_to_clear)
+                ):
+                    return Response(
+                        {'documents': 'Indique uma lista não vazia de documentos válidos, sem duplicados.'},
+                        status=400,
+                    )
                 for doc in docs_to_clear:
-                    if doc in doc_fields:
-                        field = getattr(store, doc)
-                        if field:
-                            field.delete(save=False)
-                        setattr(store, doc, '')
+                    field = getattr(store, doc)
+                    if field:
+                        field.delete(save=False)
+                    setattr(store, doc, '')
                 store.save()
                 self._log_moderation(store, 'edited', f'Documentos removidos: {", ".join(docs_to_clear)}', store.status)
-                from apps.stores.serializers import StoreDetailSerializer
                 return Response(StoreDetailSerializer(store).data)
 
             previous_status = store.status
@@ -260,6 +370,10 @@ class AdminStoreManageView(APIView):
 
             # Guardar motivo de rejeição
             reason = request.data.get('reason', '')
+            if not isinstance(reason, str) or len(reason) > 2000:
+                return Response({'reason': 'O motivo deve ser texto com no máximo 2000 caracteres.'}, status=400)
+            if action == 'reject' and not reason.strip():
+                return Response({'reason': 'Indique o motivo da rejeição.'}, status=400)
             if action == 'reject' and reason:
                 store.rejection_reason = reason
 
@@ -304,25 +418,27 @@ class AdminStoreManageView(APIView):
                         owner_email, owner_first_name, store.name, reason_text,
                     )
 
-            from apps.stores.serializers import StoreDetailSerializer
             return Response(StoreDetailSerializer(store).data)
 
         # ─── Full field update (sem action = edição de campos) ───
-        editable = ['name', 'slug', 'description', 'about', 'tagline', 'category',
-                    'location', 'phone', 'email', 'website', 'shipping_policy',
-                    'return_policy', 'default_affiliate_commission', 'low_stock_threshold',
-                    'theme_color', 'admin_notes']
-        changed = False
-        for field in editable:
-            if field in request.data:
-                setattr(store, field, request.data[field])
-                changed = True
-
-        if changed:
-            store.save()
+        serializer = AdminStoreUpdateSerializer(
+            store,
+            data=request.data,
+            partial=True,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        if serializer.validated_data:
+            try:
+                with transaction.atomic():
+                    store = serializer.save()
+            except IntegrityError:
+                return Response(
+                    {'detail': 'O nome ou endereço da loja foi alterado por outro pedido. Actualize e tente novamente.'},
+                    status=409,
+                )
             self._log_moderation(store, 'edited', 'Campos actualizados por administrador', store.status)
 
-        from apps.stores.serializers import StoreDetailSerializer
         return Response(StoreDetailSerializer(store).data)
 
 

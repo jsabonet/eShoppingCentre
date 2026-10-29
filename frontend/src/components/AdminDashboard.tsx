@@ -965,9 +965,15 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
         {activeTab === 'stores' && (
           <div>
             <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-white p-4">
-              <div>
-                <h2 className="text-lg font-bold">Gestão de Lojas</h2>
-                <p className="text-xs text-muted-foreground">Filtre lojas e exporte os resultados em CSV, Excel ou PDF.</p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold">Gestão de Lojas</h2>
+                  <p className="text-xs text-muted-foreground">Filtre lojas e exporte os resultados em CSV, Excel ou PDF.</p>
+                </div>
+                <Link href="/admin/stores/new/edit"
+                  className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90">
+                  <Plus size={15} /> Criar Loja
+                </Link>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground xl:col-span-2">Pesquisar

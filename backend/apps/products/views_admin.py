@@ -1,6 +1,13 @@
+from django.core.cache import cache
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.utils.text import slugify
 from rest_framework import generics, permissions, serializers
-from .models import Category, Product
-from .serializers import CategorySerializer
+from .models import Category, Product, ProductImage, StockLog
+from .serializers import (
+    AdminStoreProductSerializer, CategorySerializer, ProductImageSerializer,
+)
+from apps.stores.models import Store
 
 
 class AdminProductReportSerializer(serializers.ModelSerializer):
@@ -71,3 +78,102 @@ class AdminProductListView(generics.ListAPIView):
         if date_from:
             queryset = queryset.filter(created_at__date__gte=date_from, created_at__date__lte=date_to)
         return queryset
+
+
+class AdminStoreProductListCreateView(generics.ListCreateAPIView):
+    """Admin: listar e criar produtos dentro de uma loja específica."""
+    serializer_class = AdminStoreProductSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_store(self):
+        return get_object_or_404(Store, pk=self.kwargs['store_id'])
+
+    def get_queryset(self):
+        self.get_store()
+        return Product.objects.filter(store_id=self.kwargs['store_id']).select_related(
+            'store', 'category', 'course'
+        ).prefetch_related('images').order_by('-created_at')
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        store = self.get_store()
+        product_slug = slugify(serializer.validated_data.get('slug') or serializer.validated_data['name'])
+        base_slug = product_slug or 'produto'
+        product_slug = base_slug
+        suffix = 2
+        while Product.objects.filter(store=store, slug=product_slug).exists():
+            product_slug = f'{base_slug}-{suffix}'
+            suffix += 1
+        serializer.save(store=store, product_type=store.product_type, slug=product_slug)
+        cache.delete('home_sections')
+
+
+class AdminStoreProductDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin: ler, editar ou remover (soft delete) produto da loja indicada."""
+    serializer_class = AdminStoreProductSerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = Product.objects.select_related('store', 'category', 'course').prefetch_related('images')
+
+    def get_queryset(self):
+        return super().get_queryset().filter(store_id=self.kwargs['store_id'])
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        old_stock = serializer.instance.stock
+        product = serializer.save()
+        if product.stock != old_stock:
+            StockLog.objects.create(
+                product=product,
+                change_type='adjustment',
+                quantity=product.stock - old_stock,
+                stock_before=old_stock,
+                stock_after=product.stock,
+                reference='Ajuste de inventário pelo administrador',
+                changed_by=self.request.user,
+                notes='Stock actualizado através da gestão de produtos da loja.',
+            )
+        cache.delete('home_sections')
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        instance.status = 'deleted'
+        instance.save(update_fields=['status', 'updated_at'])
+        cache.delete('home_sections')
+
+
+class AdminStoreProductImageListCreateView(generics.ListCreateAPIView):
+    """Admin: consultar/adicionar imagens aos produtos da loja."""
+    serializer_class = ProductImageSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return ProductImage.objects.filter(
+            product_id=self.kwargs['product_id'],
+            product__store_id=self.kwargs['store_id'],
+        )
+
+    def perform_create(self, serializer):
+        product = get_object_or_404(
+            Product, pk=self.kwargs['product_id'], store_id=self.kwargs['store_id']
+        )
+        with transaction.atomic():
+            if serializer.validated_data.get('is_primary'):
+                ProductImage.objects.filter(product=product, is_primary=True).update(is_primary=False)
+            serializer.save(product=product)
+        cache.delete('home_sections')
+
+
+class AdminStoreProductImageDeleteView(generics.DestroyAPIView):
+    """Admin: remover imagem apenas de produtos da loja indicada."""
+    serializer_class = ProductImageSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return ProductImage.objects.filter(
+            product_id=self.kwargs['product_id'],
+            product__store_id=self.kwargs['store_id'],
+        )
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        cache.delete('home_sections')

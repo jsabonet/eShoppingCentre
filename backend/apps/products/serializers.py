@@ -278,6 +278,112 @@ class CategorySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class AdminStoreProductSerializer(serializers.ModelSerializer):
+    category = serializers.SlugRelatedField(
+        slug_field='slug',
+        queryset=Category.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+    category_name = serializers.CharField(source='category.name', read_only=True, default='')
+    images = ProductImageSerializer(many=True, read_only=True)
+    course = serializers.SerializerMethodField()
+    course_level = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    course_duration = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    total_lessons = serializers.IntegerField(write_only=True, required=False, min_value=0)
+    access_duration_days = serializers.IntegerField(
+        write_only=True, required=False, allow_null=True, min_value=1
+    )
+
+    class Meta:
+        model = Product
+        fields = (
+            'id', 'name', 'slug', 'description', 'short_description', 'price',
+            'compare_price', 'category', 'category_name', 'product_type', 'status',
+            'stock', 'sku', 'barcode', 'brand', 'condition', 'weight', 'height',
+            'width', 'length', 'allow_backorder', 'min_order_quantity',
+            'meta_title', 'meta_description', 'video_url', 'warranty_days',
+            'is_featured', 'is_on_sale', 'sale_ends_at', 'rating', 'review_count',
+            'sales_count', 'featured_score', 'affiliate_commission',
+            'affiliate_enabled', 'affiliate_cookie_days', 'affiliate_terms',
+            'tags', 'specifications', 'digital_file', 'digital_file_size',
+            'digital_format', 'digital_version', 'digital_license',
+            'digital_compatibility', 'download_limit', 'download_expiry_days',
+            'images', 'course', 'course_level', 'course_duration',
+            'total_lessons', 'access_duration_days', 'created_at',
+        )
+        read_only_fields = (
+            'id', 'product_type', 'rating', 'review_count', 'sales_count',
+            'featured_score', 'digital_file_size', 'created_at',
+        )
+
+    def get_course(self, obj):
+        course = getattr(obj, 'course', None)
+        if not course:
+            return None
+        return {
+            'level': course.level,
+            'duration': course.duration,
+            'total_lessons': course.total_lessons,
+            'access_duration_days': course.access_duration_days,
+            'certificate_enabled': course.certificate_enabled,
+            'preview_video_url': course.preview_video_url,
+        }
+
+    def create(self, validated_data):
+        course_data = self._pop_course_data(validated_data)
+        product = super().create(validated_data)
+        if product.product_type == 'course':
+            self._save_course(product, course_data)
+        return product
+
+    def update(self, instance, validated_data):
+        course_data = self._pop_course_data(validated_data)
+        product = super().update(instance, validated_data)
+        if product.product_type == 'course' and course_data:
+            self._save_course(product, course_data)
+        return product
+
+    @staticmethod
+    def _pop_course_data(validated_data):
+        return {
+            'level': validated_data.pop('course_level', None),
+            'duration': validated_data.pop('course_duration', None),
+            'total_lessons': validated_data.pop('total_lessons', None),
+            'access_duration_days': validated_data.pop('access_duration_days', serializers.empty),
+        }
+
+    def _save_course(self, product, course_data):
+        from apps.courses.models import Course
+
+        course, _ = Course.objects.get_or_create(
+            product=product,
+            defaults={
+                'instructor': product.store.owner,
+                'level': course_data['level'] or 'beginner',
+                'duration': course_data['duration'] or '',
+                'total_lessons': course_data['total_lessons'] or 0,
+                'access_duration_days': (
+                    None if course_data['access_duration_days'] is serializers.empty
+                    else course_data['access_duration_days']
+                ),
+            },
+        )
+        updates = {}
+        if course_data['level'] is not None:
+            updates['level'] = course_data['level']
+        if course_data['duration'] is not None:
+            updates['duration'] = course_data['duration']
+        if course_data['total_lessons'] is not None:
+            updates['total_lessons'] = course_data['total_lessons']
+        if course_data['access_duration_days'] is not serializers.empty:
+            updates['access_duration_days'] = course_data['access_duration_days']
+        if updates:
+            for field, value in updates.items():
+                setattr(course, field, value)
+            course.save(update_fields=[*updates, 'updated_at'])
+
+
 class WishlistItemSerializer(serializers.ModelSerializer):
     product = ProductListSerializer(read_only=True)
     product_id = serializers.UUIDField(write_only=True)

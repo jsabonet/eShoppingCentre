@@ -5,12 +5,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Save, ChevronRight, Trash2, Loader2, Upload, Image,
-  Store, Phone, Mail, Globe, MapPin, Palette, Tag, FileText,
+  Store, Phone, Mail, Globe, MapPin, Palette, Tag, FileText, User,
   Shield, ShoppingBag, Banknote, Bell, MessageSquare, Eye
 } from 'lucide-react';
 import AdminLayout from '@/src/components/admin/AdminLayout';
 import { adminAPI } from '@/src/lib/api';
 import { useAuth } from '@/src/hooks/useAuth';
+import { STORE_CATEGORIES_BY_TYPE, STORE_LOCATIONS, STORE_THEME_COLORS } from '@/src/lib/storeOptions';
 
 const API_BASE = (process.env.NEXT_PUBLIC_MEDIA_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api\/v1\/?$/, '');
 
@@ -32,6 +33,7 @@ const SECTIONS = [
 
 export default function AdminStoreEditPage() {
   const { id } = useParams<{ id: string }>();
+  const isCreateMode = id === 'new';
   const router = useRouter();
   const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -39,8 +41,12 @@ export default function AdminStoreEditPage() {
   const [error, setError] = useState('');
   const [store, setStore] = useState<any>(null);
   const [form, setForm] = useState<any>({});
+  const [owners, setOwners] = useState<any[]>([]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [documentFiles, setDocumentFiles] = useState<Record<string, File | null>>({});
+  const [clearLogo, setClearLogo] = useState(false);
+  const [clearBanner, setClearBanner] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeSection, setActiveSection] = useState('general');
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -56,13 +62,37 @@ export default function AdminStoreEditPage() {
     if (!isAuthenticated || !isAdmin) return;
     (async () => {
       setLoading(true);
+      setError('');
       try {
+        if (isCreateMode) {
+          const [ownersResponse] = await Promise.all([
+            adminAPI.storeOwners({ page_size: 100 }),
+          ]);
+          let availableOwners = ownersResponse.data.results || ownersResponse.data || [];
+          const pageCount = ownersResponse.data.count
+            ? Math.ceil(ownersResponse.data.count / 100) : 1;
+          for (let page = 2; page <= pageCount; page += 1) {
+            const { data } = await adminAPI.storeOwners({ page_size: 100, page });
+            availableOwners = [...availableOwners, ...(data.results || data || [])];
+          }
+          setOwners(availableOwners);
+          setForm({
+            name: '', slug: '', description: '', about: '', tagline: '',
+            category: '', product_type: 'physical', status: 'pending', owner: '',
+            location: 'Maputo', phone: '', email: '', website: '',
+            shipping_policy: '', return_policy: '',
+            default_affiliate_commission: 10, low_stock_threshold: 5,
+            theme_color: '#2563eb', admin_notes: '',
+          });
+          return;
+        }
         const { data } = await adminAPI.getStore(id);
         setStore(data);
         setForm({
           name: data.name || '', slug: data.slug || '',
           description: data.description || '', about: data.about || '',
           tagline: data.tagline || '', category: data.category || '',
+          product_type: data.product_type || 'physical',
           location: data.location || '', phone: data.phone || '',
           email: data.email || '', website: data.website || '',
           shipping_policy: data.shipping_policy || '', return_policy: data.return_policy || '',
@@ -71,10 +101,12 @@ export default function AdminStoreEditPage() {
           theme_color: data.theme_color || '#2563eb',
           admin_notes: data.admin_notes || '',
         });
-      } catch { setError('Erro ao carregar a loja.'); }
+      } catch (loadError: any) {
+        setError(loadError?.response?.data?.detail || 'Erro ao carregar os dados da loja.');
+      }
       finally { setLoading(false); }
     })();
-  }, [id, isAuthenticated, isAdmin, authLoading, router]);
+  }, [id, isCreateMode, isAuthenticated, isAdmin, authLoading, router]);
 
   // IntersectionObserver: update active sidebar item on scroll
   useEffect(() => {
@@ -104,22 +136,44 @@ export default function AdminStoreEditPage() {
     setSaving(true);
     setError('');
     try {
-      const hasFiles = logoFile || bannerFile;
+      const hasFiles = logoFile || bannerFile || clearLogo || clearBanner ||
+        Object.values(documentFiles).some(Boolean);
       if (hasFiles) {
         const fd = new FormData();
         Object.entries(form).forEach(([k, v]) => { if (v !== null && v !== undefined) fd.append(k, String(v)); });
         if (logoFile) fd.append('logo', logoFile);
         if (bannerFile) fd.append('banner', bannerFile);
+        if (clearLogo) fd.append('clear_logo', 'true');
+        if (clearBanner) fd.append('clear_banner', 'true');
+        Object.entries(documentFiles).forEach(([key, file]) => {
+          if (file) fd.append(key, file);
+        });
+        if (isCreateMode) {
+          const { data } = await adminAPI.createStore(fd);
+          router.push(`/admin/stores/${data.id}`);
+          return;
+        }
         await adminAPI.updateStoreDetails(id, fd, true);
+      } else if (isCreateMode) {
+        const { data } = await adminAPI.createStore(form);
+        router.push(`/admin/stores/${data.id}`);
+        return;
       } else {
         await adminAPI.updateStoreDetails(id, form);
       }
       showToast('success', 'Alterações guardadas com sucesso.');
-      setLogoFile(null); setBannerFile(null);
+      setLogoFile(null); setBannerFile(null); setDocumentFiles({});
+      setClearLogo(false); setClearBanner(false);
       // Refetch
       const { data } = await adminAPI.getStore(id);
       setStore(data);
-    } catch { showToast('error', 'Erro ao guardar alterações.'); }
+    } catch (saveError: any) {
+      const responseData = saveError?.response?.data;
+      const firstError = responseData && typeof responseData === 'object'
+        ? Object.values(responseData).flat().find((value) => typeof value === 'string')
+        : null;
+      showToast('error', typeof firstError === 'string' ? firstError : 'Erro ao guardar alterações.');
+    }
     finally { setSaving(false); }
   };
 
@@ -127,8 +181,12 @@ export default function AdminStoreEditPage() {
     if (!confirm(`Remover "${docLabel}"?`)) return;
     try {
       await adminAPI.manageStore(id, 'clear_documents', '', [docKey]);
-      const { data } = await adminAPI.getStore(id);
-      setStore(data);
+      if (isCreateMode) {
+        setDocumentFiles((current) => ({ ...current, [docKey]: null }));
+      } else {
+        const { data } = await adminAPI.getStore(id);
+        setStore(data);
+      }
       showToast('success', `Documento "${docLabel}" removido.`);
     } catch { showToast('error', 'Erro ao remover documento.'); }
   };
@@ -169,7 +227,7 @@ export default function AdminStoreEditPage() {
     );
   }
 
-  const storeName = store?.name || '...';
+  const storeName = store?.name || (isCreateMode ? 'Nova Loja' : '...');
 
   return (
     <AdminLayout>
@@ -189,9 +247,11 @@ export default function AdminStoreEditPage() {
             <ArrowLeft size={15} /> Lojas
           </Link>
           <ChevronRight size={13} />
-          <Link href={`/admin/stores/${id}`} className="hover:text-accent transition-colors truncate max-w-44">
-            {storeName}
-          </Link>
+          {!isCreateMode && (
+            <Link href={`/admin/stores/${id}`} className="hover:text-accent transition-colors truncate max-w-44">
+              {storeName}
+            </Link>
+          )}
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -204,22 +264,26 @@ export default function AdminStoreEditPage() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-foreground leading-tight">{storeName}</h1>
-              <p className="text-xs text-muted-foreground">Editar informações da loja</p>
+              <p className="text-xs text-muted-foreground">{isCreateMode ? 'Criar loja para um vendedor' : 'Editar informações da loja'}</p>
             </div>
           </div>
           <div className="flex items-center gap-2.5">
-            <Link href={`/admin/stores/${id}`}
+            {!isCreateMode && <Link href={`/admin/stores/${id}/products`}
+              className="h-10 px-4 rounded-xl border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted hover:border-accent/30 transition-all duration-200 inline-flex items-center gap-2">
+              <ShoppingBag size={15} /> Produtos
+            </Link>}
+            <Link href={isCreateMode ? '/admin?tab=stores' : `/admin/stores/${id}`}
               className="h-10 px-4 rounded-xl border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted hover:border-accent/30 transition-all duration-200 inline-flex items-center gap-2">
               Cancelar
             </Link>
-            <Link href={`/store/${store?.slug}`} target="_blank"
+            {!isCreateMode && <Link href={`/store/${store?.slug}`} target="_blank"
               className="h-10 w-10 rounded-xl border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-accent hover:border-accent/40 transition-all duration-200">
               <Eye size={16} />
-            </Link>
+            </Link>}
             <button onClick={handleSave} disabled={saving}
               className="h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all duration-200 disabled:opacity-60 inline-flex items-center gap-2 shadow-sm">
               {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-              Guardar
+              {isCreateMode ? 'Criar Loja' : 'Guardar'}
             </button>
           </div>
         </div>
@@ -262,6 +326,49 @@ export default function AdminStoreEditPage() {
             </div>
             <div className="p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {isCreateMode && (
+                  <>
+                    <div className="md:col-span-2">
+                      <label className={labelBase}><User size={12} className="inline mr-1" /> Proprietário *</label>
+                      <select value={form.owner || ''} onChange={e => updateField('owner', e.target.value)} required className={inputBase}>
+                        <option value="">Seleccionar utilizador sem loja...</option>
+                        {owners.map((owner) => (
+                          <option key={owner.id} value={owner.id}>
+                            {[owner.first_name, owner.last_name].filter(Boolean).join(' ') || owner.email}
+                            {' — '}{owner.email}
+                          </option>
+                        ))}
+                      </select>
+                      {owners.length === 0 && <p className="mt-1 text-xs text-amber-700">Não existem utilizadores activos sem loja disponíveis.</p>}
+                    </div>
+                    <div>
+                      <label className={labelBase}>Tipo de loja *</label>
+                      <select value={form.product_type || 'physical'} onChange={e => {
+                        const type = e.target.value;
+                        const defaults = type === 'digital' ? [15, 0] : type === 'course' ? [20, 0] : [10, 5];
+                        updateField('product_type', type);
+                        updateField('category', '');
+                        updateField('default_affiliate_commission', defaults[0]);
+                        updateField('low_stock_threshold', defaults[1]);
+                      }} className={inputBase}>
+                        <option value="physical">Produtos físicos</option>
+                        <option value="digital">Produtos digitais</option>
+                        <option value="course">Cursos</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelBase}>Estado inicial *</label>
+                      <select value={form.status || 'pending'} onChange={e => updateField('status', e.target.value)} className={inputBase}>
+                        <option value="pending">Pendente</option>
+                        <option value="awaiting_documents">Aguardando documentos</option>
+                        <option value="active">Activa</option>
+                        <option value="rejected">Rejeitada</option>
+                        <option value="suspended">Suspensa</option>
+                        <option value="closed">Fechada</option>
+                      </select>
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className={labelBase}>Nome da loja <span className="text-red-400">*</span></label>
                   <input type="text" value={form.name || ''} onChange={e => updateField('name', e.target.value)} required
@@ -280,7 +387,7 @@ export default function AdminStoreEditPage() {
               </div>
               <div>
                 <label className={labelBase}>Descrição</label>
-                <textarea rows={3} value={form.description || ''} onChange={e => updateField('description', e.target.value)}
+                <textarea rows={3} value={form.description || ''} onChange={e => updateField('description', e.target.value)} required={isCreateMode}
                   placeholder="Descreva o que a sua loja vende..." className={textareaBase} />
               </div>
               <div>
@@ -288,6 +395,13 @@ export default function AdminStoreEditPage() {
                 <textarea rows={3} value={form.about || ''} onChange={e => updateField('about', e.target.value)}
                   placeholder="Conte a história da sua marca..." className={textareaBase} />
               </div>
+              {!isCreateMode && (
+                <div className="md:col-span-2 rounded-xl bg-muted/40 px-4 py-3 text-sm">
+                  <span className="font-semibold">Tipo de loja:</span>{' '}
+                  {form.product_type === 'course' ? 'Cursos' : form.product_type === 'digital' ? 'Digital' : 'Físico'}
+                  <span className="ml-2 text-xs text-muted-foreground">O tipo é definido no registo e não pode ser alterado após criação.</span>
+                </div>
+              )}
             </div>
           </section>
 
@@ -326,13 +440,20 @@ export default function AdminStoreEditPage() {
                   </div>
                   <div className="flex-1 space-y-2">
                     <input ref={logoInputRef} type="file" accept="image/*"
-                      onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                      onChange={(e) => { setLogoFile(e.target.files?.[0] || null); setClearLogo(false); }}
                       className="hidden" />
                     <button type="button" onClick={() => logoInputRef.current?.click()}
                       className="h-10 px-4 rounded-xl border border-border bg-card text-sm font-medium text-foreground/80 hover:bg-muted hover:border-accent/30 transition-all duration-200 inline-flex items-center gap-2">
                       <Upload size={14} />
                       {logoFile || store?.logo ? 'Substituir imagem' : 'Carregar logo'}
                     </button>
+                    {!isCreateMode && store?.logo && (
+                      <button type="button" onClick={() => {
+                        setLogoFile(null);
+                        setClearLogo(true);
+                        setStore((current: any) => ({ ...current, logo: null }));
+                      }} className="ml-2 text-sm text-destructive hover:underline">Remover logo</button>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {logoFile ? `${logoFile.name} (${(logoFile.size / 1024).toFixed(0)} KB)` :
                        store?.logo ? 'Logo actual. Clique para substituir.' :
@@ -366,13 +487,20 @@ export default function AdminStoreEditPage() {
                 </div>
                 <div className="flex items-center justify-between mt-2">
                   <input ref={bannerInputRef} type="file" accept="image/*"
-                    onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
+                    onChange={(e) => { setBannerFile(e.target.files?.[0] || null); setClearBanner(false); }}
                     className="hidden" />
                   <button type="button" onClick={() => bannerInputRef.current?.click()}
                     className="h-9 px-3 rounded-lg border border-border bg-card text-xs font-medium text-muted-foreground hover:bg-muted transition-all duration-200 inline-flex items-center gap-1.5">
                     <Upload size={12} />
                     {bannerFile || store?.banner ? 'Substituir' : 'Carregar'}
                   </button>
+                  {!isCreateMode && store?.banner && (
+                    <button type="button" onClick={() => {
+                      setBannerFile(null);
+                      setClearBanner(true);
+                      setStore((current: any) => ({ ...current, banner: null }));
+                    }} className="text-xs text-destructive hover:underline">Remover banner</button>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     {bannerFile ? `${bannerFile.name}` : store?.banner ? 'Banner actual' : ''}
                   </span>
@@ -395,23 +523,36 @@ export default function AdminStoreEditPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className={labelBase}><Phone size={12} className="inline mr-1 text-muted-foreground" /> Telefone</label>
-                  <input type="text" value={form.phone || ''} onChange={e => updateField('phone', e.target.value)}
+                  <input type="text" value={form.phone || ''} onChange={e => updateField('phone', e.target.value)} required={isCreateMode}
                     placeholder="+258 84 123 4567" className={inputBase} />
                 </div>
                 <div>
                   <label className={labelBase}><Mail size={12} className="inline mr-1 text-muted-foreground" /> Email</label>
-                  <input type="email" value={form.email || ''} onChange={e => updateField('email', e.target.value)}
+                  <input type="email" value={form.email || ''} onChange={e => updateField('email', e.target.value)} required={isCreateMode}
                     placeholder="loja@exemplo.com" className={inputBase} />
                 </div>
                 <div>
                   <label className={labelBase}><Tag size={12} className="inline mr-1 text-muted-foreground" /> Categoria</label>
-                  <input type="text" value={form.category || ''} onChange={e => updateField('category', e.target.value)}
-                    placeholder="Ex: Tecnologia" className={inputBase} />
+                  <select value={form.category || ''} onChange={e => updateField('category', e.target.value)} className={inputBase} required={isCreateMode}>
+                    <option value="">Seleccionar categoria...</option>
+                    {(STORE_CATEGORIES_BY_TYPE[form.product_type || 'physical'] || []).map((category) => (
+                      <option key={category.value} value={category.value}>{category.label}</option>
+                    ))}
+                    {form.category && !(STORE_CATEGORIES_BY_TYPE[form.product_type || 'physical'] || [])
+                      .some((category) => category.value === form.category) && (
+                      <option value={form.category}>{form.category}</option>
+                    )}
+                  </select>
                 </div>
                 <div>
                   <label className={labelBase}><MapPin size={12} className="inline mr-1 text-muted-foreground" /> Localização</label>
-                  <input type="text" value={form.location || ''} onChange={e => updateField('location', e.target.value)}
-                    placeholder="Ex: Maputo, Moçambique" className={inputBase} />
+                  <select value={form.location || ''} onChange={e => updateField('location', e.target.value)} className={inputBase} required={isCreateMode}>
+                    <option value="">Seleccionar localização...</option>
+                    {STORE_LOCATIONS.map((location) => <option key={location} value={location}>{location}</option>)}
+                    {form.location && !STORE_LOCATIONS.includes(form.location) && (
+                      <option value={form.location}>{form.location}</option>
+                    )}
+                  </select>
                 </div>
                 <div className="md:col-span-2">
                   <label className={labelBase}><Globe size={12} className="inline mr-1 text-muted-foreground" /> Website</label>
@@ -461,6 +602,14 @@ export default function AdminStoreEditPage() {
                     <input type="text" value={form.theme_color || '#2563eb'}
                       onChange={e => updateField('theme_color', e.target.value)}
                       className={`${inputBase} font-mono text-xs max-w-30`} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {STORE_THEME_COLORS.map((color) => (
+                      <button key={color.value} type="button" aria-label={color.name}
+                        onClick={() => updateField('theme_color', color.value)}
+                        className={`h-6 w-6 rounded-full border ${form.theme_color === color.value ? 'ring-2 ring-accent ring-offset-2' : 'border-border'}`}
+                        style={{ backgroundColor: color.value }} />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -538,6 +687,27 @@ export default function AdminStoreEditPage() {
                   <p className="text-xs text-muted-foreground mt-1">O vendedor ainda não submeteu documentos de verificação.</p>
                 </div>
               )}
+              <div className="grid grid-cols-1 gap-4 border-t border-border pt-5 sm:grid-cols-2">
+                {[
+                  { key: 'identity_document', label: 'Documento de identidade' },
+                  { key: 'tax_document', label: 'NUIT / Registo comercial' },
+                  { key: 'address_proof', label: 'Comprovativo de morada / verso' },
+                  { key: 'additional_documents', label: 'Documento adicional' },
+                ].map((document) => (
+                  <label key={document.key} className={labelBase}>
+                    {document.label}
+                    <input type="file" onChange={(event) => setDocumentFiles((current) => ({
+                      ...current,
+                      [document.key]: event.target.files?.[0] || null,
+                    }))} className={`${inputBase} h-auto py-2`} />
+                    {documentFiles[document.key] && (
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        Novo ficheiro: {documentFiles[document.key]?.name}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
             </div>
           </section>
 
@@ -577,4 +747,3 @@ export default function AdminStoreEditPage() {
     </AdminLayout>
   );
 }
-

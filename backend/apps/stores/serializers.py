@@ -49,6 +49,17 @@ class StoreModerationLogSerializer(serializers.ModelSerializer):
 
 class StoreDetailSerializer(serializers.ModelSerializer):
     slug = serializers.SlugField(required=False, allow_blank=True)
+    theme_color = serializers.RegexField(
+        regex=r'^#[0-9A-Fa-f]{6}$',
+        required=False,
+        allow_blank=True,
+    )
+    logo = serializers.ImageField(required=False, allow_null=True)
+    banner = serializers.ImageField(required=False, allow_null=True)
+    identity_document = serializers.ImageField(required=False, allow_null=True)
+    tax_document = serializers.ImageField(required=False, allow_null=True)
+    address_proof = serializers.ImageField(required=False, allow_null=True)
+    additional_documents = serializers.ImageField(required=False, allow_null=True)
     owner = serializers.PrimaryKeyRelatedField(read_only=True)
     owner_name = serializers.CharField(source='owner.get_full_name', read_only=True)
     owner_email = serializers.EmailField(source='owner.email', read_only=True)
@@ -84,6 +95,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
                   'store_products', 'recent_orders', 'monthly_sales',
                   'followers_count', 'review_count', 'clear_logo', 'clear_banner')
         read_only_fields = ('id', 'rating', 'total_sales', 'status',
+                           'admin_notes', 'rejection_reason',
                            'owner', 'owner_name', 'owner_email', 'owner_verified',
                            'owner_date_joined', 'total_revenue', 'total_orders',
                            'total_products', 'moderation_logs', 'has_documents',
@@ -98,6 +110,73 @@ class StoreDetailSerializer(serializers.ModelSerializer):
     def get_total_revenue(self, obj):
         from .financials import paid_order_revenue
         return float(paid_order_revenue(obj.orders.filter(payment_status='completed')))
+
+    @staticmethod
+    def _validate_upload(upload, max_size, field_label):
+        if upload.size > max_size:
+            raise serializers.ValidationError(
+                f'{field_label} não pode ultrapassar {max_size // (1024 * 1024)} MB.'
+            )
+        from PIL import Image
+        try:
+            image = Image.open(upload)
+            if image.width * image.height > 40_000_000:
+                raise serializers.ValidationError(
+                    f'{field_label} excede as dimensões máximas permitidas.'
+                )
+            image.verify()
+        except (OSError, ValueError, Image.DecompressionBombError):
+            raise serializers.ValidationError(f'{field_label} deve ser uma imagem válida.')
+        finally:
+            upload.seek(0)
+        return upload
+
+    def validate_logo(self, value):
+        if value:
+            self._validate_upload(value, 5 * 1024 * 1024, 'O logótipo')
+        return value
+
+    def validate_banner(self, value):
+        if value:
+            self._validate_upload(value, 10 * 1024 * 1024, 'O banner')
+        return value
+
+    def validate_identity_document(self, value):
+        if value:
+            self._validate_upload(value, 10 * 1024 * 1024, 'O documento de identidade')
+        return value
+
+    def validate_tax_document(self, value):
+        if value:
+            self._validate_upload(value, 10 * 1024 * 1024, 'O documento fiscal')
+        return value
+
+    def validate_address_proof(self, value):
+        if value:
+            self._validate_upload(value, 10 * 1024 * 1024, 'O comprovativo de morada')
+        return value
+
+    def validate_additional_documents(self, value):
+        if value:
+            self._validate_upload(value, 10 * 1024 * 1024, 'O documento adicional')
+        return value
+
+    def validate_slug(self, value):
+        slug = value.strip()
+        if slug and Store.objects.filter(slug=slug).exclude(pk=getattr(self.instance, 'pk', None)).exists():
+            raise serializers.ValidationError('Este endereço de loja já está em uso.')
+        return slug
+
+    def validate_default_affiliate_commission(self, value):
+        from apps.affiliates.models import AffiliateSettings
+
+        settings_obj = AffiliateSettings.get_settings()
+        if value < settings_obj.min_commission_rate or value > settings_obj.max_commission_rate:
+            raise serializers.ValidationError(
+                f'A comissão deve estar entre {settings_obj.min_commission_rate}% '
+                f'e {settings_obj.max_commission_rate}%.'
+            )
+        return value
 
     def get_total_orders(self, obj):
         return obj.orders.count()
@@ -213,3 +292,30 @@ class StoreDetailSerializer(serializers.ModelSerializer):
         if not data.get('slug'):
             data['slug'] = slugify(data.get('name', ''))
         return data
+
+
+class PublicStoreDetailSerializer(serializers.ModelSerializer):
+    total_products = serializers.SerializerMethodField()
+    followers_count = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+    tier = serializers.CharField(read_only=True)
+    tier_display = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Store
+        fields = (
+            'id', 'name', 'slug', 'description', 'about', 'tagline', 'logo',
+            'banner', 'theme_color', 'category', 'phone', 'email', 'location',
+            'website', 'status', 'product_type', 'rating', 'total_sales',
+            'total_products', 'followers_count', 'review_count', 'tier',
+            'tier_display', 'shipping_policy', 'return_policy', 'created_at',
+        )
+
+    def get_total_products(self, obj):
+        return obj.products.exclude(status='deleted').count()
+
+    def get_followers_count(self, obj):
+        return obj.followers.count()
+
+    def get_review_count(self, obj):
+        return obj.reviews.filter(is_hidden=False).count()

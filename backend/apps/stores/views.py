@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from django.db import IntegrityError
 from django.http import Http404
 from .models import Store
-from .serializers import StoreSerializer, StoreDetailSerializer
+from .serializers import PublicStoreDetailSerializer, StoreSerializer, StoreDetailSerializer
 from .featured import get_featured_stores
 from apps.users.permissions import IsVerified
 from apps.notifications import email_service
@@ -30,7 +30,7 @@ class StoreFeaturedView(APIView):
 class StoreDetailView(generics.RetrieveAPIView):
     # Public: apenas lojas activas. Owner vê a sua via MyStoreView.
     queryset = Store.objects.filter(status='active')
-    serializer_class = StoreDetailSerializer
+    serializer_class = PublicStoreDetailSerializer
     lookup_field = 'slug'
     permission_classes = [permissions.AllowAny]
 

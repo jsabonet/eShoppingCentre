@@ -7,6 +7,7 @@ import { Store, Check, ChevronRight, Upload } from 'lucide-react';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { useAuth } from '@/src/hooks/useAuth';
 import { storesAPI } from '@/src/lib/api';
+import { STORE_CATEGORIES_BY_TYPE, STORE_LOCATIONS } from '@/src/lib/storeOptions';
 
 const steps = [
   { number: 1, label: 'Informações da Loja' },
@@ -15,39 +16,6 @@ const steps = [
 ];
 
 const needsVerso = (docType: string) => docType === 'bi';
-
-const CATEGORIES_BY_TYPE: Record<string, { value: string; label: string }[]> = {
-  physical: [
-    { value: 'eletronicos', label: '📱 Electrónicos & Tecnologia' },
-    { value: 'moda', label: '👗 Moda, Roupa & Calçado' },
-    { value: 'casa-jardim', label: '🏠 Casa, Decoração & Jardim' },
-    { value: 'esportes', label: '⚽ Desporto & Lazer' },
-    { value: 'livros', label: '📚 Livros Físicos & Papelaria' },
-    { value: 'beleza', label: '💄 Beleza, Saúde & Bem-Estar' },
-    { value: 'brinquedos', label: '🎮 Brinquedos & Jogos' },
-    { value: 'automotivo', label: '🚗 Automóvel & Acessórios' },
-    { value: 'artesanato', label: '🎨 Artesanato & Cultura' },
-    { value: 'alimentacao', label: '🍽️ Alimentação & Bebidas' },
-  ],
-  digital: [
-    { value: 'ebooks', label: '📖 Ebooks & Livros Digitais' },
-    { value: 'software', label: '💻 Software & Aplicações' },
-    { value: 'musica', label: '🎵 Música & Áudio' },
-    { value: 'templates', label: '📋 Templates & Recursos' },
-    { value: 'arte-digital', label: '🖼️ Arte Digital & NFTs' },
-    { value: 'planilhas', label: '📊 Planilhas & Ferramentas' },
-  ],
-  course: [
-    { value: 'programacao', label: '💻 Programação & Tecnologia' },
-    { value: 'design', label: '🎨 Design & Criatividade' },
-    { value: 'marketing', label: '📈 Marketing & Vendas' },
-    { value: 'negocios', label: '💼 Negócios & Empreendedorismo' },
-    { value: 'financas', label: '💰 Finanças & Investimentos' },
-    { value: 'idiomas', label: '🌍 Idiomas & Comunicação' },
-    { value: 'culinaria', label: '🍳 Culinária & Gastronomia' },
-    { value: 'bem-estar', label: '🧘 Saúde & Bem-Estar' },
-  ],
-};
 
 export default function SellerRegisterPage() {
   const router = useRouter();
@@ -482,7 +450,7 @@ export default function SellerRegisterPage() {
                     <select value={form.category} onChange={(e) => updateField('category', e.target.value)}
                       className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" required>
                       <option value="">Seleccione a categoria...</option>
-                      {(CATEGORIES_BY_TYPE[form.productType] || []).map((c) => (
+                      {(STORE_CATEGORIES_BY_TYPE[form.productType] || []).map((c) => (
                         <option key={c.value} value={c.value}>{c.label}</option>
                       ))}
                     </select>
@@ -497,11 +465,7 @@ export default function SellerRegisterPage() {
                     <select value={form.location} onChange={(e) => updateField('location', e.target.value)}
                       className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" required>
                       <option value="">Selecionar...</option>
-                      <option value="Maputo">Maputo</option><option value="Beira">Beira</option>
-                      <option value="Nampula">Nampula</option><option value="Pemba">Pemba</option>
-                      <option value="Tete">Tete</option><option value="Quelimane">Quelimane</option>
-                      <option value="Chimoio">Chimoio</option><option value="Inhambane">Inhambane</option>
-                      <option value="Lichinga">Lichinga</option><option value="Xai-Xai">Xai-Xai</option>
+                      {STORE_LOCATIONS.map((location) => <option key={location} value={location}>{location}</option>)}
                     </select>
                   </div>
                 </div>
@@ -513,11 +477,7 @@ export default function SellerRegisterPage() {
                   <select value={form.location} onChange={(e) => updateField('location', e.target.value)}
                     className="w-full px-4 py-2.5 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" required>
                     <option value="">Selecionar...</option>
-                    <option value="Maputo">Maputo</option><option value="Beira">Beira</option>
-                    <option value="Nampula">Nampula</option><option value="Pemba">Pemba</option>
-                    <option value="Tete">Tete</option><option value="Quelimane">Quelimane</option>
-                    <option value="Chimoio">Chimoio</option><option value="Inhambane">Inhambane</option>
-                    <option value="Lichinga">Lichinga</option><option value="Xai-Xai">Xai-Xai</option>
+                    {STORE_LOCATIONS.map((location) => <option key={location} value={location}>{location}</option>)}
                   </select>
                 </div>
               )}
@@ -911,7 +871,7 @@ export default function SellerRegisterPage() {
                 <p><span className="text-muted-foreground">Tipo de loja:</span> <strong>
                   {form.productType === 'physical' ? '📦 Produtos Físicos' : form.productType === 'digital' ? '📄 Produtos Digitais' : '🎓 Cursos Online'}
                 </strong></p>
-                <p><span className="text-muted-foreground">Categoria:</span> {CATEGORIES_BY_TYPE[form.productType]?.find(c => c.value === form.category)?.label || form.category || '—'}</p>
+                <p><span className="text-muted-foreground">Categoria:</span> {STORE_CATEGORIES_BY_TYPE[form.productType]?.find(c => c.value === form.category)?.label || form.category || '—'}</p>
                 <p><span className="text-muted-foreground">Localização:</span> {form.location || '—'}</p>
               </div>
 

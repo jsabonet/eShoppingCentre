@@ -910,6 +910,25 @@ export const adminAPI = {
   allStores: (params?: Record<string, any>) => api.get('/admin/stores/all/', { params }),
   allProducts: (params?: Record<string, any>) => api.get('/admin/products/', { params }),
   getStore: (id: string) => api.get(`/admin/stores/${id}/manage/`),
+  storeOwners: (params?: Record<string, any>) => api.get('/admin/stores/owners/', { params }),
+  createStore: (data: FormData | Record<string, unknown>) =>
+    api.post('/admin/stores/create/', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
+  storeProducts: (storeId: string, params?: Record<string, any>) =>
+    api.get(`/admin/stores/${storeId}/products/`, { params }),
+  createStoreProduct: (storeId: string, data: any) =>
+    api.post(`/admin/stores/${storeId}/products/`, data),
+  updateStoreProduct: (storeId: string, productId: string, data: any) =>
+    api.patch(`/admin/stores/${storeId}/products/${productId}/`, data),
+  deleteStoreProduct: (storeId: string, productId: string) =>
+    api.delete(`/admin/stores/${storeId}/products/${productId}/`),
+  storeProductCategories: (productType: string) =>
+    api.get('/categories/', { params: { product_type: productType, page_size: 100 } }),
+  addStoreProductImage: (storeId: string, productId: string, data: FormData) =>
+    api.post(`/admin/stores/${storeId}/products/${productId}/images/`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  deleteStoreProductImage: (storeId: string, productId: string, imageId: string) =>
+    api.delete(`/admin/stores/${storeId}/products/${productId}/images/${imageId}/`),
   manageStore: (id: string, action: 'approve' | 'reject' | 'suspend' | 'reactivate' | 'close' | 'request_docs' | 'clear_documents', reason?: string, documents?: string[]) =>
     api.patch(`/admin/stores/${id}/manage/`, { action, reason, documents }),
   updateStoreDetails: (id: string, data: any, isFormData?: boolean) =>

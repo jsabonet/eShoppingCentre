@@ -174,6 +174,10 @@ export default function AdminStoreDetailPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <Link href={`/admin/stores/${store.id}/products`}
+                    className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted">
+                    <Package size={14} /> Gerir Produtos
+                  </Link>
                   <Link href={`/admin/stores/${store.id}/edit`}
                     className="flex items-center gap-2 px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90">
                     <Edit size={14} /> Editar Loja
@@ -278,7 +282,10 @@ export default function AdminStoreDetailPage() {
               {/* Products */}
               {store.store_products?.length > 0 && (
                 <div className="bg-white rounded-lg border border-border shadow-sm">
-                  <div className="p-5 pb-3"><h3 className="font-bold flex items-center gap-2"><Package size={16} /> Produtos da Loja ({store.store_products.length})</h3></div>
+                  <div className="p-5 pb-3 flex items-center justify-between gap-3">
+                    <h3 className="font-bold flex items-center gap-2"><Package size={16} /> Produtos da Loja ({store.store_products.length})</h3>
+                    <Link href={`/admin/stores/${store.id}/products`} className="text-sm font-medium text-accent hover:underline">Abrir CRUD</Link>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-muted/50 border-y border-border">

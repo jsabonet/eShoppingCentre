@@ -5,6 +5,7 @@ import { Settings, Save, Upload, X, Palette, Store, Info, Phone, Mail, MapPin, P
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import { storesAPI } from '@/src/lib/api';
+import { STORE_LOCATIONS, STORE_THEME_COLORS } from '@/src/lib/storeOptions';
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -15,19 +16,6 @@ function apiMediaUrl(path: string | null): string | null {
   if (path.startsWith('http')) return path;
   return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
 }
-
-const LOCATIONS = ['Maputo', 'Beira', 'Nampula', 'Pemba', 'Quelimane', 'Tete', 'Lichinga', 'Xai-Xai', 'Inhambane', 'Matola', 'Chimoio'];
-
-const THEME_COLORS = [
-  { name: 'Azul', value: '#2563eb' },
-  { name: 'Verde', value: '#16a34a' },
-  { name: 'Roxo', value: '#9333ea' },
-  { name: 'Laranja', value: '#ea580c' },
-  { name: 'Rosa', value: '#db2777' },
-  { name: 'Ciano', value: '#0891b2' },
-  { name: 'Âmbar', value: '#d97706' },
-  { name: 'Vermelho', value: '#dc2626' },
-];
 
 export default function SellerSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -357,7 +345,7 @@ export default function SellerSettingsPage() {
               <div>
                 <label className="block text-sm font-medium mb-2">Cor Temática</label>
                 <div className="flex flex-wrap gap-2.5">
-                  {THEME_COLORS.map((c) => (
+                  {STORE_THEME_COLORS.map((c) => (
                     <button
                       key={c.value}
                       type="button"
@@ -429,7 +417,7 @@ export default function SellerSettingsPage() {
                 <label className="block text-sm font-medium mb-1.5">Localização</label>
                 <select value={form.location} onChange={(e) => updateField('location', e.target.value)}
                   className="w-full px-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm">
-                  {LOCATIONS.map((loc) => <option key={loc}>{loc}</option>)}
+                  {STORE_LOCATIONS.map((loc) => <option key={loc}>{loc}</option>)}
                 </select>
               </div>
             </div>
