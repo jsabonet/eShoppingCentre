@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/v1/reviews/', include('apps.reviews.urls')),
     path('api/v1/chat/', include('apps.chat.urls')),
     path('api/v1/shipping/', include('apps.shipping.urls')),
+    path('api/v1/campaigns/', include('apps.campaigns.urls')),
     path('api/v1/admin/', include('apps.users.urls_admin')),
     path('api/v1/admin/audit/events/', AdminAuditEventListView.as_view(), name='admin_audit_events'),
     path('api/v1/admin/categories/', include('apps.products.urls_admin')),

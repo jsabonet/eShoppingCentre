@@ -962,6 +962,20 @@ export const adminAPI = {
     api.get<PaginatedResponse<NewsletterSubscription>>('/admin/blog/newsletter/', { params }),
   deleteNewsletterSubscriber: (id: string) =>
     api.delete(`/admin/blog/newsletter/${id}/`),
+  // Homepage banner campaigns
+  listCampaigns: (params?: Record<string, string>) =>
+    api.get('/campaigns/admin/', { params }),
+  createCampaign: (data: FormData) =>
+    api.post('/campaigns/admin/', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  updateCampaign: (id: string, data: FormData | Record<string, unknown>) =>
+    api.patch(
+      `/campaigns/admin/${id}/`,
+      data,
+      data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {},
+    ),
+  activateCampaignNow: (id: string) => api.post(`/campaigns/admin/${id}/activate-now/`),
+  deleteCampaign: (id: string) => api.delete(`/campaigns/admin/${id}/`),
+  campaignHistory: (id: string) => api.get(`/campaigns/admin/${id}/history/`),
   // Courses
   listCourses: (params?: Record<string, any>) => api.get('/admin/courses/', { params }),
   createCourse: (data: any) => api.post('/admin/courses/', data),

@@ -100,6 +100,8 @@ export interface Product {
 export interface Banner {
   id: string;
   image: string;
+  mobileImage?: string;
+  altText?: string;
   title: string;
   subtitle: string;
   cta: string;

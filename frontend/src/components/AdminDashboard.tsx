@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard, Package, ShoppingCart, LogOut, Plus, Edit, Trash2,
-  TrendingUp, Users, DollarSign, Eye, X, ChevronLeft, ChevronRight,
+  TrendingUp, Users, DollarSign, Eye, X, ChevronLeft, ChevronRight, Megaphone,
   Search, Filter, AlertCircle, CheckCircle, Clock, Truck, XCircle, Store, Building2, BookOpen, RotateCcw, RefreshCw, LifeBuoy, TicketPercent, Wallet, ShieldCheck, Download, Award
 } from 'lucide-react';
 import { adminAPI, productsAPI, ordersAPI, storesAPI, type Product as APIProduct } from '@/src/lib/api';
@@ -22,6 +22,7 @@ import AdminBlogManagement from './admin/AdminBlogManagement';
 import AdminBlogCategories from './admin/AdminBlogCategories';
 import AdminAuditTrail from './admin/AdminAuditTrail';
 import AdminCertificates from './admin/AdminCertificates';
+import AdminCampaigns from './admin/AdminCampaigns';
 import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
 const BACKEND_READY = true;
@@ -32,7 +33,7 @@ const PRODUCT_TYPE_LABELS: Record<string, string> = {
   course: 'Cursos',
 };
 
-type Tab = 'dashboard' | 'stores' | 'products' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet' | 'audit' | 'certificates';
+type Tab = 'dashboard' | 'stores' | 'products' | 'categories' | 'blog' | 'users' | 'returns' | 'orders' | 'tickets' | 'coupons' | 'carts' | 'affiliates' | 'wallet' | 'audit' | 'certificates' | 'campaigns';
 
 interface Product {
   id: string;
@@ -803,6 +804,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
             { id: 'stores', label: 'Lojas', icon: Store },
             { id: 'products', label: 'Produtos', icon: Package },
+            { id: 'campaigns', label: 'Campanhas', icon: Megaphone },
             { id: 'returns', label: 'Devoluções', icon: RotateCcw },
             { id: 'orders', label: 'Encomendas', icon: ShoppingCart },
             { id: 'tickets', label: 'Suporte', icon: LifeBuoy },
@@ -1354,6 +1356,7 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
         )}
 
         {activeTab === 'blog' && <AdminBlogManagement />}
+        {activeTab === 'campaigns' && <AdminCampaigns />}
 
         {/* Users Tab */}
         {activeTab === 'users' && (

@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     'apps.courses',
     'apps.reviews',
     'apps.blog',
+    'apps.campaigns',
     'apps.notifications',
     'apps.chat',
     'apps.shipping',

@@ -48,11 +48,22 @@ async function fetchJSON(url: string, revalidate = 60, retries = 2) {
   return null;
 }
 
-const banners = [
+const fallbackBanners = [
   { id: '1', image: 'https://cdn.b12.io/client_media/iKv1biKD/5783f32a-7e6e-11f1-a05c-0242ac110002-gL5f6HGZjVLK9tX7ZtneG.jpg', title: 'Ofertas em Eletrônicos', subtitle: 'Até 30% OFF em smartphones, laptops e acessórios', cta: 'Comprar Agora', link: '/category/eletronicos' },
   { id: '2', image: 'https://cdn.b12.io/client_media/iKv1biKD/573d35e0-7e6e-11f1-a56d-0242ac110002-m84D8GY8ROKweXe5v3qi3.jpg', title: 'Nova Coleção de Moda', subtitle: 'As últimas tendências com preços imperdíveis', cta: 'Ver Coleção', link: '/category/moda' },
   { id: '3', image: 'https://cdn.b12.io/client_media/iKv1biKD/573f0734-7e6e-11f1-8673-0242ac110002-PN8pzNbMQkB30y18CiMkY.jpg', title: 'Transforme seu Lar', subtitle: 'Tudo para casa e jardim com frete grátis', cta: 'Explorar', link: '/category/casa-jardim' },
 ];
+
+interface APICampaign {
+  id: string;
+  image: string;
+  mobile_image: string | null;
+  alt_text: string;
+  title: string;
+  subtitle: string;
+  cta: string;
+  target_url: string;
+}
 
 interface APICategory { id: string; name: string; slug: string; description: string; image: string | null; }
 interface APIProduct { id: string; name: string; slug: string; price: string; compare_price: string | null; discount_percentage: number | null; primary_image: string | null; product_type: string; rating: string; review_count: number; sales_count: number; is_on_sale: boolean; stock: number; store_name: string; store_slug: string; store_owner_id: string; created_at: string; }
@@ -87,16 +98,30 @@ export default async function Home() {
   let featuredStores: any[] = [];
   let homeSections: any = { deals: [], bestsellers: [], new_arrivals: [], featured: [] };
 
-  const [catsData, storesData, sectionsData, coursesData] = await Promise.all([
+  const [catsData, storesData, sectionsData, coursesData, campaignsData] = await Promise.all([
     fetchJSON(`${API_URL}/categories/?root=true&page_size=12`),
     fetchJSON(`${API_URL}/stores/featured/`),
     fetchJSON(`${API_URL}/products/home-sections/`),
     fetchJSON(`${API_URL}/courses/?ordering=-students_count&page_size=8`),
+    fetchJSON(`${API_URL}/campaigns/active/`, 30, 1),
   ]);
 
   categories = Array.isArray(catsData) ? catsData : (catsData?.results || []);
   featuredStores = Array.isArray(storesData) ? storesData : [];
   const trendingCourses = Array.isArray(coursesData) ? coursesData : (coursesData?.results || []);
+  const campaigns: APICampaign[] = Array.isArray(campaignsData) ? campaignsData : [];
+  const banners = campaigns.length > 0
+    ? campaigns.map((campaign) => ({
+        id: campaign.id,
+        image: campaign.image,
+        mobileImage: campaign.mobile_image || undefined,
+        altText: campaign.alt_text,
+        title: campaign.title,
+        subtitle: campaign.subtitle,
+        cta: campaign.cta,
+        link: campaign.target_url,
+      }))
+    : fallbackBanners;
 
   const sectionsEmpty = !sectionsData || (
     !(sectionsData.deals?.length || 0) &&
