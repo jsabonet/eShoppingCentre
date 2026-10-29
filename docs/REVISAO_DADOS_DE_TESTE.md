@@ -181,7 +181,11 @@ alterado e, conforme o procedimento operacional, que pode ser restaurado num
 ambiente isolado. Não marque o backup como verificado apenas porque o comando
 de criação terminou.
 
-### 3. Executar somente após a revisão e o backup
+### 3. Executar a eliminação (`--execute`)
+
+Este é o comando destrutivo. Não o execute antes de rever o dry-run e
+confirmar que o backup foi criado e verificado. Use o hash exato do dry-run
+atual; não reutilize hashes anteriores.
 
 Defina `IMPACT_HASH` com o valor acabado de rever:
 
