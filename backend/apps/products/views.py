@@ -35,6 +35,7 @@ class CategoryListView(generics.ListAPIView):
         root = self.request.query_params.get('root', None)
         product_type = self.request.query_params.get('product_type', None)
         with_image = self.request.query_params.get('with_image', None)
+        with_image_or_products = self.request.query_params.get('with_image_or_products', None)
         sort = self.request.query_params.get('sort', None)
         min_count = self.request.query_params.get('min', None)
 
@@ -64,6 +65,12 @@ class CategoryListView(generics.ListAPIView):
                 output_field=IntegerField(),
             ),
         )
+
+        if with_image_or_products in ('true', '1'):
+            qs = qs.filter(
+                (Q(image__isnull=False) & ~Q(image='')) |
+                Q(_product_count__gt=0)
+            )
 
         # Ordenação por relevância
         if sort == 'most_products':

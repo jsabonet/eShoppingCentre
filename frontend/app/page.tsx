@@ -99,7 +99,7 @@ export default async function Home() {
   let homeSections: any = { deals: [], bestsellers: [], new_arrivals: [], featured: [] };
 
   const [catsData, storesData, sectionsData, coursesData, campaignsData] = await Promise.all([
-    fetchJSON(`${API_URL}/categories/?root=true&page_size=12`),
+    fetchJSON(`${API_URL}/categories/?root=true&with_image_or_products=true&sort=most_products&page_size=12`),
     fetchJSON(`${API_URL}/stores/featured/`),
     fetchJSON(`${API_URL}/products/home-sections/`),
     fetchJSON(`${API_URL}/courses/?ordering=-students_count&page_size=8`),
