@@ -577,15 +577,21 @@ class PaymentsStatusView(APIView):
             payment_status = data.get('status')
             if payment_status == 'paid':
                 total = sum((order.total for order in orders), Decimal('0.00'))
+                expected_currency = attempt.currency if attempt else 'MZN'
                 if (
                     not _amount_matches(data.get('amount'), total)
-                    or data.get('currency') != 'MZN'
+                    or expected_currency != 'MZN'
+                    or (
+                        data.get('currency') is not None
+                        and data.get('currency') != expected_currency
+                    )
                 ):
                     logger.error('VPay polling amount mismatch for order %s', order_id)
                     return Response({'error': 'Montante confirmado inválido.'},
                                     status=status.HTTP_502_BAD_GATEWAY)
                 confirmed_data = {
                     **data,
+                    'currency': expected_currency,
                     'transactionId': data.get('transactionId', ''),
                 }
                 confirmed_orders, _ = _confirm_payment(order_id, confirmed_data)

@@ -43,7 +43,7 @@ Validado em `2026-10-23` com credenciais reais (sem cobrança):
 - Autenticação: `POST https://api.vpay.co.mz/v1/auth/token` → `{"success":true,"data":{"access_token":...,"refresh_token":...,"token_type":"Bearer","expires_in":3600,...}}`.
 - Criar pedido: `POST https://api.vpay.co.mz/v1/orders` → `201` com `{"success":true,"orderId":...,"totalAmount":...,"currency":"MZN","checkout":"https://checkout.vpay.co.mz/{orderId}","data":{...,"status":"pending",...}}`.
 - Cada item do pedido exige `productId` **ou** `originProductId`; caso contrário a API devolve `400` `VALIDATION_ERROR`.
-- Consultar estado: `GET https://api.vpay.co.mz/v1/orders/{orderId}/status` → `{"success":true,"data":{"orderId":...,"status":"pending|paid|failed|cancelled","amount":...,"lastUpdated":...}}`.
+- Consultar estado: `GET https://api.vpay.co.mz/v1/orders/{orderId}/status` → `{"success":true,"data":{"orderId":...,"status":"pending|paid|failed|cancelled","amount":...,"transactionId":...,"lastUpdated":...}}`. A resposta documentada não inclui `currency`; para `paid`, validamos o montante e a moeda MZN guardada na tentativa local. Se a VPay enviar `currency`, também confirmamos que corresponde à tentativa.
 
 Nota: a página pública `/docs/api-reference/api-collection` lista caminhos `/api/...`, mas a API real responde em `/v1/...` (a `/api/...` devolve 404). A integração usa `/v1/...`, confirmado em produção.
 

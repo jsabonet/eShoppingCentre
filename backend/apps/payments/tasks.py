@@ -67,7 +67,15 @@ def reconcile_vpay_pending_payments(batch_size=100):
             if not orders:
                 logger.error('VPay order %s has no linked local orders.', gateway_order_id)
                 continue
-            if data.get('currency') != 'MZN' or not _amount_matches(data.get('amount'), total):
+            reported_currency = data.get('currency')
+            if (
+                attempt.currency != 'MZN'
+                or not _amount_matches(data.get('amount'), total)
+                or (
+                    reported_currency is not None
+                    and reported_currency != attempt.currency
+                )
+            ):
                 logger.error(
                     'VPay reconciliation amount/currency mismatch for order %s.',
                     gateway_order_id,
@@ -75,7 +83,7 @@ def reconcile_vpay_pending_payments(batch_size=100):
                 continue
             _confirm_payment(
                 gateway_order_id,
-                data,
+                {**data, 'currency': attempt.currency},
                 delivery_id='server-reconciliation',
             )
         elif data.get('status') in ('failed', 'cancelled'):

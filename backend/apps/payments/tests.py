@@ -497,6 +497,36 @@ def test_status_polling_confirms_only_when_vpay_reports_paid(digital_order, buye
 
 
 @pytest.mark.django_db
+def test_status_polling_confirms_paid_response_without_currency(digital_order, buyer):
+    digital_order.payment_id = 'vpay_order_without_currency'
+    digital_order.save(update_fields=['payment_id'])
+    client = APIClient()
+    client.force_authenticate(user=buyer)
+    status_result = {
+        'ok': True,
+        'data': {
+            'orderId': 'vpay_order_without_currency',
+            'status': 'paid',
+            'amount': '100.00',
+            'transactionId': 'txn_without_currency',
+        },
+        'message': None,
+        'http_status': 200,
+    }
+
+    with mock.patch.object(VPayClient, 'get_order_status', return_value=status_result):
+        response = client.get(
+            reverse('payments_status'),
+            {'reference': 'vpay_order_without_currency'},
+        )
+
+    assert response.status_code == 200
+    assert response.data['status'] == 'completed'
+    digital_order.refresh_from_db()
+    assert digital_order.payment_status == 'completed'
+
+
+@pytest.mark.django_db
 def test_server_reconciliation_confirms_open_payment(digital_order, store):
     attempt = PaymentTransaction.objects.create(
         order=digital_order,
@@ -534,6 +564,41 @@ def test_server_reconciliation_confirms_open_payment(digital_order, store):
     assert digital_order.payment_status == 'completed'
     assert attempt.status == 'completed'
     assert get_wallet(store.owner).payout_balance == Decimal('100.00')
+
+
+@pytest.mark.django_db
+def test_server_reconciliation_confirms_paid_response_without_currency(digital_order):
+    attempt = PaymentTransaction.objects.create(
+        order=digital_order,
+        provider='vpay',
+        gateway_order_id='vpay_server_without_currency',
+        amount=digital_order.total,
+        currency='MZN',
+        status='pending',
+    )
+    attempt.orders.add(digital_order)
+    digital_order.payment_id = attempt.gateway_order_id
+    digital_order.save(update_fields=['payment_id'])
+    paid_result = {
+        'ok': True,
+        'data': {
+            'orderId': attempt.gateway_order_id,
+            'status': 'paid',
+            'amount': '100.00',
+            'transactionId': 'txn_server_without_currency',
+        },
+        'message': None,
+        'http_status': 200,
+    }
+
+    with mock.patch.object(VPayClient, 'get_order_status', return_value=paid_result):
+        from apps.payments.tasks import reconcile_vpay_pending_payments
+        reconcile_vpay_pending_payments()
+
+    digital_order.refresh_from_db()
+    attempt.refresh_from_db()
+    assert digital_order.payment_status == 'completed'
+    assert attempt.status == 'completed'
 
 
 @pytest.mark.django_db
