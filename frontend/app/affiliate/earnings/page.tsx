@@ -231,7 +231,7 @@ export default function AffiliateEarningsPage() {
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-semibold">Taxa de saque para afiliados: 5%</p>
           <p className="mt-1 text-amber-900/80">
-            A taxa é descontada do valor solicitado. O pedido exige KYC aprovado ou uma conta de vendedor verificada, além de aprovação administrativa; a transferência é manual e não é executada automaticamente pelo gateway.
+            A taxa é descontada do valor solicitado. O pedido exige KYC aprovado ou uma conta de vendedor verificada, além de aprovação administrativa;
           </p>
         </div>
 
