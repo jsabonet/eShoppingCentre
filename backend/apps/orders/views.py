@@ -428,6 +428,11 @@ class ShipReturnView(APIView):
         return_req = get_object_or_404(
             ReturnRequest, pk=pk, buyer=request.user
         )
+        if return_req.order.is_digital_only:
+            return Response(
+                {'detail': 'Os produtos digitais não precisam de ser enviados de volta.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if return_req.status != 'approved':
             return Response(
                 {'detail': 'Só pode confirmar envio de devoluções aprovadas.'},
@@ -463,6 +468,11 @@ class ReceiveReturnView(APIView):
         return_req = get_object_or_404(
             ReturnRequest, pk=pk, store=request.user.store
         )
+        if return_req.order.is_digital_only:
+            return Response(
+                {'detail': 'Os produtos digitais não têm receção física; processe o reembolso.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if return_req.status not in ('approved', 'shipped'):
             return Response(
                 {'detail': 'Só pode confirmar receção de devoluções aprovadas ou enviadas.'},
@@ -514,9 +524,12 @@ class RefundReturnView(APIView):
                 {'detail': 'Esta devolução está em disputa. Apenas um administrador pode reembolsar.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if return_req.status != 'received':
+        is_digital_return = return_req.order.is_digital_only
+        if return_req.status != 'received' and not (
+            is_digital_return and return_req.status == 'approved'
+        ):
             return Response(
-                {'detail': 'Só pode reembolsar devoluções já recebidas.'},
+                {'detail': 'Só pode reembolsar devoluções físicas recebidas ou pedidos digitais aprovados.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

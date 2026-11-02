@@ -10,16 +10,16 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.courses.models import Course, Enrollment
 from apps.notifications.models import Notification
-from apps.orders.models import Order, OrderItem
-from apps.orders.views import AdminAllOrdersView
-from apps.orders.serializers import CreateOrderSerializer, ReturnRequestSerializer
+from apps.orders.models import Order, OrderItem, ReturnRequest
+from apps.orders.views import AdminAllOrdersView, ReceiveReturnView, RefundReturnView, ShipReturnView
+from apps.orders.serializers import CreateOrderSerializer, OrderItemSerializer, ReturnRequestSerializer
 from apps.orders.services import cancel_order
 from apps.orders.tasks import auto_release_unpaid_orders
 from apps.payments.services.completion import complete_payment
 from apps.products.models import Category, Coupon, Product
 from apps.products.models_digital import DigitalDownload
 from apps.stores.models import Store
-from apps.wallet.services import get_wallet
+from apps.wallet.services import credit, get_wallet
 from apps.wallet.services import process_refund
 from apps.affiliates.models import AffiliateCommission, AffiliateLink, AffiliateProfile
 
@@ -73,6 +73,113 @@ def physical_product(db, store, category):
         stock=8,  # já deduzido de um stock original de 10 (2 unidades reservadas)
         status='active',
     )
+
+
+@pytest.fixture
+def digital_order(db, buyer, store, physical_product):
+    physical_product.product_type = 'digital'
+    physical_product.save(update_fields=['product_type'])
+    order = Order.objects.create(
+        buyer=buyer,
+        store=store,
+        subtotal=Decimal('100.00'),
+        total=Decimal('100.00'),
+        payment_method='mpesa',
+        payment_status='completed',
+        status='delivered',
+        shipping_address={},
+    )
+    OrderItem.objects.create(
+        order=order,
+        product=physical_product,
+        product_name='Conteúdo digital',
+        quantity=1,
+        unit_price=Decimal('100.00'),
+        total_price=Decimal('100.00'),
+        product_type='',
+    )
+    return order
+
+
+@pytest.mark.django_db
+def test_legacy_order_item_uses_product_type_for_digital_fulfillment(digital_order):
+    item = digital_order.items.get()
+
+    assert digital_order.is_digital_only is True
+    assert OrderItemSerializer(item).data['product_type'] == 'digital'
+
+
+@pytest.mark.django_db
+def test_digital_return_is_serialized_and_cannot_be_shipped_or_received(
+        digital_order, buyer, seller, store):
+    return_req = ReturnRequest.objects.create(
+        order=digital_order,
+        buyer=buyer,
+        store=store,
+        reason='Problema com o conteúdo',
+        status='approved',
+    )
+
+    assert ReturnRequestSerializer(return_req).data['is_digital_only'] is True
+
+    request = APIRequestFactory().patch(
+        f'/api/v1/orders/returns/{return_req.id}/ship/',
+        {'buyer_tracking_code': 'TRACK-123'},
+        format='json',
+    )
+    force_authenticate(request, user=buyer)
+    response = ShipReturnView.as_view()(request, pk=return_req.id)
+
+    assert response.status_code == 400
+    assert 'não precisam' in response.data['detail']
+
+    request = APIRequestFactory().patch(
+        f'/api/v1/orders/returns/{return_req.id}/receive/',
+        {},
+        format='json',
+    )
+    force_authenticate(request, user=seller)
+    response = ReceiveReturnView.as_view()(request, pk=return_req.id)
+
+    assert response.status_code == 400
+    assert 'não têm receção física' in response.data['detail']
+
+
+@pytest.mark.django_db
+def test_vendor_can_refund_approved_digital_return_without_receipt(
+        digital_order, buyer, seller, store, monkeypatch):
+    monkeypatch.setattr('apps.orders.views.email_service.dispatch', lambda *_args, **_kwargs: None)
+    return_req = ReturnRequest.objects.create(
+        order=digital_order,
+        buyer=buyer,
+        store=store,
+        reason='Problema com o conteúdo',
+        status='approved',
+        refund_amount=Decimal('100.00'),
+    )
+    credit(
+        get_wallet(seller),
+        Decimal('100.00'),
+        kind='payout',
+        ref_type='order',
+        ref_id=digital_order.id,
+        description='Saldo para teste de reembolso digital',
+        idempotency_key=f'test:digital-refund:{digital_order.id}',
+    )
+    request = APIRequestFactory().patch(
+        f'/api/v1/orders/returns/{return_req.id}/refund/',
+        {},
+        format='json',
+    )
+    force_authenticate(request, user=seller)
+
+    response = RefundReturnView.as_view()(request, pk=return_req.id)
+
+    assert response.status_code == 200
+    assert response.data['status'] == 'refunded'
+    digital_order.refresh_from_db()
+    assert digital_order.status == 'refunded'
+    assert get_wallet(buyer).balance == Decimal('100.00')
 
 
 @pytest.mark.django_db

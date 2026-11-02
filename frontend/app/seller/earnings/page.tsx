@@ -84,6 +84,7 @@ export default function SellerEarningsPage() {
     e.preventDefault();
     const amount = parseFloat(payoutAmount);
     if (isNaN(amount) || amount <= 0) { setPayoutError('Indique um valor válido.'); return; }
+    if (amount < 500) { setPayoutError('O valor mínimo de saque para vendedores é 500 MZN.'); return; }
     setSubmitting(true); setPayoutError(''); setPayoutSuccess('');
     try {
       const account_details: Record<string, string> = {};
@@ -196,7 +197,7 @@ export default function SellerEarningsPage() {
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-semibold">Taxa de saque para vendedores: 11%</p>
           <p className="mt-1 text-amber-900/80">
-            A taxa é descontada do valor solicitado. O pedido fica sujeito à aprovação e a transferência é feita manualmente; o gateway não envia o saque automaticamente.
+            A taxa é descontada do valor solicitado.
           </p>
         </div>
 
@@ -412,12 +413,12 @@ export default function SellerEarningsPage() {
             </p>
             <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-950">
               <p className="font-semibold">Taxa de saque: 11%</p>
-              <p className="mt-1">O valor solicitado será reservado. Após aprovação, o administrador transferirá manualmente o valor líquido abaixo.</p>
+              <p className="mt-1">O valor mínimo de saque é 500 MZN. O valor solicitado será reservado. Após aprovação, o administrador transferirá manualmente o valor líquido abaixo.</p>
             </div>
             <form onSubmit={requestPayout} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold mb-1">Valor (MZN)</label>
-                <input type="number" min="1" value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)}
+                <input type="number" min="500" step="0.01" value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)}
                   className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" required autoFocus />
               </div>
               {requestedAmount > 0 && (

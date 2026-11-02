@@ -8,10 +8,15 @@ from apps.products.models import Product
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    product_type = serializers.SerializerMethodField()
+
     class Meta:
         model = OrderItem
         fields = ('id', 'product_name', 'product_image', 'quantity', 'unit_price', 'total_price', 'product_type')
         read_only_fields = ('product_name', 'product_image', 'unit_price', 'total_price', 'product_type')
+
+    def get_product_type(self, obj):
+        return obj.product_type or (obj.product.product_type if obj.product_id else '')
 
 
 class ReturnImageSerializer(serializers.ModelSerializer):
@@ -44,6 +49,7 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
     reason_type_display = serializers.CharField(source='get_reason_type_display', read_only=True)
     product_names = serializers.SerializerMethodField()
     product_image = serializers.SerializerMethodField()
+    is_digital_only = serializers.SerializerMethodField()
 
     class Meta:
         model = ReturnRequest
@@ -52,7 +58,7 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
             'rma_number', 'status', 'vendor_notes', 'refund_amount',
             'return_instructions', 'return_address', 'buyer_tracking_code', 'shipping_notes',
             'buyer_name', 'buyer_email', 'buyer_phone', 'store_name', 'images',
-            'product_names', 'product_image', 'created_at', 'disputed_at',
+            'product_names', 'product_image', 'is_digital_only', 'created_at', 'disputed_at',
         )
         read_only_fields = ('id', 'buyer', 'store', 'rma_number', 'created_at')
 
@@ -72,6 +78,9 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
     def get_product_image(self, obj):
         first = obj.order.items.first()
         return first.product_image if first else None
+
+    def get_is_digital_only(self, obj):
+        return obj.order.is_digital_only
 
     def create(self, validated_data):
         validated_data['buyer'] = self.context['request'].user

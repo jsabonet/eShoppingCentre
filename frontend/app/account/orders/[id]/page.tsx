@@ -7,12 +7,17 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, MapPin, CreditCard, RotateCcw, Loader2, AlertCircle, XCircle,
   Package, CheckCircle2, Circle, Truck, Clock, Ban, Undo2, MessageCircle, Camera, Store,
+  BookOpen, Download,
 } from 'lucide-react';
 import AccountLayout from '@/src/components/AccountLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';
 import LightboxImage from '@/src/components/LightboxImage';
 import { usePendingCheckout } from '@/src/hooks/usePendingCheckout';
 import { usePaymentReconciliation } from '@/src/hooks/usePaymentReconciliation';
+import {
+  getDigitalFulfillmentLabel, getOrderFulfillmentLabel, hasDigitalOrderItems,
+  hasPhysicalOrderItems, isDigitalOnlyOrder,
+} from '@/src/lib/orderFulfillment';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -25,6 +30,14 @@ const REASON_CHOICES = [
   { value: 'wrong_item', label: 'Item errado enviado' },
   { value: 'other', label: 'Outro' },
 ];
+
+const DIGITAL_REASON_LABELS: Record<string, string> = {
+  defective: 'Conteúdo com defeito',
+  not_as_described: 'Conteúdo diferente do anunciado',
+  not_satisfied: 'Problema de acesso ou utilização',
+  wrong_item: 'Conteúdo ou acesso errado',
+  other: 'Outro',
+};
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendente', confirmed: 'Confirmada', processing: 'Em Preparação',
@@ -67,6 +80,33 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 function buildTimeline(order: any) {
   const steps: { label: string; date: string | null; done: boolean; active: boolean; icon: any }[] = [];
   const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
+
+  if (isDigitalOnlyOrder(order)) {
+    const paid = ['completed', 'paid'].includes(order.payment_status);
+    const accessAvailable = order.status === 'delivered' && paid;
+    steps.push({ label: 'Pedido Realizado', date: fmt(order.created_at), done: true, active: order.status === 'pending' && !paid, icon: Package });
+    steps.push({
+      label: 'Pagamento Confirmado',
+      date: paid ? fmt(order.confirmed_at ?? order.created_at) : null,
+      done: paid,
+      active: !paid && order.status === 'pending',
+      icon: CreditCard,
+    });
+    steps.push({
+      label: getOrderFulfillmentLabel(order) === 'Acesso ao curso' ? 'Acesso ao curso disponível' : 'Download digital disponível',
+      date: accessAvailable ? fmt(order.delivered_at ?? order.confirmed_at ?? order.updated_at) : null,
+      done: accessAvailable,
+      active: paid && !accessAvailable,
+      icon: Download,
+    });
+
+    if (order.status === 'cancelled') {
+      steps.push({ label: 'Cancelado', date: fmt(order.updated_at), done: true, active: true, icon: Ban });
+    } else if (order.status === 'refunded') {
+      steps.push({ label: 'Reembolsado', date: fmt(order.updated_at), done: true, active: true, icon: Undo2 });
+    }
+    return steps;
+  }
 
   const isPickup = order.is_pickup;
   const statusOrder = isPickup
@@ -251,27 +291,32 @@ export default function OrderDetailPage() {
     </AccountLayout>
   );
 
-  const canRequestReturn = ['delivered', 'shipped', 'ready_for_pickup'].includes(order.status) && !returns.some((r: any) => ['requested', 'approved', 'shipped'].includes(r.status));
+  const isDigitalOnly = isDigitalOnlyOrder(order);
+  const canRequestReturn = (isDigitalOnly
+    ? order.status === 'delivered'
+    : ['delivered', 'shipped', 'ready_for_pickup'].includes(order.status))
+    && !returns.some((r: any) => ['requested', 'approved', 'shipped'].includes(r.status));
   const activeReturn = returns.find((r: any) => ['requested', 'approved', 'shipped', 'received', 'refunded'].includes(r.status));
   const rejectedReturn = returns.find((r: any) => r.status === 'rejected');
   const disputedReturn = returns.find((r: any) => r.status === 'disputed');
   const canShipReturn = activeReturn?.status === 'approved';
   const canDispute = rejectedReturn?.status === 'rejected' && !disputedReturn;
-  const canConfirmDelivery = order.status === 'shipped' || order.status === 'ready_for_pickup';
+  const canConfirmDelivery = !isDigitalOnly && (order.status === 'shipped' || order.status === 'ready_for_pickup');
 
-  // Janela de devolução: 7 dias após confirmação de entrega
+  // Janela de devolução: 14 dias para digitais; 7 dias após entrega para físicos.
   const returnWindowOpen = (() => {
     if (order.status !== 'delivered') return true;
     const delivered = order.confirmed_at || order.delivered_at;
     if (!delivered) return true;
     const daysSince = (Date.now() - new Date(delivered).getTime()) / (1000 * 60 * 60 * 24);
-    return daysSince <= 7;
+    return daysSince <= (isDigitalOnly ? 14 : 7);
   })();
-  const isDigitalOnly = !!order.is_digital_only;
   const hasConsumedDigital = !!order.has_consumed_digital;
   const canRequestReturnFinal = canRequestReturn && returnWindowOpen && !(isDigitalOnly && hasConsumedDigital);
 
   const timeline = buildTimeline(order);
+  const hasDigitalProducts = (order.items || []).some((item: any) => item.product_type === 'digital');
+  const hasCourseProducts = (order.items || []).some((item: any) => item.product_type === 'course');
 
   return (
     <AccountLayout>
@@ -291,7 +336,7 @@ export default function OrderDetailPage() {
               </p>
             </div>
             <span className={`self-start px-3.5 py-1.5 rounded-full text-sm font-semibold ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700'}`}>
-              {STATUS_LABELS[order.status] || order.status}
+              {isDigitalOnly && order.status === 'delivered' ? 'Acesso disponibilizado' : STATUS_LABELS[order.status] || order.status}
             </span>
           </div>
         </div>
@@ -353,9 +398,9 @@ export default function OrderDetailPage() {
                     <p className="text-muted-foreground">
                       <span className="font-medium text-foreground">{h.changed_by_name}</span>
                       {' '}alterou de{' '}
-                      <span className="font-medium">{STATUS_LABELS[h.previous_status] || h.previous_status}</span>
+                      <span className="font-medium">{isDigitalOnly && h.previous_status === 'delivered' ? 'Acesso disponibilizado' : STATUS_LABELS[h.previous_status] || h.previous_status}</span>
                       {' → '}
-                      <span className="font-semibold">{STATUS_LABELS[h.new_status] || h.new_status}</span>
+                      <span className="font-semibold">{isDigitalOnly && h.new_status === 'delivered' ? 'Acesso disponibilizado' : STATUS_LABELS[h.new_status] || h.new_status}</span>
                     </p>
                     {h.notes && <p className="text-xs text-muted-foreground mt-0.5">{h.notes}</p>}
                     <p className="text-xs text-muted-foreground/60">{new Date(h.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
@@ -399,25 +444,58 @@ export default function OrderDetailPage() {
 
             {/* Delivery + Payment info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-card border border-border rounded-2xl p-5">
-                <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><MapPin size={16} className="text-accent" /> Endereço de Entrega</h3>
-                {order.shipping_address ? (
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <p className="font-medium text-foreground">{order.shipping_address.full_name || order.shipping_address.name}</p>
-                    <p>{order.shipping_address.address || order.shipping_address.street}</p>
-                    <p>{order.shipping_address.city}{order.shipping_address.province ? `, ${order.shipping_address.province}` : ''}</p>
-                    {order.shipping_address.phone && <p>{order.shipping_address.phone}</p>}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">—</p>
-                )}
-                {order.tracking_code && (
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <p className="text-xs text-muted-foreground">Código de Rastreio</p>
-                    <p className="text-sm font-mono font-semibold text-accent">{order.tracking_code}</p>
-                  </div>
-                )}
-              </div>
+              {hasPhysicalOrderItems(order) && (
+                <div className="bg-card border border-border rounded-2xl p-5">
+                  <h3 className="font-bold text-sm mb-3 flex items-center gap-2">
+                    <MapPin size={16} className="text-accent" />
+                    {order.is_pickup ? 'Levantamento na loja' : 'Endereço de Entrega'}
+                  </h3>
+                  {order.is_pickup ? (
+                    <p className="text-sm text-muted-foreground">Combine o levantamento diretamente com a loja.</p>
+                  ) : order.shipping_address ? (
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p className="font-medium text-foreground">{order.shipping_address.full_name || order.shipping_address.name}</p>
+                      <p>{order.shipping_address.address || order.shipping_address.street}</p>
+                      <p>{order.shipping_address.city}{order.shipping_address.province ? `, ${order.shipping_address.province}` : ''}</p>
+                      {order.shipping_address.phone && <p>{order.shipping_address.phone}</p>}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">—</p>
+                  )}
+                  {!order.is_pickup && order.tracking_code && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <p className="text-xs text-muted-foreground">Código de Rastreio</p>
+                      <p className="text-sm font-mono font-semibold text-accent">{order.tracking_code}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {hasDigitalOrderItems(order) && (
+                <div className="bg-card border border-border rounded-2xl p-5">
+                  <h3 className="font-bold text-sm mb-3 flex items-center gap-2">
+                    <Download size={16} className="text-accent" /> {getDigitalFulfillmentLabel(order)}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {order.payment_status === 'completed'
+                      ? 'O conteúdo está disponível na sua conta.'
+                      : 'O acesso ao conteúdo será disponibilizado após a confirmação do pagamento.'}
+                  </p>
+                  {order.payment_status === 'completed' && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {hasDigitalProducts && (
+                        <Link href="/account/downloads" className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent/90">
+                          <Download size={15} /> Meus downloads
+                        </Link>
+                      )}
+                      {hasCourseProducts && (
+                        <Link href="/my-courses" className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted">
+                          <BookOpen size={15} /> Meus cursos
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="bg-card border border-border rounded-2xl p-5">
                 <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><CreditCard size={16} className="text-accent" /> Pagamento</h3>
                 <div className="space-y-3">
@@ -431,7 +509,7 @@ export default function OrderDetailPage() {
                       {PAYMENT_STATUS_LABELS[order.payment_status] || order.payment_status || '—'}
                     </span>
                   </div>
-                  {order.shipping_method && (
+                  {hasPhysicalOrderItems(order) && order.shipping_method && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Envio</span>
                       <span className="font-medium">{order.shipping_method}</span>
@@ -468,7 +546,7 @@ export default function OrderDetailPage() {
               )}
 
               {/* Shipping Info */}
-              {(order.status === 'shipped' || order.status === 'delivered') && order.shipping_notes && (
+              {hasPhysicalOrderItems(order) && (order.status === 'shipped' || order.status === 'delivered') && order.shipping_notes && (
                 <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
                   <h3 className="font-bold text-sm mb-2 flex items-center gap-2 text-purple-700"><Truck size={16} /> Informação de Envio</h3>
                   <p className="text-sm text-purple-800">{order.shipping_notes}</p>
@@ -495,8 +573,14 @@ export default function OrderDetailPage() {
                   <span className="font-medium">{Number(order.subtotal).toLocaleString('pt-MZ')} MZN</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Frete</span>
-                  <span className="font-medium">{Number(order.shipping_cost || 0) > 0 ? `${Number(order.shipping_cost).toLocaleString('pt-MZ')} MZN` : 'Grátis'}</span>
+                  <span className="text-muted-foreground">{isDigitalOnly ? 'Entrega digital' : 'Frete'}</span>
+                  <span className="font-medium">
+                    {isDigitalOnly
+                      ? getOrderFulfillmentLabel(order)
+                      : Number(order.shipping_cost || 0) > 0
+                        ? `${Number(order.shipping_cost).toLocaleString('pt-MZ')} MZN`
+                        : 'Grátis'}
+                  </span>
                 </div>
                 {Number(order.platform_fee) > 0 && (
                   <div className="flex justify-between">
@@ -538,7 +622,12 @@ export default function OrderDetailPage() {
               {' '}·{' '}
               Estado: <span className="font-semibold capitalize">{activeReturn.status === 'requested' ? 'Solicitada' : activeReturn.status === 'approved' ? 'Aprovada' : activeReturn.status === 'shipped' ? 'Enviada' : activeReturn.status === 'received' ? 'Recebida' : activeReturn.status === 'refunded' ? 'Reembolsada' : activeReturn.status}</span>
             </p>
-            {activeReturn.return_instructions && (
+            {isDigitalOnly && activeReturn.status === 'approved' && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Não é necessário enviar um produto físico. O vendedor poderá agora processar o reembolso.
+              </p>
+            )}
+            {hasPhysicalOrderItems(order) && activeReturn.return_instructions && (
               <div className={`mt-3 p-3 rounded-lg text-sm ${
                 activeReturn.status === 'refunded' ? 'bg-green-50 text-green-800' : 'bg-orange-50 text-orange-800'
               }`}>
@@ -547,7 +636,7 @@ export default function OrderDetailPage() {
                 {activeReturn.return_address && <p className="mt-1"><span className="font-medium">Endereço para devolução:</span> {activeReturn.return_address}</p>}
               </div>
             )}
-            {activeReturn.shipping_notes && (
+            {hasPhysicalOrderItems(order) && activeReturn.shipping_notes && (
               <div className={`mt-3 p-3 rounded-lg text-sm ${
                 activeReturn.status === 'refunded' ? 'bg-green-50 text-green-800' : 'bg-purple-50 text-purple-800'
               }`}>
@@ -572,7 +661,7 @@ export default function OrderDetailPage() {
         )}
 
         {/* Confirmar Envio (estilo MZ - informal) */}
-        {canShipReturn && (
+        {canShipReturn && hasPhysicalOrderItems(order) && (
           <button onClick={() => { setShipForm({ shipping_notes: '', buyer_tracking_code: '' }); setShowShipModal(true); }}
             className="w-full sm:w-auto px-6 py-3 border-2 border-purple-300 text-purple-700 bg-purple-50 rounded-xl font-semibold hover:bg-purple-100 transition-colors flex items-center justify-center gap-2">
             <Truck size={18} /> Confirmar Envio da Devolução
@@ -627,7 +716,9 @@ export default function OrderDetailPage() {
         {canRequestReturn && !returnWindowOpen && (
           <div className="bg-card border border-border rounded-2xl p-4 text-sm text-muted-foreground">
             <AlertCircle size={16} className="inline mr-2 text-amber-500" />
-            O prazo de devolução (7 dias após entrega) já expirou para esta encomenda.
+            {isDigitalOnly
+              ? 'O prazo de devolução (14 dias após disponibilização do conteúdo) já expirou para esta encomenda.'
+              : 'O prazo de devolução (7 dias após entrega) já expirou para esta encomenda.'}
           </div>
         )}
 
@@ -669,7 +760,7 @@ export default function OrderDetailPage() {
                   <label className="block text-sm font-semibold mb-2">Categoria</label>
                   <select value={ticketForm.category} onChange={e => setTicketForm(p => ({ ...p, category: e.target.value }))}
                     className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20">
-                    <option value="not_received">Não recebi a encomenda</option>
+                    <option value="not_received">{isDigitalOnly ? 'Não recebi o acesso digital' : 'Não recebi a encomenda'}</option>
                     <option value="defective">Produto com defeito</option>
                     <option value="wrong_item">Item errado</option>
                     <option value="payment">Problema de pagamento</option>
@@ -730,7 +821,11 @@ export default function OrderDetailPage() {
                 <div>
                   <label className="block text-sm font-semibold mb-2">Motivo da Devolução</label>
                   <select value={returnForm.reason_type} onChange={e => setReturnForm(p => ({ ...p, reason_type: e.target.value }))} className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors">
-                    {REASON_CHOICES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    {(isDigitalOnly ? REASON_CHOICES.filter(r => r.value !== 'damaged') : REASON_CHOICES).map(r => (
+                      <option key={r.value} value={r.value}>
+                        {isDigitalOnly ? DIGITAL_REASON_LABELS[r.value] || r.label : r.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>

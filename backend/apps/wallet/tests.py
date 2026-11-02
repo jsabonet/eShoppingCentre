@@ -55,7 +55,9 @@ def test_admin_payout_list_filters_by_status_method_and_search(admin, user):
     matching = PayoutRequest.objects.create(
         user=user,
         role='seller',
-        amount=Decimal('300.00'),
+        amount=Decimal('500.00'),
+        fee_percent=Decimal('11.00'),
+        fee=Decimal('55.00'),
         method='mpesa',
         status='paid',
         admin_reference='PAY-REPORT-123',
@@ -78,6 +80,8 @@ def test_admin_payout_list_filters_by_status_method_and_search(admin, user):
     assert response.status_code == 200
     assert response.data['count'] == 1
     assert response.data['results'][0]['id'] == str(matching.id)
+    assert Decimal(response.data['results'][0]['fee']) == Decimal('55.00')
+    assert Decimal(response.data['results'][0]['net_amount']) == Decimal('445.00')
 
 
 @pytest.mark.django_db
@@ -180,16 +184,55 @@ def test_request_payout_reserves_balance(user, ref_id):
     credit(wallet, 1000, kind='payout', ref_type='order', ref_id=ref_id,
            description='Venda', txn_type='sale')
 
-    payout = request_payout(user, role='seller', amount=300, method='mpesa',
+    payout = request_payout(user, role='seller', amount=500, method='mpesa',
                             account_details={'phone': '840000000'})
 
     wallet.refresh_from_db()
     assert payout.status == 'pending'
     assert wallet.payout_balance == 1000
-    assert wallet.reserved_balance == 300
+    assert wallet.reserved_balance == 500
     assert payout.fee_percent == Decimal('11.00')
-    assert payout.fee == Decimal('33.00')
-    assert payout.net_amount == Decimal('267.00')
+    assert payout.fee == Decimal('55.00')
+    assert payout.net_amount == Decimal('445.00')
+
+
+@pytest.mark.django_db
+def test_seller_payout_requires_minimum_of_500(user, ref_id):
+    wallet = get_wallet(user)
+    credit(wallet, 1000, kind='payout', ref_type='order', ref_id=ref_id,
+           description='Venda', txn_type='sale')
+
+    with pytest.raises(ValueError, match='mínimo de saque para vendedores é 500'):
+        request_payout(user, role='seller', amount=499.99, method='mpesa',
+                       account_details={'phone': '840000000'})
+
+    wallet.refresh_from_db()
+    assert wallet.reserved_balance == 0
+    assert not PayoutRequest.objects.exists()
+
+
+@pytest.mark.django_db
+def test_fee_is_calculated_for_each_seller_payout(user, ref_id):
+    wallet = get_wallet(user)
+    credit(wallet, 1500, kind='payout', ref_type='order', ref_id=ref_id,
+           description='Vendas', txn_type='sale')
+
+    first_payout = request_payout(
+        user, role='seller', amount=500, method='mpesa',
+        account_details={'phone': '840000000'},
+    )
+    second_payout = request_payout(
+        user, role='seller', amount=500, method='mpesa',
+        account_details={'phone': '840000000'},
+    )
+
+    assert first_payout.fee == Decimal('55.00')
+    assert second_payout.fee == Decimal('55.00')
+    assert first_payout.net_amount == Decimal('445.00')
+    assert second_payout.net_amount == Decimal('445.00')
+    assert first_payout.id != second_payout.id
+    wallet.refresh_from_db()
+    assert wallet.reserved_balance == Decimal('1000.00')
 
 
 @pytest.mark.django_db
@@ -199,7 +242,7 @@ def test_request_payout_rejects_over_available(user, ref_id):
            description='Venda', txn_type='sale')
 
     with pytest.raises(InsufficientFunds):
-        request_payout(user, role='seller', amount=200, method='mpesa',
+        request_payout(user, role='seller', amount=500, method='mpesa',
                        account_details={'phone': '840000000'})
 
 
@@ -208,7 +251,7 @@ def test_pay_payout_requires_approval(user, admin, ref_id):
     wallet = get_wallet(user)
     credit(wallet, 1000, kind='payout', ref_type='order', ref_id=ref_id,
            description='Venda', txn_type='sale')
-    payout = request_payout(user, role='seller', amount=300, method='mpesa',
+    payout = request_payout(user, role='seller', amount=500, method='mpesa',
                             account_details={'phone': '840000000'})
 
     with pytest.raises(ValueError):
@@ -220,7 +263,7 @@ def test_pay_payout_full_flow(user, admin, ref_id):
     wallet = get_wallet(user)
     credit(wallet, 1000, kind='payout', ref_type='order', ref_id=ref_id,
            description='Venda', txn_type='sale')
-    payout = request_payout(user, role='seller', amount=300, method='mpesa',
+    payout = request_payout(user, role='seller', amount=500, method='mpesa',
                             account_details={'phone': '840000000'})
 
     payout = approve_payout(payout, admin)
@@ -232,18 +275,18 @@ def test_pay_payout_full_flow(user, admin, ref_id):
     payout.refresh_from_db()
     assert payout.status == 'paid'
     assert payout.admin_reference == 'TX-123'
-    assert wallet.payout_balance == 700
+    assert wallet.payout_balance == 500
     assert wallet.reserved_balance == 0
-    assert wallet.total_withdrawn == 300
+    assert wallet.total_withdrawn == 500
 
     txn = WalletTransaction.objects.get(idempotency_key=f'payout:{payout.id}:pay')
-    assert txn.amount == -267
+    assert txn.amount == -445
     assert txn.type == 'withdrawal'
     entry = txn.entries.get()
     assert entry.counterparty == 'external'
     assert entry.direction == 'debit'
     fee_txn = WalletTransaction.objects.get(idempotency_key=f'payout:{payout.id}:fee')
-    assert fee_txn.amount == -33
+    assert fee_txn.amount == -55
     assert fee_txn.type == 'fee'
     assert fee_txn.entries.get().counterparty == 'platform'
 
@@ -253,7 +296,7 @@ def test_pay_payout_requires_manual_transfer_reference(user, admin, ref_id):
     wallet = get_wallet(user)
     credit(wallet, 1000, kind='payout', ref_type='order', ref_id=ref_id,
            description='Venda', txn_type='sale')
-    payout = request_payout(user, role='seller', amount=300, method='mpesa',
+    payout = request_payout(user, role='seller', amount=500, method='mpesa',
                             account_details={'phone': '840000000'})
     approve_payout(payout, admin)
 
@@ -262,7 +305,7 @@ def test_pay_payout_requires_manual_transfer_reference(user, admin, ref_id):
 
     wallet.refresh_from_db()
     assert wallet.payout_balance == 1000
-    assert wallet.reserved_balance == 300
+    assert wallet.reserved_balance == 500
 
 
 @pytest.mark.django_db
@@ -270,7 +313,7 @@ def test_reject_payout_releases_reservation(user, admin, ref_id):
     wallet = get_wallet(user)
     credit(wallet, 1000, kind='payout', ref_type='order', ref_id=ref_id,
            description='Venda', txn_type='sale')
-    payout = request_payout(user, role='seller', amount=300, method='mpesa',
+    payout = request_payout(user, role='seller', amount=500, method='mpesa',
                             account_details={'phone': '840000000'})
 
     reject_payout(payout, admin, reason='Dados inválidos')
@@ -480,7 +523,7 @@ def test_admin_reconciliation_uses_paid_totals_and_does_not_double_count_reserva
     request_payout(
         seller,
         role='seller',
-        amount=200,
+        amount=500,
         method='mpesa',
         account_details={'phone': '840000000'},
     )
@@ -550,9 +593,9 @@ def test_admin_reconciliation_uses_paid_totals_and_does_not_double_count_reserva
     assert response.data['affiliate_commissions_pending'] == 9.0
     assert response.data['affiliate_commissions_uncredited'] == 7.0
     assert response.data['payouts_paid'] == 40.0
-    assert response.data['payouts_pending'] == 206.0
+    assert response.data['payouts_pending'] == 506.0
     assert response.data['wallets_payout_balance'] == 1005.0
-    assert response.data['wallets_reserved_balance'] == 200.0
+    assert response.data['wallets_reserved_balance'] == 500.0
     assert response.data['wallets_buyer_balance'] == 0.0
     assert response.data['liabilities'] == 1312.0
 

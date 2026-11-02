@@ -10,6 +10,7 @@ import AccountLayout from '@/src/components/AccountLayout';
 import { useAuth } from '@/src/hooks/useAuth';
 import { usePaymentReconciliation } from '@/src/hooks/usePaymentReconciliation';
 import { ordersAPI } from '@/src/lib/api';
+import { isDigitalOnlyOrder } from '@/src/lib/orderFulfillment';
 
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
 
@@ -89,6 +90,9 @@ export default function OrdersPage() {
             {filtered.map((order: any) => {
               const status = statusConfig[order.status] || statusConfig.pending;
               const StatusIcon = status.icon;
+              const statusLabel = isDigitalOnlyOrder(order) && order.status === 'delivered'
+                ? 'Acesso disponibilizado'
+                : status.label;
               return (
                 <Link key={order.id} href={`/account/orders/${order.id}`}
                   className="block bg-card border border-border rounded-xl p-4 hover:shadow-md transition-shadow">
@@ -99,7 +103,7 @@ export default function OrdersPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
-                        <StatusIcon size={12} /> {status.label}
+                        <StatusIcon size={12} /> {statusLabel}
                       </span>
                       <ChevronRight size={16} className="text-muted-foreground" />
                     </div>

@@ -215,6 +215,8 @@ def test_affiliate_payout_requires_approval_then_manual_payment(affiliate_user, 
     assert payout.status == 'paid'
     assert payout.admin_reference == 'BANK-TRANSFER-01'
     assert payout.paid_by == admin
+    assert Decimal(pay_response.data['fee']) == Decimal('50.00')
+    assert Decimal(pay_response.data['net_amount']) == Decimal('950.00')
     assert wallet.payout_balance == Decimal('500.00')
     assert wallet.reserved_balance == Decimal('0.00')
     assert wallet.total_withdrawn == Decimal('1000.00')

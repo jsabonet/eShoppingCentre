@@ -5,6 +5,8 @@ from django.utils import timezone
 from .models import Wallet, WalletTransaction, WalletEntry, EscrowHolding
 from apps.notifications import email_service
 
+MIN_SELLER_PAYOUT_AMOUNT = Decimal('500.00')
+
 
 class InsufficientFunds(Exception):
     """Saldo insuficiente para executar o movimento."""
@@ -277,6 +279,10 @@ def request_payout(user, *, role, amount, method, account_details):
             raise ValueError(f'O valor mínimo de saque é {settings_obj.min_payout_amount} MZN.')
         fee_percent = Decimal('5.00')
     else:
+        if amount < MIN_SELLER_PAYOUT_AMOUNT:
+            raise ValueError(
+                f'O valor mínimo de saque para vendedores é {MIN_SELLER_PAYOUT_AMOUNT} MZN.'
+            )
         fee_percent = Decimal('11.00')
 
     fee = (amount * fee_percent / Decimal('100')).quantize(Decimal('0.01'))

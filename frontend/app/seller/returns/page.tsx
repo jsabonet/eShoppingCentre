@@ -41,11 +41,26 @@ const REASON_LABELS: Record<string, string> = {
   other: 'Outro',
 };
 
+const DIGITAL_REASON_LABELS: Record<string, string> = {
+  defective: 'Conteúdo com defeito',
+  not_as_described: 'Conteúdo diferente do anunciado',
+  not_satisfied: 'Problema de acesso ou utilização',
+  damaged: 'Arquivo digital danificado',
+  wrong_item: 'Conteúdo ou acesso errado',
+  other: 'Outro',
+};
+
 const STATUS_TIMELINE: { status: string; label: string; icon: any }[] = [
   { status: 'requested', label: 'Solicitada', icon: RotateCcw },
   { status: 'approved', label: 'Aprovada', icon: CheckCircle },
   { status: 'shipped', label: 'Enviada', icon: Truck },
   { status: 'received', label: 'Recebida', icon: Package },
+  { status: 'refunded', label: 'Reembolsada', icon: DollarSign },
+];
+
+const DIGITAL_RETURN_TIMELINE: { status: string; label: string; icon: any }[] = [
+  { status: 'requested', label: 'Solicitada', icon: RotateCcw },
+  { status: 'approved', label: 'Aprovada', icon: CheckCircle },
   { status: 'refunded', label: 'Reembolsada', icon: DollarSign },
 ];
 
@@ -77,11 +92,25 @@ interface ReturnItem {
   images: ReturnImage[];
   product_names: string[];
   product_image: string | null;
+  is_digital_only: boolean;
 }
 
 interface Toast {
   type: 'success' | 'error';
   message: string;
+}
+
+function getStatusFlow(item: ReturnItem) {
+  if (item.is_digital_only && item.status === 'approved') {
+    return { nextLabel: 'Processar Reembolso', nextStatus: 'refunded', action: 'refund', color: 'bg-green-600 text-white', icon: DollarSign };
+  }
+  return STATUS_FLOW[item.status];
+}
+
+function getReasonLabel(item: ReturnItem) {
+  return item.is_digital_only
+    ? DIGITAL_REASON_LABELS[item.reason_type] || item.reason
+    : REASON_LABELS[item.reason_type] || item.reason;
 }
 
 export default function SellerReturnsPage() {
@@ -254,7 +283,14 @@ export default function SellerReturnsPage() {
     );
   };
 
-  const getTimelineIndex = (status: string) => STATUS_TIMELINE.findIndex(s => s.status === status);
+  const getTimelineIndex = (status: string, isDigital = false) => {
+    if (isDigital) {
+      if (status === 'refunded') return 2;
+      if (status === 'approved' || status === 'received') return 1;
+      return status === 'requested' ? 0 : -1;
+    }
+    return STATUS_TIMELINE.findIndex(s => s.status === status);
+  };
 
   // --- COUNTERS ---
   const metricReturns = returns.filter((item) => {
@@ -396,7 +432,7 @@ export default function SellerReturnsPage() {
                     const statusInfo = STATUS_CONFIG[r.status] || STATUS_CONFIG.requested;
                     const StatusIcon = statusInfo.icon;
                     const isExpanded = expandedRows.has(r.id);
-                    const flow = STATUS_FLOW[r.status];
+                    const flow = getStatusFlow(r);
                     const isLoading = actionLoading === r.id;
 
                     return (
@@ -423,7 +459,7 @@ export default function SellerReturnsPage() {
                         </td>
                         <td className="py-2.5 px-2 sm:px-4 font-medium text-xs sm:text-sm">{r.buyer_name}</td>
                         <td className="py-2.5 px-2 sm:px-4 hidden md:table-cell">
-                          <span className="text-xs">{REASON_LABELS[r.reason_type] || r.reason}</span>
+                          <span className="text-xs">{getReasonLabel(r)}</span>
                         </td>
                         <td className="py-2.5 px-2 sm:px-4">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusInfo.color}`}>
@@ -527,18 +563,24 @@ export default function SellerReturnsPage() {
                         onChange={e => setResolveForm(p => ({ ...p, refund_amount: e.target.value }))}
                         className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20" />
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold mb-1">Morada para Devolução</label>
-                      <input type="text" placeholder="Av. 24 de Julho, 1234, Maputo" value={resolveForm.return_address}
-                        onChange={e => setResolveForm(p => ({ ...p, return_address: e.target.value }))}
-                        className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold mb-1">Instruções para o Cliente</label>
-                      <textarea rows={3} placeholder="Como o cliente deve proceder com a devolução..." value={resolveForm.return_instructions}
-                        onChange={e => setResolveForm(p => ({ ...p, return_instructions: e.target.value }))}
-                        className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 resize-none" />
-                    </div>
+                    {selectedReturn.is_digital_only ? (
+                      <p className="text-xs text-green-800">Não é necessário receber nem enviar um produto físico. Após aprovar, poderá processar o reembolso.</p>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-xs font-semibold mb-1">Morada para Devolução</label>
+                          <input type="text" placeholder="Av. 24 de Julho, 1234, Maputo" value={resolveForm.return_address}
+                            onChange={e => setResolveForm(p => ({ ...p, return_address: e.target.value }))}
+                            className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold mb-1">Instruções para o Cliente</label>
+                          <textarea rows={3} placeholder="Como o cliente deve proceder com a devolução..." value={resolveForm.return_instructions}
+                            onChange={e => setResolveForm(p => ({ ...p, return_instructions: e.target.value }))}
+                            className="w-full px-4 py-2.5 border border-border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 resize-none" />
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -587,8 +629,8 @@ export default function SellerReturnsPage() {
               <div className="mb-6">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Progresso</h3>
                 <div className="flex items-center gap-1">
-                  {STATUS_TIMELINE.map((step, i) => {
-                    const currentIdx = getTimelineIndex(selectedReturn.status);
+                  {(selectedReturn.is_digital_only ? DIGITAL_RETURN_TIMELINE : STATUS_TIMELINE).map((step, i) => {
+                    const currentIdx = getTimelineIndex(selectedReturn.status, selectedReturn.is_digital_only);
                     const isDone = i <= currentIdx || (selectedReturn.status === 'rejected' && i === 0);
                     const isRejected = selectedReturn.status === 'rejected' && i >= 1;
                     const StepIcon = step.icon;
@@ -619,7 +661,7 @@ export default function SellerReturnsPage() {
                 </div>
                 <div className="bg-muted/50 rounded-xl p-4 space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground"><FileText size={14} /> <span className="text-xs">Motivo</span></div>
-                  <p className="font-semibold text-sm">{REASON_LABELS[selectedReturn.reason_type]}</p>
+                  <p className="font-semibold text-sm">{getReasonLabel(selectedReturn)}</p>
                   {selectedReturn.reason && <p className="text-xs text-muted-foreground">{selectedReturn.reason}</p>}
                 </div>
                 <div className="bg-muted/50 rounded-xl p-4 space-y-2 text-sm">
@@ -635,7 +677,7 @@ export default function SellerReturnsPage() {
               </div>
 
               {/* Tracking */}
-              {selectedReturn.buyer_tracking_code && (
+              {!selectedReturn.is_digital_only && selectedReturn.buyer_tracking_code && (
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
                   <div className="flex items-center gap-2 text-blue-700 mb-1"><Truck size={14} /> <span className="text-xs font-semibold">Código de Rastreio do Cliente</span></div>
                   <p className="font-mono font-bold text-blue-800">{selectedReturn.buyer_tracking_code}</p>
@@ -643,7 +685,7 @@ export default function SellerReturnsPage() {
               )}
 
               {/* Return Instructions */}
-              {selectedReturn.return_instructions && (
+              {!selectedReturn.is_digital_only && selectedReturn.return_instructions && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                   <div className="flex items-center gap-2 text-amber-700 mb-1"><ArrowRight size={14} /> <span className="text-xs font-semibold">Instruções Enviadas ao Cliente</span></div>
                   <p className="text-sm text-amber-800">{selectedReturn.return_instructions}</p>
@@ -681,17 +723,18 @@ export default function SellerReturnsPage() {
               )}
 
               {/* Quick actions in detail */}
-              {STATUS_FLOW[selectedReturn.status] && (
+              {getStatusFlow(selectedReturn) && (
                 <div className="mt-6 pt-4 border-t border-border">
                   <button onClick={() => {
                     setDetailModal(false);
-                    if (STATUS_FLOW[selectedReturn.status].action === 'resolve') openResolveModal(selectedReturn);
-                    else if (STATUS_FLOW[selectedReturn.status].action === 'receive') handleReceive(selectedReturn.id);
-                    else if (STATUS_FLOW[selectedReturn.status].action === 'refund') handleRefund(selectedReturn.id);
+                    const flow = getStatusFlow(selectedReturn)!;
+                    if (flow.action === 'resolve') openResolveModal(selectedReturn);
+                    else if (flow.action === 'receive') handleReceive(selectedReturn.id);
+                    else if (flow.action === 'refund') handleRefund(selectedReturn.id);
                   }}
-                  className={`w-full px-4 py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${STATUS_FLOW[selectedReturn.status].color} hover:opacity-90`}>
+                  className={`w-full px-4 py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${getStatusFlow(selectedReturn)!.color} hover:opacity-90`}>
                     {actionLoading === selectedReturn.id ? <Loader2 size={15} className="animate-spin" /> : null}
-                    {STATUS_FLOW[selectedReturn.status].nextLabel}
+                    {getStatusFlow(selectedReturn)!.nextLabel}
                   </button>
                 </div>
               )}

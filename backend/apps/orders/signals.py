@@ -38,7 +38,7 @@ def enroll_in_courses(sender, instance, **kwargs):
 @receiver(post_save, sender=Order)
 def auto_complete_digital_orders(sender, instance, **kwargs):
     """Pedidos 100% digitais/cursos (com itens) são concluídos automaticamente após pagamento."""
-    if instance.payment_status != 'completed' or instance.status == 'delivered':
+    if instance.payment_status != 'completed' or instance.status in ('delivered', 'refunded', 'cancelled'):
         return
     if instance.is_digital_only:
         from django.utils import timezone

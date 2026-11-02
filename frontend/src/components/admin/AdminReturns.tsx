@@ -27,6 +27,15 @@ const REASON_LABELS: Record<string, string> = {
   wrong_item: 'Item errado', other: 'Outro',
 };
 
+const DIGITAL_REASON_LABELS: Record<string, string> = {
+  defective: 'Conteúdo com defeito',
+  not_as_described: 'Conteúdo diferente do anunciado',
+  not_satisfied: 'Problema de acesso ou utilização',
+  damaged: 'Arquivo digital danificado',
+  wrong_item: 'Conteúdo ou acesso errado',
+  other: 'Outro',
+};
+
 interface ReturnImage {
   id: string;
   image: string;
@@ -42,10 +51,17 @@ interface ReturnItem {
   refund_amount: number | null; vendor_notes: string;
   admin_notes: string; disputed_at: string | null;
   buyer_tracking_code: string; shipping_notes: string;
+  is_digital_only: boolean;
   created_at: string;
   product_names: string[];
   product_image: string | null;
   images: ReturnImage[];
+}
+
+function getReasonLabel(item: ReturnItem) {
+  return item.is_digital_only
+    ? DIGITAL_REASON_LABELS[item.reason_type] || item.reason
+    : REASON_LABELS[item.reason_type] || item.reason;
 }
 
 export default function AdminReturns() {
@@ -204,7 +220,7 @@ export default function AdminReturns() {
                       </td>
                       <td className="py-2.5 px-3 text-xs font-medium">{r.buyer_name}</td>
                       <td className="py-2.5 px-3 hidden sm:table-cell">
-                        <span className="text-xs">{REASON_LABELS[r.reason_type] || r.reason}</span>
+                        <span className="text-xs">{getReasonLabel(r)}</span>
                       </td>
                       <td className="py-2.5 px-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${s.color}`}>
@@ -255,7 +271,8 @@ export default function AdminReturns() {
               {selected.buyer_email && <div><span className="text-muted-foreground">Email:</span> {selected.buyer_email}</div>}
               {selected.buyer_phone && <div><span className="text-muted-foreground">Tel:</span> {selected.buyer_phone}</div>}
               <div><span className="text-muted-foreground">Loja:</span> {selected.store_name}</div>
-              <div><span className="text-muted-foreground">Motivo:</span> {REASON_LABELS[selected.reason_type]} — {selected.reason}</div>
+              {selected.is_digital_only && <div className="font-medium text-emerald-700">Encomenda digital — sem devolução física.</div>}
+              <div><span className="text-muted-foreground">Motivo:</span> {getReasonLabel(selected)} — {selected.reason}</div>
               <div><span className="text-muted-foreground">Estado atual:</span> <span className={`font-semibold ${STATUS_CONFIG[selected.status]?.color}`}>{STATUS_CONFIG[selected.status]?.label}</span></div>
               {selected.refund_amount && <div><span className="text-muted-foreground">Reembolso:</span> {Number(selected.refund_amount).toLocaleString('pt-MZ')} MZN</div>}
             </div>
@@ -302,18 +319,24 @@ export default function AdminReturns() {
                       onChange={e => setOverrideForm(p => ({ ...p, refund_amount: e.target.value }))}
                       className="w-full px-3 py-2 border border-border rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20" />
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold mb-1">Morada p/ Devolução</label>
-                    <input type="text" placeholder="Morada" value={overrideForm.return_address}
-                      onChange={e => setOverrideForm(p => ({ ...p, return_address: e.target.value }))}
-                      className="w-full px-3 py-2 border border-border rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold mb-1">Instruções</label>
-                    <textarea rows={2} placeholder="Instruções para o comprador..." value={overrideForm.return_instructions}
-                      onChange={e => setOverrideForm(p => ({ ...p, return_instructions: e.target.value }))}
-                      className="w-full px-3 py-2 border border-border rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 resize-none" />
-                  </div>
+                  {selected.is_digital_only ? (
+                    <p className="text-xs text-green-800">Não é necessário receber nem enviar um produto físico.</p>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-[11px] font-semibold mb-1">Morada p/ Devolução</label>
+                        <input type="text" placeholder="Morada" value={overrideForm.return_address}
+                          onChange={e => setOverrideForm(p => ({ ...p, return_address: e.target.value }))}
+                          className="w-full px-3 py-2 border border-border rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold mb-1">Instruções</label>
+                        <textarea rows={2} placeholder="Instruções para o comprador..." value={overrideForm.return_instructions}
+                          onChange={e => setOverrideForm(p => ({ ...p, return_instructions: e.target.value }))}
+                          className="w-full px-3 py-2 border border-border rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 resize-none" />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 

@@ -6,9 +6,13 @@ import LightboxImage from '@/src/components/LightboxImage';
 import {
   ShoppingCart, Search, Clock, CheckCircle, Truck, XCircle, RefreshCw,
   AlertCircle, ChevronDown, ChevronUp, History, Eye, User, Phone, Mail, Loader2,
-  Download, ChevronLeft, ChevronRight,
+  Download, ChevronLeft, ChevronRight, MapPin,
 } from 'lucide-react';
 import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
+import {
+  getDigitalFulfillmentLabel, getOrderFulfillmentLabel, hasDigitalOrderItems,
+  hasPhysicalOrderItems, isDigitalOnlyOrder,
+} from '@/src/lib/orderFulfillment';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || 'http://localhost:8000';
@@ -36,9 +40,16 @@ interface OrderItem {
   platform_fee?: number; affiliate_commission?: number;
   buyer_email?: string; buyer_phone?: string; buyer_name?: string;
   store_name?: string; store_phone?: string;
+  is_digital_only?: boolean; has_physical_items?: boolean; is_pickup?: boolean;
+  shipping_method?: string; shipping_address?: Record<string, string>;
   items?: any[]; shipping_notes?: string; tracking_code?: string;
   shipping_evidence?: string;
   status_history?: StatusEntry[];
+}
+
+function getStatusLabel(order: OrderItem, status: string) {
+  if (isDigitalOnlyOrder(order) && status === 'delivered') return 'Acesso disponibilizado';
+  return STATUS_CONFIG[status]?.label || status;
 }
 
 export default function AdminOrders() {
@@ -329,7 +340,7 @@ export default function AdminOrders() {
                         <td className="py-2.5 px-2 text-xs text-muted-foreground hidden md:table-cell">{order.store_name || '—'}</td>
                         <td className="py-2.5 px-2 font-semibold text-xs">{Number(order.total).toLocaleString('pt-MZ')} MZN</td>
                         <td className="py-2.5 px-2">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${s.color}`}>{s.label}</span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${s.color}`}>{getStatusLabel(order, order.status)}</span>
                         </td>
                         <td className="py-2.5 px-2 text-xs text-muted-foreground hidden sm:table-cell">{new Date(order.created_at).toLocaleDateString('pt-MZ')}</td>
                         <td className="py-2.5 px-2">
@@ -337,9 +348,14 @@ export default function AdminOrders() {
                             disabled={updating === order.id}
                             className="text-[11px] px-1.5 py-1 border border-border rounded bg-white disabled:opacity-50 max-w-[110px]">
                             <option value="">Mudar...</option>
-                            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                              <option key={k} value={k} disabled={k === order.status}>{v.label}</option>
-                            ))}
+                            {Object.entries(STATUS_CONFIG)
+                              .filter(([status]) => !isDigitalOnlyOrder(order)
+                                || !['processing', 'shipped', 'ready_for_pickup'].includes(status))
+                              .map(([k, v]) => (
+                              <option key={k} value={k} disabled={k === order.status}>
+                                {isDigitalOnlyOrder(order) && k === 'delivered' ? 'Acesso disponibilizado' : v.label}
+                              </option>
+                              ))}
                           </select>
                           {updating === order.id && <Loader2 size={12} className="animate-spin inline ml-1" />}
                         </td>
@@ -358,7 +374,7 @@ export default function AdminOrders() {
                                   <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1 flex-shrink-0" />
                                   <div>
                                     <span className="font-medium text-foreground">{h.changed_by_name}</span>
-                                    <span className="text-muted-foreground">: {STATUS_CONFIG[h.previous_status]?.label || h.previous_status} → {STATUS_CONFIG[h.new_status]?.label || h.new_status}</span>
+                                    <span className="text-muted-foreground">: {getStatusLabel(order, h.previous_status)} → {getStatusLabel(order, h.new_status)}</span>
                                     {h.notes && <span className="text-muted-foreground/60"> — {h.notes}</span>}
                                     <span className="text-muted-foreground/40 ml-2">{new Date(h.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                                   </div>
@@ -425,8 +441,30 @@ export default function AdminOrders() {
                 {detail.store_phone && <p className="text-[11px] text-accent">{detail.store_phone}</p>}
               </div>
               <div className="bg-muted/30 rounded-xl p-3">
+                <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
+                  {hasPhysicalOrderItems(detail) ? <MapPin size={12} /> : <Download size={12} />}
+                  {hasPhysicalOrderItems(detail) ? (detail.is_pickup ? 'Levantamento' : 'Entrega') : 'Disponibilização'}
+                </div>
+                <p className="font-semibold text-xs">{getOrderFulfillmentLabel(detail)}</p>
+                {hasPhysicalOrderItems(detail) && detail.shipping_method && (
+                  <p className="text-[11px] text-muted-foreground">{detail.shipping_method}</p>
+                )}
+                {hasPhysicalOrderItems(detail) && !detail.is_pickup && detail.shipping_address && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {[detail.shipping_address.address || detail.shipping_address.street, detail.shipping_address.city, detail.shipping_address.province]
+                      .filter(Boolean).join(', ')}
+                  </p>
+                )}
+                {hasDigitalOrderItems(detail) && hasPhysicalOrderItems(detail) && (
+                  <p className="mt-1 text-[11px] text-emerald-700">
+                    Também inclui {getDigitalFulfillmentLabel(detail)}; sem envio físico deste conteúdo.
+                  </p>
+                )}
+                {isDigitalOnlyOrder(detail) && <p className="mt-1 text-[11px] text-muted-foreground">Sem envio físico.</p>}
+              </div>
+              <div className="bg-muted/30 rounded-xl p-3">
                 <span className="text-xs text-muted-foreground">Status</span>
-                <p><span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_CONFIG[detail.status]?.color}`}>{STATUS_CONFIG[detail.status]?.label}</span></p>
+                <p><span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_CONFIG[detail.status]?.color}`}>{getStatusLabel(detail, detail.status)}</span></p>
               </div>
               <div className="bg-muted/30 rounded-xl p-3">
                 <span className="text-xs text-muted-foreground">Total</span>
@@ -459,13 +497,13 @@ export default function AdminOrders() {
               </div>
             )}
 
-            {detail.shipping_notes && (
+            {hasPhysicalOrderItems(detail) && detail.shipping_notes && (
               <div className="bg-purple-50 rounded-xl p-3 mb-4 text-xs">
                 <span className="font-semibold text-purple-700">Envio:</span> {detail.shipping_notes}
               </div>
             )}
 
-            {detail.shipping_evidence && (
+            {hasPhysicalOrderItems(detail) && detail.shipping_evidence && (
               <div className="mb-4">
                 <div className="text-xs font-semibold text-muted-foreground mb-2">Evidência de Envio</div>
                 <LightboxImage src={detail.shipping_evidence} alt="Evidência de envio" fill

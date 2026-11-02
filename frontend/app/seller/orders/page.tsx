@@ -12,6 +12,10 @@ import LoadingSpinner from '@/src/components/LoadingSpinner';
 import LightboxImage from '@/src/components/LightboxImage';
 import { ordersAPI } from '@/src/lib/api';
 import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
+import {
+  getDigitalFulfillmentLabel, getOrderFulfillmentLabel, hasDigitalOrderItems,
+  hasPhysicalOrderItems, isDigitalOnlyOrder,
+} from '@/src/lib/orderFulfillment';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -47,11 +51,17 @@ interface OrderItem {
   store_phone?: string;
   items?: any[]; shipping_notes?: string; tracking_code?: string;
   shipping_method?: string;
+  shipping_address?: Record<string, string>;
   shipping_evidence?: string;
   is_pickup?: boolean;
   has_physical_items?: boolean;
   is_digital_only?: boolean;
   status_history?: { id: string; previous_status: string; new_status: string; changed_by_name: string; notes: string; created_at: string }[];
+}
+
+function getStatusLabel(order: OrderItem, status: string) {
+  if (isDigitalOnlyOrder(order) && status === 'delivered') return 'Acesso disponibilizado';
+  return STATUS_CONFIG[status]?.label || status;
 }
 
 export default function SellerOrdersPage() {
@@ -287,7 +297,7 @@ export default function SellerOrdersPage() {
                     const s = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
                     const Icon = s.icon;
                     const isExpanded = expanded.has(order.id);
-                    const isDigital = order.is_digital_only === true;
+                    const isDigital = isDigitalOnlyOrder(order);
                     const allowed = isDigital ? [] : (ALLOWED_OPTIONS[order.status] || []);
                     const hasHistory = (order.status_history?.length || 0) > 0;
 
@@ -324,11 +334,16 @@ export default function SellerOrdersPage() {
                           <td className="py-2.5 px-2 sm:px-4 text-muted-foreground text-xs hidden md:table-cell">{new Date(order.created_at).toLocaleDateString('pt-MZ')}</td>
                           <td className="py-2.5 px-2 sm:px-4">
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${s.color}`}>
-                              <Icon size={11} /> {s.label}
+                              <Icon size={11} /> {getStatusLabel(order, order.status)}
                             </span>
                             {isDigital && (
                               <span className="inline-flex items-center gap-1 ml-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">
                                 Digital
+                              </span>
+                            )}
+                            {!isDigital && hasDigitalOrderItems(order) && hasPhysicalOrderItems(order) && (
+                              <span className="inline-flex items-center gap-1 ml-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-100 text-sky-700">
+                                Misto
                               </span>
                             )}
                           </td>
@@ -363,7 +378,7 @@ export default function SellerOrdersPage() {
                               <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
                                 <History size={13} /> Histórico de Status
                               </div>
-                              {(order.shipping_evidence || order.shipping_notes) && (
+                              {hasPhysicalOrderItems(order) && (order.shipping_evidence || order.shipping_notes) && (
                                 <div className="mb-3 flex items-start gap-3">
                                   {order.shipping_evidence && (
                                     <LightboxImage src={order.shipping_evidence} alt="Evidência de envio" fill
@@ -385,8 +400,8 @@ export default function SellerOrdersPage() {
                                     <div>
                                       <span className="text-muted-foreground">
                                         <span className="font-medium text-foreground">{h.changed_by_name}</span>
-                                        {' '}: <span className="font-medium">{STATUS_CONFIG[h.previous_status]?.label || h.previous_status}</span>
-                                        {' → '}<span className="font-semibold">{STATUS_CONFIG[h.new_status]?.label || h.new_status}</span>
+                                        {' '}: <span className="font-medium">{getStatusLabel(order, h.previous_status)}</span>
+                                        {' → '}<span className="font-semibold">{getStatusLabel(order, h.new_status)}</span>
                                       </span>
                                       {h.notes && <span className="text-muted-foreground/70 ml-1">— {h.notes}</span>}
                                       <span className="text-muted-foreground/50 ml-2">{new Date(h.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
@@ -475,13 +490,32 @@ export default function SellerOrdersPage() {
                 {detail.buyer_phone && <p className="text-[11px] text-accent">{detail.buyer_phone}</p>}
               </div>
               <div className="bg-muted/30 rounded-xl p-3">
-                <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1"><MapPin size={12} /> Entrega</div>
-                <p className="font-semibold text-xs">{detail.is_pickup ? 'Levantamento na loja' : 'Entrega ao domicílio'}</p>
-                {detail.shipping_method && <p className="text-[11px] text-muted-foreground">{detail.shipping_method}</p>}
+                <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
+                  {hasPhysicalOrderItems(detail) ? <MapPin size={12} /> : <Download size={12} />}
+                  {hasPhysicalOrderItems(detail) ? (detail.is_pickup ? 'Levantamento' : 'Entrega') : 'Disponibilização'}
+                </div>
+                <p className="font-semibold text-xs">{getOrderFulfillmentLabel(detail)}</p>
+                {hasPhysicalOrderItems(detail) && detail.shipping_method && (
+                  <p className="text-[11px] text-muted-foreground">{detail.shipping_method}</p>
+                )}
+                {hasPhysicalOrderItems(detail) && !detail.is_pickup && detail.shipping_address && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {[detail.shipping_address.address || detail.shipping_address.street, detail.shipping_address.city, detail.shipping_address.province]
+                      .filter(Boolean).join(', ')}
+                  </p>
+                )}
+                {hasDigitalOrderItems(detail) && hasPhysicalOrderItems(detail) && (
+                  <p className="mt-1 text-[11px] text-emerald-700">
+                    Também inclui {getDigitalFulfillmentLabel(detail)}; sem envio físico deste conteúdo.
+                  </p>
+                )}
+                {isDigitalOnlyOrder(detail) && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">Sem envio físico.</p>
+                )}
               </div>
               <div className="bg-muted/30 rounded-xl p-3">
                 <span className="text-xs text-muted-foreground">Status</span>
-                <p><span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_CONFIG[detail.status]?.color}`}>{STATUS_CONFIG[detail.status]?.label}</span></p>
+                <p><span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_CONFIG[detail.status]?.color}`}>{getStatusLabel(detail, detail.status)}</span></p>
               </div>
               <div className="bg-muted/30 rounded-xl p-3">
                 <span className="text-xs text-muted-foreground">Total</span>
@@ -515,13 +549,13 @@ export default function SellerOrdersPage() {
             )}
 
             {/* Envio */}
-            {detail.shipping_notes && (
+            {hasPhysicalOrderItems(detail) && detail.shipping_notes && (
               <div className="bg-purple-50 rounded-xl p-3 mb-4 text-xs">
                 <span className="font-semibold text-purple-700">Envio:</span> {detail.shipping_notes}
                 {detail.tracking_code && <div className="mt-0.5 text-purple-600">Ref: {detail.tracking_code}</div>}
               </div>
             )}
-            {detail.shipping_evidence && (
+            {hasPhysicalOrderItems(detail) && detail.shipping_evidence && (
               <div className="mb-4">
                 <div className="text-xs font-semibold text-muted-foreground mb-2">Evidência de Envio</div>
                 <LightboxImage src={detail.shipping_evidence} alt="Evidência de envio" fill
@@ -542,7 +576,7 @@ export default function SellerOrdersPage() {
                         {i < detail.status_history!.length - 1 && <div className="w-px flex-1 bg-border" />}
                       </div>
                       <div className="pb-2">
-                        <p><span className="font-medium">{h.changed_by_name}</span>: {STATUS_CONFIG[h.previous_status]?.label || h.previous_status} → <span className="font-semibold">{STATUS_CONFIG[h.new_status]?.label || h.new_status}</span></p>
+                        <p><span className="font-medium">{h.changed_by_name}</span>: {getStatusLabel(detail, h.previous_status)} → <span className="font-semibold">{getStatusLabel(detail, h.new_status)}</span></p>
                         {h.notes && <p className="text-muted-foreground">{h.notes}</p>}
                         <p className="text-muted-foreground/50">{new Date(h.created_at).toLocaleDateString('pt-MZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                       </div>

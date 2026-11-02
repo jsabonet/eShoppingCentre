@@ -42,7 +42,7 @@ Existe ainda **duplicação**: dois subsistemas de saque paralelos (a carteira `
 | `WalletTransaction` | `type` (sale/commission/affiliate_commission/withdrawal/fee/refund/bonus), `status` (pending/completed/failed), `balance_before/after`, `reference_type/reference_id` | Sem chave de idempotência (prevista no plano, não implementada). |
 | `WalletEntry` | direção `debit`/`credit`, `kind` (`buyer`/`payout`/`platform`), `balance_before/after` | **Não é double-entry verdadeiro**: uma entrada por transação, sem conta contraparte ⇒ Σdébitos ≠ Σcréditos por construção. |
 | `EscrowHolding` | `order` FK, `amount`, `status` (held/released/reversed), `released_at` | Apenas bens físicos. |
-| `PayoutRequest` | `user`, `role` (seller/affiliate), `amount`, `method` (mpesa/emola/bank), `account_details` (JSON), `status` (pending/approved/paid/rejected), `approved_by`, `paid_by`, `admin_reference`, `approved_at`, `paid_at`, `rejection_reason`, `notes` | Saque do circuito da carteira. |
+| `PayoutRequest` | `user`, `role` (seller/affiliate), `amount` bruto, `fee_percent`, `fee`, `method`, `account_details`, `status`, dados de aprovação/pagamento | `net_amount = amount − fee`; o admin transfere o líquido. |
 
 Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 
@@ -50,9 +50,9 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 |--------|-------------|
 | `AffiliateProfile` | `available_commission` = `total_commission − total_withdrawn` (property). |
 | `AffiliateCommission` | pending → approved (Celery após `approve_after_days`=7, ou admin). **Nunca credita a carteira.** |
-| `AffiliatePayout` | Saque separado; sem reserva de saldo. |
+| `AffiliatePayout` | Pedido separado do `PayoutRequest`; o valor bruto fica reservado em `Wallet.reserved_balance`. |
 | `AffiliateKYC` | Gate de verificação para afiliados. |
-| `AffiliateSettings` | `min_payout_amount` (500 MZN), `approve_after_days` (7), `payout_fee_percent` (default 0) — **`payout_fee_percent` definido mas nunca aplicado**. |
+| `AffiliateSettings` | `min_payout_amount` (default 500 MZN), `approve_after_days` (7), `payout_fee_percent` (default 5%). |
 
 `payments.PaymentTransaction`: mantém o registo do pedido VPay e da confirmação do pagamento; pagamentos históricos PaySuite são preservados como legado.
 
@@ -96,20 +96,20 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 
 - `AffiliateCommission` criado após `settle_payment` (prorrateado por loja).
 - pending → approved via Celery `auto_approve_affiliate_commissions` (após `approve_after_days`=7) ou admin (`PATCH /affiliates/admin/affiliates/commissions/<pk>/`).
-- Aprovação → `total_commission += valor`. Clawback (`clawback_days`=30) → `total_commission −= valor`.
-- **Nunca credita `Wallet`** — o circuito do afiliado é totalmente paralelo.
+- Aprovação → credita a comissão aprovada em `Wallet.payout_balance` e atualiza `total_commission`. Clawback (`clawback_days`=30) reverte o crédito quando possível.
 
 ### 3.6 Pedido de saque
 
-- **Vendedor** → `wallet.services.request_payout(role="seller")` (161–195): valida `0 < amount ≤ available` (= `payout_balance − reserved_balance`), cria `PayoutRequest`, incrementa `reserved_balance`, envia email ao admin (on_commit).
-- **Afiliado** → `POST /affiliates/me/payouts/`: `IsVerified` + KYC aprovado + `amount ≥ min_payout_amount` (500 MZN) + `amount ≤ available_commission`; cria `AffiliatePayout` **sem reserva**.
+- **Vendedor** → `wallet.services.request_payout(role="seller")`: exige valor bruto mínimo de **500 MZN** e valor disponível (`payout_balance − reserved_balance`) suficiente; aplica taxa de **11%** a cada pedido, guarda bruto/taxa/líquido em `PayoutRequest` e reserva o bruto.
+- **Afiliado** → `POST /affiliates/me/payouts/` ou `POST /wallet/me/payouts/` com `role="affiliate"`: exige perfil ativo, KYC aprovado ou conta de vendedor verificada, mínimo configurado (default **500 MZN**) e saldo disponível; aplica taxa de **5%** a cada pedido e reserva o bruto em `Wallet`.
 
 ### 3.7 Aprovação e pagamento (admin)
 
-- `wallet.approve_payout` (198–206): pending → approved; apenas carimba admin + timestamp (**não é load-bearing** para o dinheiro).
-- `wallet.pay_payout` (209–245): aceita status pending **ou** approved; liberta `reserved_balance`; valida `payout_balance ≥ amount`; debita `payout_balance`; incrementa `total_withdrawn`; escreve transação `withdrawal` + `WalletEntry` débito; marca paid/paid_by/paid_at/admin_reference; email `send_payout_paid_email` (on_commit).
-- `wallet.reject_payout` (248–257): pending/approved → rejected + motivo; liberta `reserved_balance`; email `send_payout_rejected_email`.
-- **Afiliado (admin)** → `PATCH /affiliates/admin/affiliates/payouts/<pk>/` ação `approve` → status **`paid`** diretamente + `total_withdrawn += amount` (passo único, sem ledger, sem reserva); ação `reject` → rejected + notes.
+- `wallet.approve_payout`: pending → approved; grava admin e timestamp.
+- `wallet.pay_payout`: exige aprovação e referência; debita do saldo o líquido transferido mais a taxa, atualiza `total_withdrawn` pelo bruto e regista transações distintas para transferência externa e taxa da plataforma.
+- `wallet.reject_payout`: pending/approved → rejected; liberta o bruto reservado.
+- **Afiliado (admin)** → `PATCH /affiliates/admin/affiliates/payouts/<pk>/`: aprovação, pagamento manual ou rejeição. No pagamento, debita líquido + taxa, regista movimentos no ledger e grava referência/admin.
+- As listagens administrativas expõem o bruto, a taxa e `net_amount`; o valor indicado para transferência manual já está líquido da taxa.
 
 ### 3.8 Reconciliação (admin)
 
@@ -132,7 +132,7 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 
 | Camada | Implementado | Estado |
 |--------|-------------|--------|
-| Backend | `settle_payment` → escrow (físico) ou crédito imediato (digital/curso); `Wallet.payout_balance`; `request_payout(role="seller")`; `pay_payout`. | ✅ |
+| Backend | `settle_payment` → escrow (físico) ou crédito imediato (digital/curso); `Wallet.payout_balance`; saque mínimo 500 MZN, taxa de 11% por pedido; admin transfere `net_amount`. | ✅ |
 | Backend | `stores/views_earnings.py` (StoreStatsView, StoreEarningsView) lê `wallet.transactions.filter(type="sale")`. | ✅ |
 | Frontend | `frontend/app/seller/earnings/page.tsx`: saldo disponível, modal "Solicitar Saque" (mpesa/emola/bank com telefone/dados), histórico de transações. | ✅ |
 | Frontend | **Histórico de saques do vendedor** (só afiliado tem "Meus Saques"). | ❌ Em falta |
@@ -141,9 +141,8 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 
 | Camada | Implementado | Estado |
 |--------|-------------|--------|
-| Backend | Comissões (pending → approved → `total_commission`); KYC; `AffiliatePayout` com `min_payout_amount`; ação admin approve→paid. | ✅ |
-| Backend | **Unificação com a carteira** (`wallet.services.credit` para afiliados). | ❌ Não ligado |
-| Backend | `payout_fee_percent` aplicado. | ❌ Definido mas inutilizado |
+| Backend | Comissões aprovadas creditam `Wallet.payout_balance`; KYC; saque mínimo padrão de 500 MZN, taxa de 5% por pedido e reserva do valor bruto. | ✅ |
+| Backend | Pagamento admin debita o líquido transferido e a taxa em movimentos separados, mantendo a referência do pagamento. | ✅ |
 | Frontend | `frontend/app/affiliate/earnings/page.tsx`: gate KYC, `available_commission`, pedido de saque, lista "Meus Saques". | ✅ |
 
 ### 4.4 Admin
@@ -152,8 +151,8 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 |--------|-------------|--------|
 | Backend | `wallet` admin: `GET admin/payouts/`, `POST admin/payouts/<pk>/approve|pay|reject/`, `GET admin/reconciliation/`. | ✅ |
 | Backend | `affiliates` admin: aprovar comissão, payout approve→paid, KYC action. | ✅ |
-| Frontend | `frontend/src/components/admin/AdminWallet.tsx` — UI completa (lista, aprovar, marcar pago com referência, rejeitar com motivo, reconciliação). | ✅ |
-| Frontend | `frontend/src/components/admin/AdminAffiliates.tsx` — 5 abas (affiliates/commissions/payouts/kyc/settings). | ✅ |
+| Frontend | `frontend/src/components/admin/AdminWallet.tsx` — lista bruto, taxa e valor líquido a transferir; aprova, marca pago com referência e rejeita. | ✅ |
+| Frontend | `frontend/src/components/admin/AdminAffiliates.tsx` — lista bruto, taxa e líquido a transferir para os saques de afiliados. | ✅ |
 | Backend | **Stubs**: `users/views_admin.py` `PendingPayoutsView` (retorna `[]`) e `ApprovePayoutView` (fake `{'status':'approved'}`). | ⚠️ Dead code |
 | Frontend | `api.ts` `adminAPI.pendingPayouts()` (l.782) e `approvePayout()` (l.783) apontam para os stubs; **nenhum componente as chama**. | ⚠️ Dead code |
 
