@@ -80,9 +80,10 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 
 ### 3.3 Escrow e libertação
 
-- `release_escrow(escrow)` (117–131): liberta quando a janela de devolução termina.
-- Celery `release_escrow_after_return_window`: liberta quando `order.status == "delivered"` e `delivered_at <= now − 7 dias` (`ESCROW_RELEASE_DAYS=7`).
-- Celery `auto_confirm_delivery`: entrega automática após `AUTO_DELIVERY_DAYS=7`.
+- `release_escrow(escrow)`: credita o saldo de saque do proprietário da loja.
+- Se o comprador confirmar a receção, Celery `release_escrow_after_return_window` liberta o escrow 7 dias corridos depois de `delivered_at` (`ESCROW_RELEASE_DAYS=7`).
+- Se o comprador não confirmar, Celery `auto_confirm_delivery` confirma a encomenda e liberta o saldo após 5 dias úteis da confirmação do pagamento. A contagem exclui fins de semana e feriados nacionais de Moçambique.
+- As duas tarefas são executadas de hora em hora. A libertação credita a carteira do vendedor; o pedido e pagamento externo do saque continuam manuais.
 
 ### 3.4 Cancelamento, devolução e reembolso
 
@@ -109,6 +110,7 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 - `wallet.pay_payout`: exige aprovação e referência; debita do saldo o líquido transferido mais a taxa, atualiza `total_withdrawn` pelo bruto e regista transações distintas para transferência externa e taxa da plataforma.
 - `wallet.reject_payout`: pending/approved → rejected; liberta o bruto reservado.
 - **Afiliado (admin)** → `PATCH /affiliates/admin/affiliates/payouts/<pk>/`: aprovação, pagamento manual ou rejeição. No pagamento, debita líquido + taxa, regista movimentos no ledger e grava referência/admin.
+- O painel financeiro permite consultar saldo de comprador, saldo de saque disponível e reservas por utilizador; lista encomendas pagas sem crédito por loja/produto. A ação administrativa exige motivo, confirma manualmente a receção física e credita pelo serviço idempotente de liquidação/escrow, registando o admin no histórico da encomenda.
 - As listagens administrativas expõem o bruto, a taxa e `net_amount`; o valor indicado para transferência manual já está líquido da taxa.
 
 ### 3.8 Reconciliação (admin)
@@ -209,7 +211,7 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 | Tarefa | Função |
 |--------|--------|
 | `auto_refund_unprocessed_returns` | Reembolso automático de devoluções (3 dias; saldo insuficiente → `disputed`). |
-| `auto_confirm_delivery` | Entrega automática após `AUTO_DELIVERY_DAYS=7`. |
+| `auto_confirm_delivery` | Confirma a entrega e liberta o saldo após 5 dias úteis do pagamento sem confirmação do comprador. |
 | `recover_abandoned_carts` | Recupera carrinhos abandonados (24h). |
 | `auto_approve_affiliate_commissions` | Aprova comissões após `approve_after_days=7`. |
 | `release_escrow_after_return_window` | Liberta escrow após `ESCROW_RELEASE_DAYS=7`. |

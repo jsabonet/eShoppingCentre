@@ -113,9 +113,11 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
             return Order.objects.all()
         return self.request.user.store.orders.all()
 
+    @transaction.atomic
     def perform_update(self, serializer):
         new_status = self.request.data.get('status')
-        order = self.get_object()
+        order = Order.objects.select_for_update().get(pk=self.get_object().pk)
+        serializer.instance = order
         old_status = order.status
         is_admin = self.request.user.is_staff
 
@@ -182,8 +184,11 @@ class ConfirmDeliveryView(APIView):
     """POST /api/v1/orders/{pk}/confirm-delivery/ — Buyer confirms they received the order."""
     permission_classes = [permissions.IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, pk):
-        order = get_object_or_404(Order, pk=pk, buyer=request.user)
+        order = get_object_or_404(
+            Order.objects.select_for_update(), pk=pk, buyer=request.user,
+        )
         if not order.has_physical_items:
             return Response(
                 {'detail': 'Encomendas digitais não requerem confirmação de entrega.'},

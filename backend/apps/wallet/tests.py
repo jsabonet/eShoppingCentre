@@ -7,13 +7,14 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.affiliates.models import AffiliateCommission, AffiliatePayout, AffiliateProfile
-from apps.orders.models import Order
+from apps.orders.models import Order, OrderItem, OrderStatusHistory
 from apps.stores.models import Store
 from apps.wallet.models import EscrowHolding, PayoutRequest, WalletTransaction, WalletEntry
 from apps.wallet.services import (
     credit,
     debit,
     get_wallet,
+    force_credit_order_to_seller,
     request_payout,
     approve_payout,
     pay_payout,
@@ -22,7 +23,14 @@ from apps.wallet.services import (
     get_refundable_amount,
     InsufficientFunds,
 )
-from apps.wallet.views import AdminPayoutListView, AdminReconciliationView, WalletPayoutView
+from apps.wallet.views import (
+    AdminForceOrderCreditView,
+    AdminPendingCreditsView,
+    AdminPayoutListView,
+    AdminReconciliationView,
+    AdminWalletListView,
+    WalletPayoutView,
+)
 
 User = get_user_model()
 
@@ -82,6 +90,213 @@ def test_admin_payout_list_filters_by_status_method_and_search(admin, user):
     assert response.data['results'][0]['id'] == str(matching.id)
     assert Decimal(response.data['results'][0]['fee']) == Decimal('55.00')
     assert Decimal(response.data['results'][0]['net_amount']) == Decimal('445.00')
+
+
+@pytest.mark.django_db
+def test_admin_wallet_list_shows_balances_and_user_types(admin, user):
+    seller = User.objects.create_user(
+        email='seller-wallet@example.com',
+        username='seller-wallet',
+        password='SenhaForte123!',
+        roles=['seller'],
+    )
+    store = Store.objects.create(
+        owner=seller,
+        name='Loja Carteira',
+        description='Loja de teste',
+        category='geral',
+        product_type='physical',
+        phone='840000001',
+        email='wallet-store@example.com',
+        location='Maputo',
+        status='active',
+    )
+    affiliate_user = User.objects.create_user(
+        email='affiliate-wallet@example.com',
+        username='affiliate-wallet',
+        password='SenhaForte123!',
+    )
+    AffiliateProfile.objects.create(
+        user=affiliate_user,
+        referral_code='WALLET-AFFILIATE',
+    )
+    credit(
+        get_wallet(user), 125, kind='buyer', ref_type='system', ref_id=uuid.uuid4(),
+        description='Saldo comprador',
+    )
+    credit(
+        get_wallet(seller), 900, kind='payout', ref_type='system', ref_id=uuid.uuid4(),
+        description='Saldo vendedor',
+    )
+
+    request = APIRequestFactory().get('/api/v1/wallet/admin/wallets/')
+    force_authenticate(request, user=admin)
+    response = AdminWalletListView.as_view()(request)
+
+    assert response.status_code == 200
+    wallets = {row['user_email']: row for row in response.data['results']}
+    assert Decimal(wallets[user.email]['balance']) == Decimal('125.00')
+    assert 'buyer' in wallets[user.email]['user_types']
+    assert Decimal(wallets[seller.email]['available_payout']) == Decimal('900.00')
+    assert 'seller' in wallets[seller.email]['user_types']
+    assert wallets[seller.email]['store_name'] == store.name
+    assert 'affiliate' in wallets[affiliate_user.email]['user_types']
+
+
+@pytest.mark.django_db
+def test_admin_lists_and_manually_releases_paid_physical_order(admin, user):
+    seller = User.objects.create_user(
+        email='seller-credit@example.com',
+        username='seller-credit',
+        password='SenhaForte123!',
+        roles=['seller'],
+    )
+    store = Store.objects.create(
+        owner=seller,
+        name='Loja Crédito',
+        description='Loja para teste de crédito manual',
+        category='geral',
+        product_type='physical',
+        phone='840000002',
+        email='credit-store@example.com',
+        location='Maputo',
+        status='active',
+    )
+    order = Order.objects.create(
+        buyer=user,
+        store=store,
+        order_number='PED-MANUAL-CREDIT',
+        status='confirmed',
+        subtotal=Decimal('600.00'),
+        platform_fee=Decimal('48.00'),
+        total=Decimal('600.00'),
+        payment_method='mpesa',
+        payment_status='completed',
+        shipping_address={},
+    )
+    OrderItem.objects.create(
+        order=order,
+        product_name='Produto retido',
+        quantity=1,
+        unit_price=Decimal('600.00'),
+        total_price=Decimal('600.00'),
+        product_type='physical',
+    )
+    escrow = EscrowHolding.objects.create(order=order, amount=Decimal('552.00'))
+
+    list_request = APIRequestFactory().get('/api/v1/wallet/admin/orders/pending-credits/')
+    force_authenticate(list_request, user=admin)
+    list_response = AdminPendingCreditsView.as_view()(list_request)
+    assert list_response.status_code == 200
+    pending = list_response.data['results']
+    assert len(pending) == 1
+    assert pending[0]['id'] == str(order.id)
+    assert pending[0]['store_name'] == store.name
+    assert pending[0]['products'][0]['name'] == 'Produto retido'
+    assert Decimal(pending[0]['amount_to_credit']) == Decimal('552.00')
+
+    force_request = APIRequestFactory().post(
+        f'/api/v1/wallet/admin/orders/{order.id}/force-credit/',
+        {'reason': 'Confirmação manual após falha do processo automático'},
+        format='json',
+    )
+    force_authenticate(force_request, user=admin)
+    force_response = AdminForceOrderCreditView.as_view()(force_request, order_id=order.id)
+
+    order.refresh_from_db()
+    escrow.refresh_from_db()
+    assert force_response.status_code == 200
+    assert force_response.data['credited'] is True
+    assert Decimal(force_response.data['available_payout']) == Decimal('552.00')
+    assert order.status == 'delivered'
+    assert order.confirmed_at is None
+    assert escrow.status == 'released'
+    assert get_wallet(seller).payout_balance == Decimal('552.00')
+    assert OrderStatusHistory.objects.filter(
+        order=order, changed_by=admin, notes__contains='Confirmação manual',
+    ).exists()
+
+    retry_request = APIRequestFactory().post(
+        f'/api/v1/wallet/admin/orders/{order.id}/force-credit/',
+        {'reason': 'Repetir teste de idempotência'},
+        format='json',
+    )
+    force_authenticate(retry_request, user=admin)
+    retry_response = AdminForceOrderCreditView.as_view()(retry_request, order_id=order.id)
+    assert retry_response.status_code == 200
+    assert retry_response.data['credited'] is False
+    assert get_wallet(seller).payout_balance == Decimal('552.00')
+
+
+@pytest.mark.django_db
+def test_manual_order_credit_requires_admin(admin, user):
+    request = APIRequestFactory().get('/api/v1/wallet/admin/wallets/')
+    force_authenticate(request, user=user)
+
+    response = AdminWalletListView.as_view()(request)
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_manual_credit_recovers_missing_physical_escrow_and_digital_settlement(admin, user):
+    seller = User.objects.create_user(
+        email='seller-missing-credit@example.com',
+        username='seller-missing-credit',
+        password='SenhaForte123!',
+        roles=['seller'],
+    )
+    store = Store.objects.create(
+        owner=seller,
+        name='Loja Liquidação',
+        description='Loja para recuperar créditos em falta',
+        category='geral',
+        product_type='physical',
+        phone='840000003',
+        email='missing-credit-store@example.com',
+        location='Maputo',
+        status='active',
+    )
+    orders = []
+    for suffix, product_type in (('PHYSICAL', 'physical'), ('DIGITAL', 'digital')):
+        order = Order.objects.create(
+            buyer=user,
+            store=store,
+            order_number=f'PED-MISSING-{suffix}',
+            status='confirmed',
+            subtotal=Decimal('600.00'),
+            total=Decimal('600.00'),
+            platform_fee=Decimal('48.00'),
+            payment_method='mpesa',
+            payment_status='completed',
+            shipping_address={},
+        )
+        OrderItem.objects.create(
+            order=order,
+            product_name=f'Produto {product_type}',
+            quantity=1,
+            unit_price=Decimal('600.00'),
+            total_price=Decimal('600.00'),
+            product_type=product_type,
+        )
+        orders.append(order)
+
+    physical_result = force_credit_order_to_seller(
+        orders[0].id, admin, 'Recuperar escrow ausente',
+    )
+    digital_result = force_credit_order_to_seller(
+        orders[1].id, admin, 'Recuperar liquidação ausente',
+    )
+
+    orders[0].refresh_from_db()
+    orders[1].refresh_from_db()
+    assert physical_result[1] == seller
+    assert physical_result[2:] == (Decimal('552.00'), True)
+    assert digital_result[2:] == (Decimal('552.00'), True)
+    assert EscrowHolding.objects.get(order=orders[0]).status == 'released'
+    assert orders[0].status == 'delivered'
+    assert orders[1].status == 'confirmed'
+    assert get_wallet(seller).payout_balance == Decimal('1104.00')
 
 
 @pytest.mark.django_db

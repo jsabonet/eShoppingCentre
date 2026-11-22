@@ -6,6 +6,7 @@ idempotente e despoleta a liquidação do dinheiro (`settle_payment`), que credi
 vendedor (digital/curso) ou retém em escrow (físico).
 """
 from django.db import transaction
+from django.utils import timezone
 
 from apps.orders.models import Order, OrderStatusHistory
 
@@ -30,7 +31,8 @@ def complete_payment(order_id, *, provider, provider_transaction_id='',
     # Não liquidar nem libertar conteúdo — sinalizar para reembolso manual.
     if order.status == 'cancelled':
         order.payment_status = 'completed'
-        order.save(update_fields=['payment_status', 'updated_at'])
+        order.payment_confirmed_at = timezone.now()
+        order.save(update_fields=['payment_status', 'payment_confirmed_at', 'updated_at'])
         from apps.notifications.models import Notification
         Notification.objects.create(
             user=order.buyer,
@@ -53,12 +55,15 @@ def complete_payment(order_id, *, provider, provider_transaction_id='',
 
     previous_status = order.status
     order.payment_status = 'completed'
+    order.payment_confirmed_at = timezone.now()
     if provider_transaction_id and not order.payment_id:
         order.payment_id = provider_transaction_id
     if order.status == 'pending':
         order.status = 'confirmed'
     order.reserved_until = None
-    order.save(update_fields=['payment_status', 'payment_id', 'status', 'reserved_until'])
+    order.save(update_fields=[
+        'payment_status', 'payment_confirmed_at', 'payment_id', 'status', 'reserved_until',
+    ])
 
     if previous_status != order.status:
         OrderStatusHistory.objects.create(

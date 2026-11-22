@@ -1,10 +1,13 @@
 from celery import shared_task
+from datetime import datetime, timedelta
+from functools import lru_cache
+import holidays
+from django.db import transaction
 from django.utils import timezone
-from datetime import timedelta
 import logging
 
-# Dias sem confirmação do comprador até a entrega ser confirmada automaticamente
-AUTO_DELIVERY_DAYS = 7
+# Dias úteis após a confirmação do pagamento até à confirmação/libertação automática
+AUTO_RELEASE_BUSINESS_DAYS = 5
 
 # Horas sem atividade até o carrinho ser considerado abandonado
 ABANDONED_CART_HOURS = 24
@@ -12,6 +15,28 @@ ABANDONED_CART_HOURS = 24
 # Dias após entrega até o escrow ser libertado ao vendedor
 ESCROW_RELEASE_DAYS = 7
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=8)
+def mozambique_holidays(year):
+    return holidays.country_holidays('MZ', years=range(year, year + 2))
+
+
+def add_mozambique_business_days(start_at, days):
+    local_start = timezone.localtime(start_at)
+    due_date = local_start.date()
+    holiday_calendar = mozambique_holidays(due_date.year)
+    remaining = days
+
+    while remaining:
+        due_date += timedelta(days=1)
+        if due_date.weekday() < 5 and due_date not in holiday_calendar:
+            remaining -= 1
+        if due_date.year > local_start.year + 1:
+            holiday_calendar = mozambique_holidays(due_date.year)
+
+    due_time = datetime.combine(due_date, local_start.time().replace(tzinfo=None))
+    return timezone.make_aware(due_time, timezone=local_start.tzinfo)
 
 
 @shared_task
@@ -79,53 +104,83 @@ def auto_refund_unprocessed_returns():
 @shared_task
 def auto_confirm_delivery():
     """
-    Confirma automaticamente a entrega de encomendas 'shipped' (envio)
-    ou 'ready_for_pickup' (levantamento) após AUTO_DELIVERY_DAYS dias sem
-    confirmação do comprador.
+    Após cinco dias úteis da confirmação do pagamento, confirma a entrega e
+    liberta o escrow se o comprador ainda não confirmou a receção.
     """
     from apps.orders.models import Order, OrderStatusHistory
     from apps.notifications.models import Notification
+    from apps.wallet.models import EscrowHolding
+    from apps.wallet.services import release_escrow
 
-    cutoff = timezone.now() - timedelta(days=AUTO_DELIVERY_DAYS)
-    pending = Order.objects.filter(
-        status__in=['shipped', 'ready_for_pickup'],
-        shipped_at__lte=cutoff,
-    )
+    pending = list(EscrowHolding.objects.filter(
+        status='held',
+        order__payment_status='completed',
+        order__payment_confirmed_at__isnull=False,
+        order__status__in=['confirmed', 'processing', 'shipped', 'ready_for_pickup'],
+    ).values_list('id', 'order_id'))
 
-    count = 0
-    for order in pending:
-        previous_status = order.status
-        order.status = 'delivered'
-        order.confirmed_at = timezone.now()
-        order.delivered_at = timezone.now()
-        order.save(update_fields=['status', 'confirmed_at', 'delivered_at'])
+    released_count = 0
+    for escrow_id, order_id in pending:
+        with transaction.atomic():
+            order = Order.objects.select_for_update().filter(pk=order_id).first()
+            if (
+                not order
+                or order.payment_status != 'completed'
+                or order.status not in ('confirmed', 'processing', 'shipped', 'ready_for_pickup')
+                or not order.payment_confirmed_at
+            ):
+                continue
 
-        OrderStatusHistory.objects.create(
-            order=order,
-            previous_status=previous_status,
-            new_status='delivered',
-            changed_by=None,
-            notes='Entrega confirmada automaticamente pelo sistema',
-        )
+            escrow = EscrowHolding.objects.select_for_update().filter(
+                pk=escrow_id, order=order, status='held',
+            ).first()
+            if not escrow:
+                continue
 
-        Notification.objects.create(
-            user=order.buyer,
-            title='Encomenda entregue',
-            message=f'A entrega da encomenda {order.order_number} foi confirmada automaticamente.',
-            notification_type='order_update',
-            link=f'/account/orders/{order.id}',
-        )
-        if order.store and order.store.owner:
-            Notification.objects.create(
-                user=order.store.owner,
-                title='Encomenda entregue',
-                message=f'A encomenda {order.order_number} foi marcada como entregue automaticamente.',
-                notification_type='order_update',
-                link=f'/seller/orders',
+            release_at = add_mozambique_business_days(
+                order.payment_confirmed_at, AUTO_RELEASE_BUSINESS_DAYS,
             )
-        count += 1
+            if release_at > timezone.now():
+                continue
 
-    return f'{count} encomenda(s) entregue(s) automaticamente.'
+            previous_status = order.status
+            order.status = 'delivered'
+            order.delivered_at = release_at
+            order.save(update_fields=['status', 'delivered_at'])
+
+            OrderStatusHistory.objects.create(
+                order=order,
+                previous_status=previous_status,
+                new_status='delivered',
+                changed_by=None,
+                notes='Entrega e saldo confirmados automaticamente após 5 dias úteis sem confirmação do comprador',
+            )
+            release_escrow(escrow)
+
+            Notification.objects.create(
+                user=order.buyer,
+                title='Encomenda entregue',
+                message=(
+                    f'A encomenda {order.order_number} foi confirmada automaticamente '
+                    'após 5 dias úteis sem confirmação de receção.'
+                ),
+                notification_type='order_update',
+                link=f'/account/orders/{order.id}',
+            )
+            if order.store and order.store.owner:
+                Notification.objects.create(
+                    user=order.store.owner,
+                    title='Saldo da encomenda libertado',
+                    message=(
+                        f'O saldo da encomenda {order.order_number} foi creditado '
+                        'para saque após 5 dias úteis.'
+                    ),
+                    notification_type='order_update',
+                    link='/seller/earnings',
+                )
+            released_count += 1
+
+    return f'{released_count} encomenda(s) confirmada(s) e saldo(s) libertado(s) automaticamente.'
 
 
 @shared_task

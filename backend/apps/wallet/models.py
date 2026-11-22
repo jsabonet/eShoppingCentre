@@ -84,7 +84,7 @@ class WalletEntry(BaseModel):
 
 
 class EscrowHolding(BaseModel):
-    """Retenção virtual (escrow) do valor de uma encomenda física até entrega + janela de devolução."""
+    """Retenção de vendas físicas até confirmação da receção ou expiração do prazo automático."""
     STATUS_CHOICES = [
         ('held', 'Retido'),
         ('released', 'Libertado'),

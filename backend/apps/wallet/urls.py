@@ -11,4 +11,11 @@ urlpatterns = [
     path('admin/payouts/<uuid:pk>/pay/', views.AdminPayoutPayView.as_view(), name='admin_payout_pay'),
     path('admin/payouts/<uuid:pk>/reject/', views.AdminPayoutRejectView.as_view(), name='admin_payout_reject'),
     path('admin/reconciliation/', views.AdminReconciliationView.as_view(), name='admin_reconciliation'),
+    path('admin/wallets/', views.AdminWalletListView.as_view(), name='admin_wallet_list'),
+    path('admin/orders/pending-credits/', views.AdminPendingCreditsView.as_view(), name='admin_pending_credits'),
+    path(
+        'admin/orders/<uuid:order_id>/force-credit/',
+        views.AdminForceOrderCreditView.as_view(),
+        name='admin_force_order_credit',
+    ),
 ]

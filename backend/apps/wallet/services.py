@@ -151,6 +151,99 @@ def release_escrow(escrow):
 
 
 @transaction.atomic
+def force_credit_order_to_seller(order_id, admin, reason):
+    """Liberta ou recupera um crédito de venda manualmente, com auditoria."""
+    from apps.orders.models import Order, OrderStatusHistory
+
+    reason = str(reason or '').strip()
+    if not reason:
+        raise ValueError('Indique o motivo do crédito manual.')
+    if len(reason) > 200:
+        raise ValueError('O motivo deve ter no máximo 200 caracteres.')
+
+    order = Order.objects.select_for_update().get(pk=order_id)
+    if order.payment_status != 'completed':
+        raise ValueError('Só é possível creditar encomendas com pagamento confirmado.')
+    if order.status in ('cancelled', 'refunded'):
+        raise ValueError('Encomendas canceladas ou reembolsadas não podem ser creditadas.')
+    if not order.store or not order.store.owner:
+        raise ValueError('A encomenda não tem uma loja com vendedor associado.')
+
+    seller = order.store.owner
+    amount = max(
+        order.total - (order.platform_fee or 0) - (order.affiliate_commission or 0),
+        Decimal('0.00'),
+    )
+    if amount <= 0:
+        raise ValueError('O valor líquido da encomenda não permite crédito ao vendedor.')
+
+    now = timezone.now()
+    previous_status = order.status
+    physical = order.has_physical_items
+    credited = False
+
+    if physical:
+        escrow = EscrowHolding.objects.select_for_update().filter(order=order).first()
+        if escrow and escrow.status == 'reversed':
+            raise ValueError('O escrow desta encomenda foi revertido e não pode ser creditado.')
+
+        sale_credit_exists = WalletTransaction.objects.filter(
+            reference_type='order',
+            reference_id=order.id,
+            type='sale',
+        ).exists()
+
+        if not escrow and not sale_credit_exists:
+            escrow = EscrowHolding.objects.create(
+                order=order,
+                amount=amount,
+                status='held',
+            )
+
+        if escrow and escrow.status == 'held':
+            if sale_credit_exists:
+                escrow.status = 'released'
+                escrow.released_at = now
+                escrow.save(update_fields=['status', 'released_at'])
+            else:
+                release_escrow(escrow)
+                credited = True
+        elif escrow and escrow.status == 'released' and not sale_credit_exists:
+            credit(
+                get_wallet(seller),
+                escrow.amount,
+                kind='payout',
+                ref_type='order',
+                ref_id=order.id,
+                description=f'Crédito manual da encomenda {order.order_number}: {reason}',
+                txn_type='sale',
+                idempotency_key=f'admin-order:{order.id}:force-credit',
+                counterparty='escrow',
+            )
+            credited = True
+        amount = escrow.amount if escrow else amount
+    else:
+        settlement_key = f'order:{order.id}:settle'
+        if not WalletTransaction.objects.filter(idempotency_key=settlement_key).exists():
+            settle_payment(order)
+            credited = True
+
+    if physical and (order.status != 'delivered' or not order.delivered_at):
+        order.status = 'delivered'
+        order.delivered_at = now
+        order.save(update_fields=['status', 'delivered_at'])
+
+    OrderStatusHistory.objects.create(
+        order=order,
+        previous_status=previous_status,
+        new_status=order.status,
+        changed_by=admin,
+        notes=f'Crédito manual solicitado por {admin.email}: {reason}',
+    )
+    return order, seller, amount, credited
+
+
+@transaction.atomic
 def reverse_escrow(order):
     """Reverte um escrow ainda retido (ex: cancelamento/reembolso). Retorna True se reverteu."""
     escrow = EscrowHolding.objects.select_for_update().filter(order=order, status='held').first()

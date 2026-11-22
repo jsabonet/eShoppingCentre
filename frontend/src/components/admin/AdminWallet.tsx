@@ -20,12 +20,38 @@ function formatAccount(acc: any): string {
 }
 
 const fmt = (v: any) => Number(v || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 });
+const USER_TYPE_LABEL: Record<string, string> = {
+  buyer: 'Comprador',
+  seller: 'Vendedor',
+  affiliate: 'Afiliado',
+  admin: 'Administrador',
+};
+
+async function fetchAllPages<T>(loadPage: (page: number) => Promise<{ data: any }>): Promise<T[]> {
+  const rows: T[] = [];
+  let page = 1;
+  let hasNext = true;
+  while (hasNext) {
+    const { data } = await loadPage(page);
+    const pageRows = Array.isArray(data) ? data : data.results || [];
+    rows.push(...pageRows);
+    hasNext = !Array.isArray(data) && Boolean(data.next);
+    page += 1;
+  }
+  return rows;
+}
 
 export default function AdminWallet() {
   const [payouts, setPayouts] = useState<any[]>([]);
+  const [wallets, setWallets] = useState<any[]>([]);
+  const [pendingCredits, setPendingCredits] = useState<any[]>([]);
   const [recon, setRecon] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [walletSearch, setWalletSearch] = useState('');
+  const [walletRoleFilter, setWalletRoleFilter] = useState('');
+  const [creditSearch, setCreditSearch] = useState('');
+  const [creditingOrderId, setCreditingOrderId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [methodFilter, setMethodFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -34,34 +60,28 @@ export default function AdminWallet() {
   const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const showToast = (type: 'success' | 'error', text: string) => {
+  const showToast = useCallback((type: 'success' | 'error', text: string) => {
     setToast({ type, text }); setTimeout(() => setToast(null), 4000);
-  };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [allPayouts, rRes] = await Promise.all([
-        (async () => {
-          const result: any[] = [];
-          let page = 1;
-          let hasNext = true;
-          while (hasNext) {
-            const { data } = await walletAPI.adminPayouts({ page_size: 100, page });
-            const pageResults = Array.isArray(data) ? data : data.results || [];
-            result.push(...pageResults);
-            hasNext = !Array.isArray(data) && Boolean(data.next);
-            page += 1;
-          }
-          return result;
-        })(),
+      const [allPayouts, rRes, allWallets, allPendingCredits] = await Promise.all([
+        fetchAllPages<any>((page) => walletAPI.adminPayouts({ page_size: 100, page })),
         walletAPI.adminReconciliation(),
+        fetchAllPages<any>((page) => walletAPI.adminWallets({ page_size: 100, page })),
+        fetchAllPages<any>((page) => walletAPI.adminPendingCredits({ page_size: 100, page })),
       ]);
       setPayouts(allPayouts);
       setRecon(rRes.data);
-    } catch { setPayouts([]); }
+      setWallets(allWallets);
+      setPendingCredits(allPendingCredits);
+    } catch {
+      showToast('error', 'Não foi possível carregar carteiras, créditos pendentes e reconciliação.');
+    }
     finally { setLoading(false); }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -85,6 +105,59 @@ export default function AdminWallet() {
     try { await walletAPI.adminPayoutReject(id, reason); showToast('success', 'Saque rejeitado.'); load(); }
     catch { showToast('error', 'Erro ao rejeitar.'); }
   };
+
+  const forceCreditOrder = async (order: any) => {
+    const action = order.is_physical ? 'confirmar a receção e creditar' : 'creditar';
+    const reason = window.prompt(`Motivo para ${action} a encomenda ${order.order_number}:`);
+    if (reason === null) return;
+    if (!reason.trim()) {
+      showToast('error', 'O motivo do crédito manual é obrigatório.');
+      return;
+    }
+    if (!window.confirm(
+      `${order.is_physical ? 'Confirmar a receção e creditar' : 'Creditar'} ${fmt(order.amount_to_credit)} MZN ao vendedor de "${order.store_name}"?`,
+    )) return;
+
+    setCreditingOrderId(order.id);
+    try {
+      const { data } = await walletAPI.adminForceOrderCredit(order.id, reason.trim());
+      showToast('success', data.detail || 'Ação administrativa concluída.');
+      await load();
+    } catch (error: any) {
+      showToast(
+        'error',
+        error?.response?.data?.detail || 'Não foi possível creditar esta encomenda.',
+      );
+    } finally {
+      setCreditingOrderId(null);
+    }
+  };
+
+  const filteredWallets = wallets.filter((wallet) => {
+    const query = walletSearch.trim().toLowerCase();
+    const searchable = [
+      wallet.user_name,
+      wallet.user_email,
+      wallet.store_name,
+      ...(wallet.user_types || []).map((type: string) => USER_TYPE_LABEL[type] || type),
+    ].join(' ').toLowerCase();
+    return (!query || searchable.includes(query))
+      && (!walletRoleFilter || (wallet.user_types || []).includes(walletRoleFilter));
+  });
+
+  const filteredPendingCredits = pendingCredits.filter((order) => {
+    const query = creditSearch.trim().toLowerCase();
+    const searchable = [
+      order.order_number,
+      order.store_name,
+      order.buyer_name,
+      order.buyer_email,
+      order.seller_name,
+      order.seller_email,
+      ...(order.products || []).map((product: any) => product.name),
+    ].join(' ').toLowerCase();
+    return !query || searchable.includes(query);
+  });
 
   const filteredPayouts = payouts.filter((p) => {
     const query = search.trim().toLowerCase();
@@ -207,6 +280,173 @@ export default function AdminWallet() {
           ))}
         </div>
       )}
+
+      <section className="mb-6 overflow-hidden rounded-xl border border-border bg-white">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="font-bold">Compras pagas sem crédito ao vendedor</h3>
+            <p className="text-xs text-muted-foreground">
+              Escrows retidos e liquidações em falta, agrupados por encomenda, loja e produto.
+              A ação manual confirma a receção e regista o motivo no histórico.
+            </p>
+          </div>
+          <input
+            type="search"
+            value={creditSearch}
+            onChange={(event) => setCreditSearch(event.target.value)}
+            placeholder="Pesquisar encomenda, loja, produto ou utilizador"
+            className="min-h-10 w-full rounded-lg border border-border px-3 text-sm sm:max-w-sm"
+          />
+        </div>
+        {loading ? (
+          <div className="py-10 text-center"><Loader2 size={24} className="mx-auto animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Encomenda</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Loja / vendedor</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Comprador</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Produtos</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Por creditar</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredPendingCredits.map((order) => (
+                  <tr key={order.id} className="align-top hover:bg-muted/20">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold">{order.order_number}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{order.status.replace(/_/g, ' ')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Pago: {order.payment_confirmed_at
+                          ? new Date(order.payment_confirmed_at).toLocaleDateString('pt-MZ')
+                          : 'data não registada'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{order.store_name || 'Loja indisponível'}</p>
+                      <p className="text-xs text-muted-foreground">{order.seller_name}</p>
+                      <p className="text-xs text-muted-foreground">{order.seller_email}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p>{order.buyer_name}</p>
+                      <p className="text-xs text-muted-foreground">{order.buyer_email}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      {(order.products || []).map((product: any, index: number) => (
+                        <p key={`${product.name}-${index}`} className="text-xs">
+                          {product.name} × {product.quantity}
+                        </p>
+                      ))}
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {order.credit_state === 'escrow_retido' ? 'Saldo retido em escrow' : 'Liquidação em falta'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
+                      {fmt(order.amount_to_credit)} MZN
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => forceCreditOrder(order)}
+                        disabled={creditingOrderId === order.id}
+                        className="inline-flex min-h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        {creditingOrderId === order.id && <Loader2 size={14} className="animate-spin" />}
+                        {order.is_physical ? 'Confirmar e creditar' : 'Creditar manualmente'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredPendingCredits.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-10 text-center text-muted-foreground">
+                      {pendingCredits.length ? 'Nenhuma compra corresponde à pesquisa.' : 'Não há compras pagas pendentes de crédito.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+          {filteredPendingCredits.length} de {pendingCredits.length} encomendas pendentes
+        </p>
+      </section>
+
+      <section className="mb-6 overflow-hidden rounded-xl border border-border bg-white">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="font-bold">Carteiras por utilizador</h3>
+            <p className="text-xs text-muted-foreground">
+              Saldo do comprador, saldo de saque disponível e valores reservados.
+            </p>
+          </div>
+          <div className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row">
+            <input
+              type="search"
+              value={walletSearch}
+              onChange={(event) => setWalletSearch(event.target.value)}
+              placeholder="Pesquisar nome, email ou loja"
+              className="min-h-10 min-w-0 flex-1 rounded-lg border border-border px-3 text-sm"
+            />
+            <select
+              value={walletRoleFilter}
+              onChange={(event) => setWalletRoleFilter(event.target.value)}
+              className="min-h-10 rounded-lg border border-border px-3 text-sm"
+            >
+              <option value="">Todos os tipos</option>
+              {Object.entries(USER_TYPE_LABEL).map(([type, label]) => (
+                <option key={type} value={type}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {loading ? (
+          <div className="py-10 text-center"><Loader2 size={24} className="mx-auto animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Utilizador</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tipo(s)</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Saldo comprador</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Disponível para saque</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Reservado</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Total levantado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredWallets.map((wallet) => (
+                  <tr key={wallet.id} className="hover:bg-muted/20">
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{wallet.user_name}</p>
+                      <p className="text-xs text-muted-foreground">{wallet.user_email}</p>
+                      {wallet.store_name && <p className="text-xs text-muted-foreground">{wallet.store_name}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(wallet.user_types || []).map((type: string) => USER_TYPE_LABEL[type] || type).join(', ')}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(wallet.balance)} MZN</td>
+                    <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">{fmt(wallet.available_payout)} MZN</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(wallet.reserved_balance)} MZN</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(wallet.total_withdrawn)} MZN</td>
+                  </tr>
+                ))}
+                {filteredWallets.length === 0 && (
+                  <tr><td colSpan={6} className="py-10 text-center text-muted-foreground">Nenhuma carteira corresponde à pesquisa.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+          {filteredWallets.length} de {wallets.length} carteiras
+        </p>
+      </section>
 
       <section className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-border bg-white p-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-2 xl:col-span-4">

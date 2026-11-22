@@ -1,5 +1,5 @@
 """Testes da reserva de stock e cancelamento automático de encomendas não pagas."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -11,16 +11,27 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from apps.courses.models import Course, Enrollment
 from apps.notifications.models import Notification
 from apps.orders.models import Order, OrderItem, ReturnRequest
-from apps.orders.views import AdminAllOrdersView, ReceiveReturnView, RefundReturnView, ShipReturnView
+from apps.orders.views import (
+    AdminAllOrdersView,
+    ConfirmDeliveryView,
+    ReceiveReturnView,
+    RefundReturnView,
+    ShipReturnView,
+)
 from apps.orders.serializers import CreateOrderSerializer, OrderItemSerializer, ReturnRequestSerializer
 from apps.orders.services import cancel_order
-from apps.orders.tasks import auto_release_unpaid_orders
+from apps.orders.tasks import (
+    add_mozambique_business_days,
+    auto_confirm_delivery,
+    auto_release_unpaid_orders,
+)
 from apps.payments.services.completion import complete_payment
 from apps.products.models import Category, Coupon, Product
 from apps.products.models_digital import DigitalDownload
 from apps.stores.models import Store
 from apps.wallet.services import credit, get_wallet
 from apps.wallet.services import process_refund
+from apps.wallet.models import EscrowHolding
 from apps.affiliates.models import AffiliateCommission, AffiliateLink, AffiliateProfile
 
 User = get_user_model()
@@ -277,6 +288,96 @@ def test_auto_release_ignores_active_reservation(pending_order, physical_product
     physical_product.refresh_from_db()
     assert pending_order.status == 'pending'
     assert physical_product.stock == 8
+
+
+@pytest.mark.django_db
+def test_add_mozambique_business_days_skips_weekends_and_national_holidays():
+    start_at = timezone.make_aware(datetime(2026, 6, 24, 12, 30))
+
+    due_at = add_mozambique_business_days(start_at, 5)
+
+    assert timezone.localtime(due_at) == timezone.make_aware(datetime(2026, 7, 2, 12, 30))
+
+
+@pytest.mark.django_db
+def test_auto_confirm_delivery_releases_seller_balance_after_five_business_days(
+        pending_order, seller):
+    pending_order.total = Decimal('1000.00')
+    pending_order.save(update_fields=['total'])
+    complete_payment(
+        pending_order.id,
+        provider='vpay',
+        provider_transaction_id='txn_auto_release',
+    )
+    pending_order.refresh_from_db()
+    assert pending_order.payment_confirmed_at is not None
+    pending_order.payment_confirmed_at = timezone.now() - timedelta(days=14)
+    pending_order.save(update_fields=['payment_confirmed_at'])
+
+    escrow = EscrowHolding.objects.get(order=pending_order)
+    assert get_wallet(seller).payout_balance == Decimal('0.00')
+
+    result = auto_confirm_delivery()
+
+    pending_order.refresh_from_db()
+    escrow.refresh_from_db()
+    wallet = get_wallet(seller)
+    assert 'saldo(s) libertado(s)' in result
+    assert pending_order.status == 'delivered'
+    assert pending_order.confirmed_at is None
+    assert escrow.status == 'released'
+    assert wallet.payout_balance == Decimal('1000.00')
+    assert wallet.payout_balance - wallet.reserved_balance >= Decimal('500.00')
+
+
+@pytest.mark.django_db
+def test_auto_confirm_delivery_waits_until_five_business_days(
+        pending_order, seller):
+    complete_payment(
+        pending_order.id,
+        provider='vpay',
+        provider_transaction_id='txn_auto_release_not_due',
+    )
+    escrow = EscrowHolding.objects.get(order=pending_order)
+
+    auto_confirm_delivery()
+
+    pending_order.refresh_from_db()
+    escrow.refresh_from_db()
+    assert pending_order.status == 'confirmed'
+    assert escrow.status == 'held'
+    assert get_wallet(seller).payout_balance == Decimal('0.00')
+
+
+@pytest.mark.django_db
+def test_auto_confirm_delivery_does_not_release_when_buyer_confirmed(
+        pending_order, buyer, seller):
+    complete_payment(
+        pending_order.id,
+        provider='vpay',
+        provider_transaction_id='txn_buyer_confirmed',
+    )
+    pending_order.refresh_from_db()
+    pending_order.payment_confirmed_at = timezone.now() - timedelta(days=14)
+    pending_order.status = 'shipped'
+    pending_order.shipped_at = timezone.now()
+    pending_order.save(update_fields=['payment_confirmed_at', 'status', 'shipped_at'])
+
+    request = APIRequestFactory().post(
+        f'/api/v1/orders/{pending_order.id}/confirm-delivery/',
+        {},
+        format='json',
+    )
+    force_authenticate(request, user=buyer)
+    response = ConfirmDeliveryView.as_view()(request, pk=pending_order.id)
+    assert response.status_code == 200
+
+    escrow = EscrowHolding.objects.get(order=pending_order)
+    auto_confirm_delivery()
+
+    escrow.refresh_from_db()
+    assert escrow.status == 'held'
+    assert get_wallet(seller).payout_balance == Decimal('0.00')
 
 
 @pytest.mark.django_db

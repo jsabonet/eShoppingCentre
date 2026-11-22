@@ -30,6 +30,10 @@ class Order(BaseModel):
     affiliate_commission = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=50)
     payment_status = models.CharField(max_length=20, default='pending')
+    payment_confirmed_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Data em que o pagamento da encomenda foi confirmado.',
+    )
     payment_id = models.CharField(max_length=255, blank=True)
     reserved_until = models.DateTimeField(
         null=True, blank=True,

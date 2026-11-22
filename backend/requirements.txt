@@ -22,6 +22,7 @@ uvicorn>=0.30
 whitenoise>=6.8
 firebase-admin>=6.5
 django-anymail>=12.0
+holidays>=0.60
 openpyxl>=3.1
 reportlab>=4.2
 pytest>=8.3

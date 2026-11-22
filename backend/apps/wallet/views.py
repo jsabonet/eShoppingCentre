@@ -2,12 +2,27 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q, Subquery
 from django.utils.dateparse import parse_date
 from rest_framework.exceptions import ValidationError
 from .models import PayoutRequest
-from .serializers import WalletSerializer, WalletTransactionSerializer, PayoutRequestSerializer
-from .services import request_payout, approve_payout, pay_payout, reject_payout, InsufficientFunds
+from .serializers import (
+    AdminPendingCreditSerializer,
+    AdminWalletSerializer,
+    WalletSerializer,
+    WalletTransactionSerializer,
+    PayoutRequestSerializer,
+)
+from .services import (
+    request_payout,
+    approve_payout,
+    pay_payout,
+    reject_payout,
+    force_credit_order_to_seller,
+    get_available_balance,
+    get_wallet,
+    InsufficientFunds,
+)
 from apps.users.permissions import IsVerified
 
 
@@ -248,4 +263,93 @@ class AdminReconciliationView(APIView):
             'wallets_reserved_balance': float(wallets_reserved),
             'wallets_buyer_balance': float(wallets_buyer),
             'liabilities': float(liabilities),
+        })
+
+
+class AdminWalletListView(generics.ListAPIView):
+    """Lista saldos da carteira por utilizador e tipo de conta."""
+    serializer_class = AdminWalletSerializer
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get_queryset(self):
+        from apps.affiliates.models import AffiliateProfile
+        from apps.stores.models import Store
+        from .models import Wallet
+
+        stores = Store.objects.filter(owner_id=OuterRef('user_id'))
+        affiliates = AffiliateProfile.objects.filter(user_id=OuterRef('user_id'))
+        return Wallet.objects.select_related('user').annotate(
+            user_has_store=Exists(stores),
+            user_has_affiliate_profile=Exists(affiliates),
+            store_name=Subquery(stores.values('name')[:1]),
+        ).order_by('user__email')
+
+
+class AdminPendingCreditsView(generics.ListAPIView):
+    """Lista encomendas pagas cujo saldo do vendedor ainda não foi creditado."""
+    serializer_class = AdminPendingCreditSerializer
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get_queryset(self):
+        from apps.orders.models import Order
+        from .models import EscrowHolding, WalletTransaction
+
+        seller_credits = WalletTransaction.objects.filter(
+            reference_type='order',
+            reference_id=OuterRef('pk'),
+            type='sale',
+        )
+        held_escrows = EscrowHolding.objects.filter(
+            order_id=OuterRef('pk'),
+            status='held',
+        )
+        reversed_escrows = EscrowHolding.objects.filter(
+            order_id=OuterRef('pk'),
+            status='reversed',
+        )
+        return (
+            Order.objects.filter(payment_status='completed', store__isnull=False)
+            .exclude(status__in=['cancelled', 'refunded'])
+            .annotate(
+                has_seller_credit=Exists(seller_credits),
+                has_held_escrow=Exists(held_escrows),
+                has_reversed_escrow=Exists(reversed_escrows),
+            )
+            .filter(Q(has_held_escrow=True) | Q(has_seller_credit=False))
+            .filter(has_reversed_escrow=False)
+            .select_related('store', 'store__owner', 'buyer')
+            .prefetch_related('items__product', 'escrow')
+            .order_by('-payment_confirmed_at', '-created_at')
+        )
+
+
+class AdminForceOrderCreditView(APIView):
+    """Confirma manualmente a receção e recupera, se necessário, o crédito do vendedor."""
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def post(self, request, order_id):
+        from apps.orders.models import Order
+
+        try:
+            order, seller, amount, credited = force_credit_order_to_seller(
+                order_id,
+                request.user,
+                request.data.get('reason', ''),
+            )
+        except Order.DoesNotExist:
+            return Response({'detail': 'Encomenda não encontrada.'}, status=404)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=400)
+
+        available = get_available_balance(get_wallet(seller))
+        return Response({
+            'detail': (
+                'Saldo creditado para saque.'
+                if credited else 'A encomenda já estava creditada; não foi criado um crédito duplicado.'
+            ),
+            'credited': credited,
+            'credited_amount': str(amount if credited else 0),
+            'available_payout': str(available),
+            'order_id': str(order.id),
+            'order_status': order.status,
         })

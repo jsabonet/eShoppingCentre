@@ -482,6 +482,7 @@ class CreateOrderSerializer(serializers.Serializer):
                 affiliate_commission=store_affiliate_commission,
                 payment_method=validated_data['payment_method'],
                 payment_status=payment_status,
+                payment_confirmed_at=timezone.now() if payment_status == 'completed' else None,
                 status=order_status,
                 reserved_until=reserved_until,
                 shipping_address=validated_data['shipping_address'],

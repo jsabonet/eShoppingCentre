@@ -792,6 +792,12 @@ export const walletAPI = {
   adminPayoutPay: (id: string, reference: string) => api.post(`/wallet/admin/payouts/${id}/pay/`, { reference }),
   adminPayoutReject: (id: string, reason: string) => api.post(`/wallet/admin/payouts/${id}/reject/`, { reason }),
   adminReconciliation: () => api.get<any>('/wallet/admin/reconciliation/'),
+  adminWallets: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<any>>('/wallet/admin/wallets/', { params }),
+  adminPendingCredits: (params?: Record<string, any>) =>
+    api.get<PaginatedResponse<any>>('/wallet/admin/orders/pending-credits/', { params }),
+  adminForceOrderCredit: (orderId: string, reason: string) =>
+    api.post(`/wallet/admin/orders/${orderId}/force-credit/`, { reason }),
 };
 
 export const paymentsAPI = {
