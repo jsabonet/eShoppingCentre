@@ -17,6 +17,11 @@ urlpatterns = [
         views.AdminWalletTransactionsView.as_view(),
         name='admin_wallet_transactions',
     ),
+    path(
+        'admin/wallets/<int:user_id>/buyer-orders/',
+        views.AdminBuyerOrdersView.as_view(),
+        name='admin_buyer_orders',
+    ),
     path('admin/orders/pending-credits/', views.AdminPendingCreditsView.as_view(), name='admin_pending_credits'),
     path(
         'admin/orders/<uuid:order_id>/force-credit/',

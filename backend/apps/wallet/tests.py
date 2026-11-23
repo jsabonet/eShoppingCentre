@@ -33,6 +33,7 @@ from apps.wallet.views import (
     AdminReconciliationView,
     AdminWalletListView,
     AdminWalletTransactionsView,
+    AdminBuyerOrdersView,
     WalletPayoutView,
 )
 
@@ -296,6 +297,53 @@ def test_admin_lists_and_manually_releases_paid_physical_order(admin, user):
     assert retry_response.status_code == 200
     assert retry_response.data['credited'] is False
     assert get_wallet(seller).payout_balance == Decimal('552.00')
+
+
+@pytest.mark.django_db
+def test_admin_buyer_orders_include_gateway_purchase(admin, user):
+    store = Store.objects.create(
+        owner=admin,
+        name='Loja Comprador',
+        description='Loja',
+        category='geral',
+        product_type='physical',
+        phone='840000007',
+        email='buyer-order-store@example.com',
+        location='Maputo',
+        status='active',
+    )
+    order = Order.objects.create(
+        buyer=user,
+        store=store,
+        order_number='PED-BUYER-GATEWAY',
+        subtotal=Decimal('280.00'),
+        total=Decimal('280.00'),
+        payment_status='completed',
+        payment_method='mpesa',
+        payment_id='gateway-purchase-280',
+        shipping_address={},
+    )
+    OrderItem.objects.create(
+        order=order,
+        product_name='Pasta de dente active',
+        quantity=1,
+        unit_price=Decimal('280.00'),
+        total_price=Decimal('280.00'),
+        product_type='physical',
+    )
+
+    request = APIRequestFactory().get(
+        f'/api/v1/wallet/admin/wallets/{user.id}/buyer-orders/'
+    )
+    force_authenticate(request, user=admin)
+    response = AdminBuyerOrdersView.as_view()(request, user_id=user.id)
+
+    assert response.status_code == 200
+    assert response.data['count'] == 1
+    assert response.data['results'][0]['order_number'] == 'PED-BUYER-GATEWAY'
+    assert response.data['results'][0]['order_total'] == '280.00'
+    assert response.data['results'][0]['payment_method'] == 'mpesa'
+    assert response.data['results'][0]['products'][0]['name'] == 'Pasta de dente active'
 
 
 @pytest.mark.django_db

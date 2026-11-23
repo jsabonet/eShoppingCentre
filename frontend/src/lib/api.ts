@@ -798,6 +798,8 @@ export const walletAPI = {
     api.get<PaginatedResponse<any>>('/wallet/admin/wallets/', { params }),
   adminWalletTransactions: (userId: string, params?: Record<string, any>) =>
     api.get<PaginatedResponse<any>>(`/wallet/admin/wallets/${userId}/transactions/`, { params }),
+  adminBuyerOrders: (userId: string) =>
+    api.get<{ count: number; results: any[] }>(`/wallet/admin/wallets/${userId}/buyer-orders/`),
   adminPendingCredits: (params?: Record<string, any>) =>
     api.get<PaginatedResponse<any>>('/wallet/admin/orders/pending-credits/', { params }),
   adminForceOrderCredit: (orderId: string, reason: string) =>

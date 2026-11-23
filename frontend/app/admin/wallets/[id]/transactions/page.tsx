@@ -34,6 +34,7 @@ export default function AdminWalletTransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [buyerOrders, setBuyerOrders] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [walletMode, setWalletMode] = useState<'buyer' | 'seller'>('buyer');
@@ -53,12 +54,14 @@ export default function AdminWalletTransactionsPage() {
       setLoading(true);
       setError('');
       try {
-        const [allWallets, allTransactions] = await Promise.all([
+        const [allWallets, allTransactions, buyerOrdersResponse] = await Promise.all([
           fetchAllPages<any>((page) => walletAPI.adminWallets({ page_size: 100, page })),
           fetchAllPages<any>((page) => walletAPI.adminWalletTransactions(id, { page_size: 100, page })),
+          walletAPI.adminBuyerOrders(id),
         ]);
         setWallet(allWallets.find((item) => String(item.user_id) === String(id)) || null);
         setTransactions(allTransactions);
+        setBuyerOrders(buyerOrdersResponse.data.results || []);
       } catch {
         setError('Não foi possível carregar esta carteira e suas transações.');
       } finally {
@@ -66,6 +69,53 @@ export default function AdminWalletTransactionsPage() {
       }
     })();
   }, [id, isAuthenticated, isAdmin, authLoading, router]);
+
+  const walletPurchaseOrderIds = new Set(
+    combinedTransactions
+      .filter((transaction) =>
+        transaction.reference_type === 'order'
+        && (transaction.ledger_entries || []).some((entry: any) => entry.kind === 'buyer')
+      )
+      .map((transaction) => String(transaction.reference_id)),
+  );
+  const syntheticBuyerTransactions = buyerOrders
+    .filter((order) => !walletPurchaseOrderIds.has(String(order.id)))
+    .map((order) => ({
+      id: `buyer-order-${order.id}`,
+      type: 'purchase',
+      amount: `-${order.order_total}`,
+      balance_before: '0.00',
+      balance_after: '0.00',
+      reference_type: 'order',
+      reference_id: order.id,
+      description: `Compra ${order.order_number} via ${order.payment_method}`,
+      status: 'completed',
+      idempotency_key: order.payment_id ? `payment:${order.payment_id}` : null,
+      created_at: order.created_at,
+      ledger_entries: [{
+        id: `buyer-order-ledger-${order.id}`,
+        direction: 'debit',
+        amount: order.order_total,
+        balance_before: '0.00',
+        balance_after: '0.00',
+        kind: 'buyer',
+        counterparty: 'external',
+        created_at: order.created_at,
+      }],
+      origin: {
+        type: 'order',
+        id: order.id,
+        order_number: order.order_number,
+        store_name: order.store_name,
+        buyer_email: wallet?.user_email,
+        payment_status: order.payment_status,
+        order_status: order.order_status,
+        order_total: order.order_total,
+        products: order.products,
+        payment_method: order.payment_method,
+      },
+    }));
+  const combinedTransactions = [...transactions, ...syntheticBuyerTransactions];
 
   const transactionMatchesMode = (transaction: any) => {
     const kinds = (transaction.ledger_entries || []).map((entry: any) => entry.kind);
@@ -79,7 +129,7 @@ export default function AdminWalletTransactionsPage() {
     );
   };
 
-  const filtered = transactions.filter((transaction) => {
+  const filtered = combinedTransactions.filter((transaction) => {
     const query = search.trim().toLowerCase();
     const date = String(transaction.created_at || '').slice(0, 10);
     const origin = transaction.origin || {};
@@ -115,6 +165,9 @@ export default function AdminWalletTransactionsPage() {
         origem_id: origin.id || transaction.reference_id,
         encomenda: origin.order_number || '',
         loja: origin.store_name || '',
+        produtos: (origin.products || []).map((product: any) =>
+          `${product.quantity}x ${product.name}`
+        ).join(' | ') ,
         afiliado: origin.affiliate_email || '',
         referencia_admin: origin.admin_reference || '',
         descricao: transaction.description || '',
@@ -132,7 +185,7 @@ export default function AdminWalletTransactionsPage() {
       reportFormat,
       `transacoes-carteira-${id}.${extension}`,
       'Transações da carteira',
-      ['modo', 'data', 'estado', 'tipo', 'origem_tipo', 'origem_id', 'encomenda', 'loja', 'afiliado', 'referencia_admin', 'descricao', 'valor_mzn', 'saldo_antes_mzn', 'saldo_depois_mzn', 'idempotencia', 'ledger'],
+      ['modo', 'data', 'estado', 'tipo', 'origem_tipo', 'origem_id', 'encomenda', 'loja', 'produtos', 'afiliado', 'referencia_admin', 'descricao', 'valor_mzn', 'saldo_antes_mzn', 'saldo_depois_mzn', 'idempotencia', 'ledger'],
       rows,
       {
         subtitle: wallet?.user_email || '',
@@ -340,6 +393,13 @@ export default function AdminWalletTransactionsPage() {
                             Total {fmt(origin.order_total)} · taxa {fmt(origin.platform_fee)} · comissão afil. {fmt(origin.affiliate_commission)} MZN
                           </p>
                         )}
+                        {origin.products && origin.products.length > 0 && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Produtos: {origin.products.map((product: any) =>
+                              `${product.quantity}× ${product.name}`
+                            ).join(', ')}
+                          </p>
+                        )}
                         {origin.commission_rate && (
                           <p className="mt-1 text-xs text-muted-foreground">
                             Taxa {fmt(origin.commission_rate)}% · líquido {fmt(origin.amount)} MZN
@@ -378,7 +438,7 @@ export default function AdminWalletTransactionsPage() {
             </table>
           </div>
           <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-            {filtered.length} de {transactions.length} transações
+            {filtered.length} de {combinedTransactions.length} transações
           </p>
         </section>
       </div>

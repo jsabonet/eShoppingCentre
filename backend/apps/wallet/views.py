@@ -332,6 +332,50 @@ class AdminWalletTransactionsView(generics.ListAPIView):
         return queryset
 
 
+class AdminBuyerOrdersView(APIView):
+    """Lista as compras pagas de um utilizador para completar o extrato do modo comprador."""
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get(self, request, user_id):
+        from apps.orders.models import Order
+
+        orders = (
+            Order.objects.filter(
+                buyer_id=user_id,
+                payment_status='completed',
+            )
+            .exclude(status__in=['cancelled', 'refunded'])
+            .select_related('store', 'buyer')
+            .prefetch_related('items')
+            .order_by('-payment_confirmed_at', '-created_at')
+        )
+        rows = []
+        for order in orders:
+            rows.append({
+                'id': str(order.id),
+                'order_number': order.order_number,
+                'created_at': (
+                    order.payment_confirmed_at or order.created_at
+                ).isoformat(),
+                'payment_status': order.payment_status,
+                'payment_method': order.payment_method,
+                'payment_id': order.payment_id,
+                'order_status': order.status,
+                'order_total': str(order.total),
+                'store_name': order.store.name if order.store else order.store_name,
+                'products': [
+                    {
+                        'id': str(item.product_id) if item.product_id else None,
+                        'name': item.product_name,
+                        'quantity': item.quantity,
+                        'total_price': str(item.total_price),
+                    }
+                    for item in order.items.all()
+                ],
+            })
+        return Response({'count': len(rows), 'results': rows})
+
+
 class AdminPendingCreditsView(generics.ListAPIView):
     """Lista encomendas pagas cujo saldo do vendedor ainda não foi creditado."""
     serializer_class = AdminPendingCreditSerializer
