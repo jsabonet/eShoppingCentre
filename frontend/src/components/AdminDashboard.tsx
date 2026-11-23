@@ -157,7 +157,15 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
 
   // Confirmation modal
-  const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; action: string; onConfirm: () => void } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    action: string;
+    reasonRequired?: boolean;
+    onConfirm: (reason?: string) => void;
+  } | null>(null);
+  const [confirmReason, setConfirmReason] = useState('');
 
   // Categories state
   const [categories, setCategories] = useState<any[]>([]);
@@ -403,17 +411,30 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
   const handleStoreAction = (storeId: string, action: 'approve' | 'reject' | 'suspend' | 'reactivate') => {
     const labels: Record<string, string> = { approve: 'aprovar', reject: 'rejeitar', suspend: 'suspender', reactivate: 'reactivar' };
     const colors: Record<string, string> = { approve: 'green', reject: 'red', suspend: 'orange', reactivate: 'green' };
+    const reasonRequired = action === 'reject';
+    setConfirmReason('');
     setConfirmModal({
       open: true,
       title: `Confirmar ${labels[action]}`,
       message: `Tem certeza que deseja ${labels[action]} esta loja? Esta acção pode ser revertida.`,
       action: colors[action],
-      onConfirm: async () => {
+      reasonRequired,
+      onConfirm: async (reasonValue?: string) => {
+        const reason = (reasonValue || '').trim();
+        if (reasonRequired && !reason) {
+          alert('Indique o motivo da rejeição.');
+          return;
+        }
         try {
-          await adminAPI.manageStore(storeId, action);
+          await adminAPI.manageStore(storeId, action, reasonRequired ? reason : undefined);
           loadStores();
           loadDashboardStats();
-        } catch { alert('Erro ao executar acção.'); }
+        } catch (error: any) {
+          const data = error?.response?.data;
+          const reasonError = Array.isArray(data?.reason) ? data.reason[0] : data?.reason;
+          alert(reasonError || data?.detail || 'Erro ao executar acção.');
+          return;
+        }
         setConfirmModal(null);
       },
     });
@@ -1633,12 +1654,28 @@ export default function AdminDashboard({ activeTab: initialTab = 'dashboard' }: 
                     <p className="text-sm text-muted-foreground">{confirmModal.message}</p>
                   </div>
                 </div>
+                {confirmModal.reasonRequired && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2" htmlFor="store-rejection-reason">
+                      Motivo da rejeição *
+                    </label>
+                    <textarea
+                      id="store-rejection-reason"
+                      value={confirmReason}
+                      onChange={(event) => setConfirmReason(event.target.value)}
+                      maxLength={2000}
+                      rows={4}
+                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                      placeholder="Explique porque a loja está sendo rejeitada"
+                    />
+                  </div>
+                )}
                 <div className="flex gap-3 justify-end">
                   <button onClick={() => setConfirmModal(null)}
                     className="px-4 py-2 border rounded-md hover:bg-muted transition-colors text-sm">
                     Cancelar
                   </button>
-                  <button onClick={confirmModal.onConfirm}
+                  <button onClick={() => confirmModal.onConfirm(confirmReason)}
                     className={`px-4 py-2 rounded-md text-sm font-medium text-white transition-colors ${
                       confirmModal.action === 'red' ? 'bg-red-600 hover:bg-red-700' :
                       confirmModal.action === 'green' ? 'bg-green-600 hover:bg-green-700' :
