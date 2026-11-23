@@ -226,6 +226,7 @@ class AdminReconciliationView(APIView):
         wallets_payout = s(Wallet.objects.all(), 'payout_balance')
         wallets_reserved = s(Wallet.objects.all(), 'reserved_balance')
         wallets_buyer = s(Wallet.objects.all(), 'balance')
+        buyer_spent = s(paid_orders, 'total')
         gateway_refunds_pending = PaymentTransaction.objects.filter(
             provider='vpay', status='refund_pending',
         )
@@ -263,6 +264,7 @@ class AdminReconciliationView(APIView):
             'wallets_payout_balance': float(wallets_payout),
             'wallets_reserved_balance': float(wallets_reserved),
             'wallets_buyer_balance': float(wallets_buyer),
+            'buyer_spent_total': float(buyer_spent),
             'liabilities': float(liabilities),
         })
 

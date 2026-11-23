@@ -209,7 +209,7 @@ export default function AdminWallet() {
     { label: 'Saques pagos', value: recon.payouts_paid, color: 'text-red-700' },
     { label: 'Saques pendentes', value: recon.payouts_pending, color: 'text-orange-700' },
     { label: 'Escrow retido', value: recon.escrow_held, color: 'text-blue-700' },
-    { label: 'Saldo comprador', value: recon.wallets_buyer_balance, color: 'text-blue-700' },
+    { label: 'Saldo gasto pelos compradores', value: recon.buyer_spent_total ?? recon.collected_total, color: 'text-blue-700' },
     { label: 'Passivo total estimado', value: recon.liabilities, color: 'text-accent' },
   ] : [];
 
