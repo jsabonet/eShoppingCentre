@@ -140,6 +140,7 @@ def test_admin_wallet_list_shows_balances_and_user_types(admin, user):
     assert response.status_code == 200
     wallets = {row['user_email']: row for row in response.data['results']}
     assert Decimal(wallets[user.email]['balance']) == Decimal('125.00')
+    assert 'total_spent' in wallets[user.email]
     assert 'buyer' in wallets[user.email]['user_types']
     assert Decimal(wallets[seller.email]['available_payout']) == Decimal('900.00')
     assert 'seller' in wallets[seller.email]['user_types']

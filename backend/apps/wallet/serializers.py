@@ -9,13 +9,14 @@ class AdminWalletSerializer(serializers.ModelSerializer):
     user_types = serializers.SerializerMethodField()
     store_name = serializers.CharField(read_only=True)
     available_payout = serializers.SerializerMethodField()
+    total_spent = serializers.SerializerMethodField()
 
     class Meta:
         model = Wallet
         fields = (
             'id', 'user_id', 'user_name', 'user_email', 'user_types', 'store_name',
             'balance', 'payout_balance', 'reserved_balance', 'available_payout',
-            'total_earned', 'total_withdrawn', 'is_active',
+            'total_earned', 'total_withdrawn', 'total_spent', 'is_active',
         )
 
     def get_user_name(self, obj):
@@ -34,6 +35,16 @@ class AdminWalletSerializer(serializers.ModelSerializer):
 
     def get_available_payout(self, obj):
         return obj.payout_balance - obj.reserved_balance
+
+    def get_total_spent(self, obj):
+        from django.db.models import Sum
+        from apps.orders.models import Order
+        return str(
+            Order.objects.filter(
+                buyer=obj.user,
+                payment_status='completed',
+            ).aggregate(total=Sum('total'))['total'] or 0
+        )
 
 
 class AdminPendingCreditSerializer(serializers.Serializer):

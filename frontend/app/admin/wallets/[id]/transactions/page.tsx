@@ -202,16 +202,30 @@ export default function AdminWalletTransactionsPage() {
 
         {wallet && (
           <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {[
-              ['Saldo comprador', wallet.balance],
-              ['Disponível para saque', wallet.available_payout],
-              ['Reservado', wallet.reserved_balance],
-              ['Total ganho', wallet.total_earned],
-              ['Total levantado', wallet.total_withdrawn],
-            ].map(([label, value]) => (
+            {(walletMode === 'buyer'
+              ? [
+                  ['Saldo comprador disponível', wallet.balance],
+                  ['Total comprado', wallet.total_spent],
+                  ['Transações do comprador', filtered.filter((transaction) => {
+                    const kinds = (transaction.ledger_entries || []).map((entry: any) => entry.kind);
+                    return kinds.includes('buyer');
+                  }).length],
+                ]
+              : [
+                  ['Disponível para saque', wallet.available_payout],
+                  ['Saldo bruto de venda', wallet.payout_balance],
+                  ['Reservado em saques', wallet.reserved_balance],
+                  ['Total ganho', wallet.total_earned],
+                  ['Total levantado', wallet.total_withdrawn],
+                  ['Transações vendedor/afiliado', filtered.length],
+                ]).map(([label, value]) => (
               <div key={String(label)} className="rounded-xl border border-border bg-white p-4">
                 <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="mt-1 text-xl font-bold">{fmt(value)} MZN</p>
+                <p className="mt-1 text-xl font-bold">
+                  {String(label).includes('Transações')
+                    ? String(value)
+                    : `${fmt(value)} MZN`}
+                </p>
               </div>
             ))}
           </div>
