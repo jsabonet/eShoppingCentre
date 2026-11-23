@@ -13,7 +13,7 @@ urlpatterns = [
     path('admin/reconciliation/', views.AdminReconciliationView.as_view(), name='admin_reconciliation'),
     path('admin/wallets/', views.AdminWalletListView.as_view(), name='admin_wallet_list'),
     path(
-        'admin/wallets/<uuid:user_id>/transactions/',
+        'admin/wallets/<int:user_id>/transactions/',
         views.AdminWalletTransactionsView.as_view(),
         name='admin_wallet_transactions',
     ),

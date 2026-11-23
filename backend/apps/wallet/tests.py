@@ -6,6 +6,7 @@ from io import StringIO
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.urls import reverse
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.affiliates.models import AffiliateCommission, AffiliatePayout, AffiliateProfile
@@ -187,6 +188,11 @@ def test_admin_wallet_transactions_include_origin_and_ledger(admin, user):
         idempotency_key='audit:wallet:transaction',
         counterparty='escrow',
     )
+
+    assert reverse(
+        'admin_wallet_transactions',
+        kwargs={'user_id': seller.id},
+    ) == f'/api/v1/wallet/admin/wallets/{seller.id}/transactions/'
 
     request = APIRequestFactory().get(
         f'/api/v1/wallet/admin/wallets/{seller.id}/transactions/',
