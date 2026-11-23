@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Wallet, RefreshCw, Loader2, CheckCircle, AlertCircle, Search, Download, Eye, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Wallet, RefreshCw, Loader2, CheckCircle, AlertCircle, Search, Download, Eye } from 'lucide-react';
 import { walletAPI } from '@/src/lib/api';
 import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
@@ -42,6 +43,7 @@ async function fetchAllPages<T>(loadPage: (page: number) => Promise<{ data: any 
 }
 
 export default function AdminWallet() {
+  const router = useRouter();
   const [payouts, setPayouts] = useState<any[]>([]);
   const [wallets, setWallets] = useState<any[]>([]);
   const [pendingCredits, setPendingCredits] = useState<any[]>([]);
@@ -55,13 +57,6 @@ export default function AdminWallet() {
   const [statusFilter, setStatusFilter] = useState('');
   const [methodFilter, setMethodFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-  const [selectedWallet, setSelectedWallet] = useState<any | null>(null);
-  const [walletTransactions, setWalletTransactions] = useState<any[]>([]);
-  const [walletTransactionsLoading, setWalletTransactionsLoading] = useState(false);
-  const [transactionSearch, setTransactionSearch] = useState('');
-  const [transactionTypeFilter, setTransactionTypeFilter] = useState('');
-  const [transactionDateFrom, setTransactionDateFrom] = useState('');
-  const [transactionDateTo, setTransactionDateTo] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
@@ -140,26 +135,6 @@ export default function AdminWallet() {
     }
   };
 
-  const openWalletTransactions = async (wallet: any) => {
-    setSelectedWallet(wallet);
-    setWalletTransactionsLoading(true);
-    setTransactionSearch('');
-    setTransactionTypeFilter('');
-    setTransactionDateFrom('');
-    setTransactionDateTo('');
-    try {
-      const transactions = await fetchAllPages<any>((page) =>
-        walletAPI.adminWalletTransactions(wallet.user_id, { page_size: 100, page }),
-      );
-      setWalletTransactions(transactions);
-    } catch {
-      setWalletTransactions([]);
-      showToast('error', 'Não foi possível carregar as transações desta carteira.');
-    } finally {
-      setWalletTransactionsLoading(false);
-    }
-  };
-
   const filteredWallets = wallets.filter((wallet) => {
     const query = walletSearch.trim().toLowerCase();
     const searchable = [
@@ -170,29 +145,6 @@ export default function AdminWallet() {
     ].join(' ').toLowerCase();
     return (!query || searchable.includes(query))
       && (!walletRoleFilter || (wallet.user_types || []).includes(walletRoleFilter));
-  });
-
-  const filteredWalletTransactions = walletTransactions.filter((transaction) => {
-    const query = transactionSearch.trim().toLowerCase();
-    const date = String(transaction.created_at || '').slice(0, 10);
-    const origin = transaction.origin || {};
-    const searchable = [
-      transaction.id,
-      transaction.type,
-      transaction.description,
-      transaction.reference_type,
-      transaction.reference_id,
-      transaction.idempotency_key,
-      origin.order_number,
-      origin.store_name,
-      origin.buyer_email,
-      origin.affiliate_email,
-      origin.admin_reference,
-    ].join(' ').toLowerCase();
-    return (!query || searchable.includes(query))
-      && (!transactionTypeFilter || transaction.type === transactionTypeFilter)
-      && (!transactionDateFrom || date >= transactionDateFrom)
-      && (!transactionDateTo || date <= transactionDateTo);
   });
 
   const filteredPendingCredits = pendingCredits.filter((order) => {
@@ -488,7 +440,7 @@ export default function AdminWallet() {
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <button
                         type="button"
-                        onClick={() => openWalletTransactions(wallet)}
+                        onClick={() => router.push(`/admin/wallets/${wallet.user_id}/transactions`)}
                         className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
                       >
                         <Eye size={13} /> Ver transações
@@ -507,152 +459,6 @@ export default function AdminWallet() {
           {filteredWallets.length} de {wallets.length} carteiras
         </p>
       </section>
-
-      {selectedWallet && (
-        <section className="mb-6 overflow-hidden rounded-xl border border-border bg-white">
-          <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h3 className="font-bold">Transações da carteira</h3>
-              <p className="text-xs text-muted-foreground">
-                {selectedWallet.user_name} · {selectedWallet.user_email}
-                {selectedWallet.store_name ? ` · ${selectedWallet.store_name}` : ''}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelectedWallet(null)}
-              className="inline-flex min-h-9 items-center justify-center gap-1 self-start rounded-md border border-border px-3 text-sm hover:bg-muted"
-            >
-              <X size={14} /> Fechar
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 border-b border-border p-4 md:grid-cols-4">
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground md:col-span-2">
-              Pesquisar origem
-              <input
-                type="search"
-                value={transactionSearch}
-                onChange={(event) => setTransactionSearch(event.target.value)}
-                placeholder="Encomenda, saque, afiliado, referência ou idempotência"
-                className="min-h-10 rounded-lg border border-border px-3 text-sm text-foreground"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-              Tipo
-              <select
-                value={transactionTypeFilter}
-                onChange={(event) => setTransactionTypeFilter(event.target.value)}
-                className="min-h-10 rounded-lg border border-border px-3 text-sm"
-              >
-                <option value="">Todos</option>
-                {Array.from(new Set(walletTransactions.map((item) => item.type))).sort().map((type) => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                De
-                <input type="date" value={transactionDateFrom} max={transactionDateTo || undefined} onChange={(event) => setTransactionDateFrom(event.target.value)}
-                  className="min-h-10 rounded-lg border border-border px-2 text-sm" />
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                Até
-                <input type="date" value={transactionDateTo} min={transactionDateFrom || undefined} onChange={(event) => setTransactionDateTo(event.target.value)}
-                  className="min-h-10 rounded-lg border border-border px-2 text-sm" />
-              </label>
-            </div>
-          </div>
-
-          {walletTransactionsLoading ? (
-            <div className="py-10 text-center"><Loader2 size={24} className="mx-auto animate-spin text-muted-foreground" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data / estado</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tipo</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Origem</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Antes</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Depois</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Ledger / idempotência</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredWalletTransactions.map((transaction) => {
-                    const origin = transaction.origin || {};
-                    const originText = origin.order_number
-                      ? `Encomenda ${origin.order_number}${origin.store_name ? ` · ${origin.store_name}` : ''}`
-                      : origin.affiliate_email
-                        ? `Comissão · ${origin.affiliate_email}${origin.order_number ? ` · ${origin.order_number}` : ''}`
-                        : origin.role
-                          ? `Saque ${origin.role} · ${origin.status}${origin.admin_reference ? ` · ${origin.admin_reference}` : ''}`
-                          : transaction.description || 'Sistema';
-                    return (
-                      <tr key={transaction.id} className="align-top hover:bg-muted/20">
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <p>{transaction.created_at ? new Date(transaction.created_at).toLocaleString('pt-MZ') : '—'}</p>
-                          <p className="text-xs text-muted-foreground">{transaction.status}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium">{transaction.type}</span>
-                        </td>
-                        <td className="px-4 py-3 min-w-[220px]">
-                          <p className="font-medium">{originText}</p>
-                          {transaction.description && <p className="mt-1 text-xs text-muted-foreground">{transaction.description}</p>}
-                          {origin.order_total && (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Total {fmt(origin.order_total)} · taxa {fmt(origin.platform_fee)} · comissão afil. {fmt(origin.affiliate_commission)} MZN
-                            </p>
-                          )}
-                          {origin.commission_rate && (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Taxa {fmt(origin.commission_rate)}% · líquido {fmt(origin.amount)} MZN
-                            </p>
-                          )}
-                        </td>
-                        <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${Number(transaction.amount) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                          {Number(transaction.amount) >= 0 ? '+' : ''}{fmt(transaction.amount)} MZN
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(transaction.balance_before)} MZN</td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(transaction.balance_after)} MZN</td>
-                        <td className="px-4 py-3 min-w-[260px]">
-                          {(transaction.ledger_entries || []).map((entry: any) => (
-                            <p key={entry.id} className="text-xs">
-                              {entry.direction} · {entry.kind} · {entry.counterparty} · {fmt(entry.amount)} MZN
-                            </p>
-                          ))}
-                          {transaction.idempotency_key && (
-                            <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">
-                              {transaction.idempotency_key}
-                            </p>
-                          )}
-                          <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">
-                            {transaction.reference_type}:{transaction.reference_id}
-                          </p>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {filteredWalletTransactions.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="py-10 text-center text-muted-foreground">
-                        Nenhuma transação corresponde aos filtros.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-            {filteredWalletTransactions.length} de {walletTransactions.length} transações
-          </p>
-        </section>
-      )}
 
       <section className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-border bg-white p-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-2 xl:col-span-4">
