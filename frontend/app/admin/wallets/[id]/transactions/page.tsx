@@ -36,6 +36,7 @@ export default function AdminWalletTransactionsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [walletMode, setWalletMode] = useState<'buyer' | 'seller'>('buyer');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [reportFormat, setReportFormat] = useState<ReportFormat>('csv');
@@ -66,6 +67,18 @@ export default function AdminWalletTransactionsPage() {
     })();
   }, [id, isAuthenticated, isAdmin, authLoading, router]);
 
+  const transactionMatchesMode = (transaction: any) => {
+    const kinds = (transaction.ledger_entries || []).map((entry: any) => entry.kind);
+    if (walletMode === 'buyer') {
+      return kinds.includes('buyer') || (
+        !kinds.length && ['purchase', 'refund', 'deposit'].includes(transaction.type)
+      );
+    }
+    return kinds.includes('payout') || kinds.includes('platform') || (
+      !kinds.length && ['sale', 'withdrawal', 'fee', 'affiliate_commission', 'commission'].includes(transaction.type)
+    );
+  };
+
   const filtered = transactions.filter((transaction) => {
     const query = search.trim().toLowerCase();
     const date = String(transaction.created_at || '').slice(0, 10);
@@ -83,7 +96,8 @@ export default function AdminWalletTransactionsPage() {
       origin.affiliate_email,
       origin.admin_reference,
     ].join(' ').toLowerCase();
-    return (!query || searchable.includes(query))
+    return transactionMatchesMode(transaction)
+      && (!query || searchable.includes(query))
       && (!typeFilter || transaction.type === typeFilter)
       && (!dateFrom || date >= dateFrom)
       && (!dateTo || date <= dateTo);
@@ -93,6 +107,7 @@ export default function AdminWalletTransactionsPage() {
     const rows = filtered.map((transaction) => {
       const origin = transaction.origin || {};
       return {
+        modo: walletMode === 'buyer' ? 'Comprador' : 'Vendedor/Afiliado',
         data: transaction.created_at ? new Date(transaction.created_at).toLocaleString('pt-MZ') : '',
         estado: transaction.status,
         tipo: transaction.type,
@@ -117,7 +132,7 @@ export default function AdminWalletTransactionsPage() {
       reportFormat,
       `transacoes-carteira-${id}.${extension}`,
       'Transações da carteira',
-      ['data', 'estado', 'tipo', 'origem_tipo', 'origem_id', 'encomenda', 'loja', 'afiliado', 'referencia_admin', 'descricao', 'valor_mzn', 'saldo_antes_mzn', 'saldo_depois_mzn', 'idempotencia', 'ledger'],
+      ['modo', 'data', 'estado', 'tipo', 'origem_tipo', 'origem_id', 'encomenda', 'loja', 'afiliado', 'referencia_admin', 'descricao', 'valor_mzn', 'saldo_antes_mzn', 'saldo_depois_mzn', 'idempotencia', 'ledger'],
       rows,
       {
         subtitle: wallet?.user_email || '',
@@ -186,7 +201,7 @@ export default function AdminWalletTransactionsPage() {
         </div>
 
         {wallet && (
-          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
               ['Saldo comprador', wallet.balance],
               ['Disponível para saque', wallet.available_payout],
@@ -201,6 +216,31 @@ export default function AdminWalletTransactionsPage() {
             ))}
           </div>
         )}
+
+        <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-border bg-white p-2">
+          <button
+            type="button"
+            onClick={() => { setWalletMode('buyer'); setTypeFilter(''); }}
+            className={`min-h-10 rounded-lg px-4 text-sm font-medium ${
+              walletMode === 'buyer'
+                ? 'bg-blue-600 text-white'
+                : 'border border-border bg-white text-foreground hover:bg-muted'
+            }`}
+          >
+            Modo comprador
+          </button>
+          <button
+            type="button"
+            onClick={() => { setWalletMode('seller'); setTypeFilter(''); }}
+            className={`min-h-10 rounded-lg px-4 text-sm font-medium ${
+              walletMode === 'seller'
+                ? 'bg-green-600 text-white'
+                : 'border border-border bg-white text-foreground hover:bg-muted'
+            }`}
+          >
+            Modo vendedor / afiliado
+          </button>
+        </div>
 
         <section className="mb-6 grid grid-cols-1 gap-3 rounded-xl border border-border bg-white p-4 md:grid-cols-4">
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground md:col-span-2">
@@ -218,7 +258,11 @@ export default function AdminWalletTransactionsPage() {
             <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}
               className="min-h-10 rounded-lg border border-border px-3 text-sm">
               <option value="">Todos</option>
-              {Array.from(new Set(transactions.map((item) => item.type))).sort().map((type) => (
+              {Array.from(new Set(
+                transactions
+                  .filter((item) => transactionMatchesMode(item))
+                  .map((item) => item.type)
+              )).sort().map((type) => (
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
