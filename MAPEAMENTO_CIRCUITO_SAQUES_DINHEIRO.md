@@ -101,6 +101,8 @@ Modelos do circuito dos afiliados (`backend/apps/affiliates/models.py`):
 
 ### 3.6 Pedido de saque
 
+- A taxa de plataforma de 8% sobre vendas foi removida. Novas encomendas usam `platform_fee=0`; apenas comissões de afiliados continuam a ser descontadas separadamente.
+- Taxas históricas são restituíveis ao vendedor uma única vez pelo comando `restore_removed_platform_fees`, usando idempotência no ledger.
 - **Vendedor** → `wallet.services.request_payout(role="seller")`: exige valor bruto mínimo de **500 MZN** e valor disponível (`payout_balance − reserved_balance`) suficiente; aplica taxa de **11%** a cada pedido, guarda bruto/taxa/líquido em `PayoutRequest` e reserva o bruto.
 - **Afiliado** → `POST /affiliates/me/payouts/` ou `POST /wallet/me/payouts/` com `role="affiliate"`: exige perfil ativo, KYC aprovado ou conta de vendedor verificada, mínimo configurado (default **500 MZN**) e saldo disponível; aplica taxa de **5%** a cada pedido e reserva o bruto em `Wallet`.
 

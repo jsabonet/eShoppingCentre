@@ -402,7 +402,7 @@ class Command(BaseCommand):
                 'order_count': len(orders),
             },
             'settings_observed_in_code': {
-                'platform_fee_percent_used_on_checkout': '8%',
+                'platform_fee_percent_used_on_checkout': '0%',
                 'seller_payout_fee_percent': '11%',
                 'affiliate_payout_fee_percent': '5%',
             },

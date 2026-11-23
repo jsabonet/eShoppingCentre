@@ -466,7 +466,7 @@ class CreateOrderSerializer(serializers.Serializer):
             ship = store_shipping.get(store_id, {'cost': 0, 'method_name': '', 'is_pickup': False})
             store_total = store_data['store_total']
             order_discount = discounts.get(store_id, 0)
-            platform_fee = (store_total * 8) / 100
+            platform_fee = Decimal('0')
             store_affiliate_commission = store_commissions.get(store_id, Decimal('0.00'))
 
             order = Order.objects.create(

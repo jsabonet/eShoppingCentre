@@ -1,9 +1,11 @@
 """Testes do circuito da carteira — movimentos, idempotência e saques manuais."""
 import uuid
 from decimal import Decimal
+from io import StringIO
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.affiliates.models import AffiliateCommission, AffiliatePayout, AffiliateProfile
@@ -971,3 +973,68 @@ def test_refund_rejects_unpaid_order(user):
             order, seller, user, Decimal('50.00'), 'Tentativa não paga',
             refund_id=uuid.uuid4(),
         )
+
+
+@pytest.mark.django_db
+def test_restore_removed_platform_fees_is_idempotent(user):
+    seller = User.objects.create_user(
+        email='restore-platform-fee-seller@example.com',
+        username='restore-platform-fee-seller',
+        password='SenhaForte123!',
+    )
+    store = Store.objects.create(
+        owner=seller,
+        name='Loja Restauro',
+        description='Loja para testar o restauro da taxa histórica',
+        category='geral',
+        product_type='physical',
+        phone='840000005',
+        email='restore-platform-fee@example.com',
+        location='Maputo',
+        status='active',
+    )
+    order = Order.objects.create(
+        buyer=user,
+        store=store,
+        subtotal=Decimal('300.00'),
+        total=Decimal('300.00'),
+        platform_fee=Decimal('24.00'),
+        payment_method='mpesa',
+        payment_status='completed',
+        shipping_address={},
+    )
+    wallet = get_wallet(seller)
+    credit(
+        wallet,
+        Decimal('276.00'),
+        kind='payout',
+        ref_type='order',
+        ref_id=order.id,
+        description='Crédito líquido anterior',
+        txn_type='sale',
+        idempotency_key=f'test:{order.id}:seller-credit',
+    )
+
+    call_command(
+        'restore_removed_platform_fees',
+        str(store.id),
+        '--apply',
+        stdout=StringIO(),
+    )
+    order.refresh_from_db()
+    wallet.refresh_from_db()
+    assert order.platform_fee == Decimal('0.00')
+    assert wallet.payout_balance == Decimal('300.00')
+    assert WalletTransaction.objects.filter(
+        idempotency_key=f'platform_fee_restore:{order.id}:credit',
+        amount=Decimal('24.00'),
+    ).count() == 1
+
+    call_command(
+        'restore_removed_platform_fees',
+        str(store.id),
+        '--apply',
+        stdout=StringIO(),
+    )
+    wallet.refresh_from_db()
+    assert wallet.payout_balance == Decimal('300.00')
