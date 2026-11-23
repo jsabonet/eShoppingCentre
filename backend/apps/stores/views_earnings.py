@@ -62,6 +62,13 @@ class StoreStatsView(APIView):
 
         total_revenue = float(paid_order_revenue(completed_orders))
         today_revenue = float(paid_order_revenue(today_paid_orders))
+        affiliate_commissions_deducted = completed_orders.aggregate(
+            total=Sum('affiliate_commission')
+        )['total'] or 0
+        net_seller_revenue = max(
+            Decimal(str(total_revenue)) - Decimal(str(affiliate_commissions_deducted)),
+            Decimal('0'),
+        )
 
         # Recent orders (last 5)
         recent = orders.select_related('buyer').order_by('-created_at')[:5]
@@ -152,6 +159,8 @@ class StoreStatsView(APIView):
             'today_sales': today_paid_orders.count(),
             'today_revenue': today_revenue,
             'total_revenue': total_revenue,
+            'affiliate_commissions_deducted': float(affiliate_commissions_deducted),
+            'net_seller_revenue': float(net_seller_revenue),
             'total_products': store.products.filter(status='active').count(),
             'total_orders': orders.count(),
             'pending_orders': orders.filter(status='pending').count(),
@@ -186,12 +195,67 @@ class StoreEarningsView(APIView):
 
     def get(self, request):
         if not hasattr(request.user, 'store') or not hasattr(request.user, 'wallet'):
-            return Response({'transactions': []})
+            return Response({
+                'transactions': [],
+                'affiliate_commissions': [],
+                'summary': {},
+            })
         from apps.wallet.serializers import WalletTransactionSerializer
+        from apps.affiliates.models import AffiliateCommission
+        store = request.user.store
         wallet = request.user.wallet
         transactions = wallet.transactions.filter(type='sale').order_by('-created_at')[:50]
         serializer = WalletTransactionSerializer(transactions, many=True)
-        return Response({'transactions': serializer.data})
+        commissions = (
+            AffiliateCommission.objects.filter(order__store=store)
+            .select_related('affiliate__user', 'order', 'product')
+            .order_by('-created_at')
+        )
+        commission_rows = [
+            {
+                'id': str(commission.id),
+                'order_id': str(commission.order_id),
+                'order_number': commission.order.order_number,
+                'product_id': str(commission.product_id) if commission.product_id else None,
+                'product_name': commission.product.name if commission.product else '',
+                'affiliate_id': str(commission.affiliate_id),
+                'affiliate_name': commission.affiliate.user.get_full_name() or commission.affiliate.user.email,
+                'affiliate_email': commission.affiliate.user.email,
+                'affiliate_referral_code': commission.affiliate.referral_code,
+                'commission_rate': str(commission.commission_rate),
+                'amount': str(commission.amount),
+                'reversed_amount': str(commission.reversed_amount),
+                'net_amount': str(
+                    max(
+                        Decimal(str(commission.amount)) -
+                        Decimal(str(commission.reversed_amount)),
+                        Decimal('0'),
+                    )
+                ),
+                'status': commission.status,
+                'created_at': commission.created_at.isoformat(),
+            }
+            for commission in commissions
+        ]
+        gross_sales = store.orders.filter(payment_status='completed').aggregate(
+            total=Sum('total')
+        )['total'] or Decimal('0')
+        commission_deducted = store.orders.filter(payment_status='completed').aggregate(
+            total=Sum('affiliate_commission')
+        )['total'] or Decimal('0')
+        net_seller = max(gross_sales - commission_deducted, Decimal('0'))
+        return Response({
+            'transactions': serializer.data,
+            'affiliate_commissions': commission_rows,
+            'summary': {
+                'gross_sales': str(gross_sales),
+                'affiliate_commissions_deducted': str(commission_deducted),
+                'net_seller_revenue': str(net_seller),
+                'wallet_available': str(
+                    wallet.payout_balance - wallet.reserved_balance
+                ),
+            },
+        })
 
 
 def _csv_safe(value):

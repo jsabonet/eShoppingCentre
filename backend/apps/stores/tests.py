@@ -9,11 +9,13 @@ from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.orders.models import Order, OrderItem
+from apps.affiliates.models import AffiliateCommission, AffiliateProfile
 from apps.products.models import Category, Product
 from apps.stores.models import Store, StoreReportExport
 from apps.stores.views_earnings import (
     StoreEarningsReportView,
     StoreStatsView,
+    StoreEarningsView,
     _build_pdf_report,
 )
 from apps.wallet.models import WalletTransaction
@@ -142,6 +144,81 @@ def test_store_stats_include_only_paid_sales_and_use_order_item_values():
     assert response.data['total_orders'] == 2
     assert response.data['top_products'][0]['sales'] == 4
     assert response.data['top_products'][0]['revenue'] == 40.0
+
+
+@pytest.mark.django_db
+def test_store_earnings_exposes_affiliate_commission_by_order_and_product():
+    seller = User.objects.create_user(
+        email='seller-affiliate-detail@example.com',
+        username='seller-affiliate-detail',
+        password='SenhaForte123!',
+    )
+    affiliate_user = User.objects.create_user(
+        email='affiliate-detail@example.com',
+        username='affiliate-detail',
+        password='SenhaForte123!',
+    )
+    buyer = User.objects.create_user(
+        email='buyer-affiliate-detail@example.com',
+        username='buyer-affiliate-detail',
+        password='SenhaForte123!',
+    )
+    store = Store.objects.create(
+        owner=seller,
+        name='Loja Comissão',
+        description='Loja',
+        category='beleza',
+        product_type='physical',
+        phone='840000010',
+        email='seller-affiliate-detail@example.com',
+        location='Maputo',
+        status='active',
+    )
+    product = Product.objects.create(
+        store=store,
+        name='Produto Comissionado',
+        slug='produto-comissionado',
+        price=Decimal('280.00'),
+        stock=10,
+        status='active',
+        product_type='physical',
+    )
+    order = Order.objects.create(
+        buyer=buyer,
+        store=store,
+        order_number='PED-AFFILIATE-DATA',
+        subtotal=Decimal('280.00'),
+        total=Decimal('280.00'),
+        affiliate=affiliate_user,
+        affiliate_commission=Decimal('28.00'),
+        payment_status='completed',
+        payment_method='mpesa',
+        shipping_address={},
+    )
+    affiliate = AffiliateProfile.objects.create(
+        user=affiliate_user,
+        referral_code='DETAIL-AFFILIATE',
+    )
+    AffiliateCommission.objects.create(
+        affiliate=affiliate,
+        order=order,
+        product=product,
+        amount=Decimal('28.00'),
+        commission_rate=Decimal('10.00'),
+        status='approved',
+    )
+
+    request = APIRequestFactory().get('/api/v1/stores/me/earnings/')
+    force_authenticate(request, user=seller)
+    response = StoreEarningsView.as_view()(request)
+
+    assert response.status_code == 200
+    assert Decimal(response.data['summary']['gross_sales']) == Decimal('280.00')
+    assert Decimal(response.data['summary']['affiliate_commissions_deducted']) == Decimal('28.00')
+    assert Decimal(response.data['summary']['net_seller_revenue']) == Decimal('252.00')
+    assert response.data['affiliate_commissions'][0]['order_number'] == 'PED-AFFILIATE-DATA'
+    assert response.data['affiliate_commissions'][0]['product_name'] == 'Produto Comissionado'
+    assert response.data['affiliate_commissions'][0]['affiliate_email'] == 'affiliate-detail@example.com'
 
 
 @pytest.mark.django_db

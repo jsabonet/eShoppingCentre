@@ -664,6 +664,8 @@ export interface SellerDashboard {
   today_sales: number;
   today_revenue: number;
   total_revenue: number;
+  affiliate_commissions_deducted: number;
+  net_seller_revenue: number;
   total_products: number;
   total_orders: number;
   pending_orders: number;

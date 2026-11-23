@@ -18,6 +18,8 @@ function localDateString(date: Date) {
 export default function SellerEarningsPage() {
   const [wallet, setWallet] = useState<WalletInfo | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [affiliateCommissions, setAffiliateCommissions] = useState<any[]>([]);
+  const [earningsSummary, setEarningsSummary] = useState<any>(null);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportDateFrom, setReportDateFrom] = useState(() => {
@@ -42,7 +44,7 @@ export default function SellerEarningsPage() {
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
-      const [wRes, allTransactions, pRes] = await Promise.all([
+      const [wRes, allTransactions, pRes, earningsRes] = await Promise.all([
         walletAPI.myWallet(),
         (async () => {
           const results: WalletTransaction[] = [];
@@ -57,10 +59,15 @@ export default function SellerEarningsPage() {
           return results;
         })(),
         walletAPI.myPayouts(),
+        storesAPI.myEarnings(),
       ]);
       setWallet(wRes.data);
       setTransactions(allTransactions);
       setPayouts(Array.isArray(pRes.data) ? pRes.data : (pRes.data as any)?.results || []);
+      setAffiliateCommissions(Array.isArray(earningsRes.data?.affiliate_commissions)
+        ? earningsRes.data.affiliate_commissions
+        : []);
+      setEarningsSummary(earningsRes.data?.summary || null);
     } catch { /* silently fail */ }
     finally { setLoading(false); }
   }, []);
@@ -281,6 +288,69 @@ export default function SellerEarningsPage() {
             O relatório não distribui descontos por produto; o desconto e os totais
             da encomenda aparecem uma única vez por encomenda.
           </p>
+        </section>
+
+        <section className="mb-6 overflow-hidden rounded-xl border border-border bg-white">
+          <div className="border-b border-border p-4">
+            <h2 className="font-bold">Comissões de afiliados por venda</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Mostra exactamente onde a comissão foi descontada: encomenda, produto, afiliado e valor líquido da comissão.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
+            <div className="rounded-lg bg-blue-50 p-4">
+              <p className="text-xs text-muted-foreground">Receita bruta</p>
+              <p className="mt-1 text-xl font-bold">{Number(earningsSummary?.gross_sales || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</p>
+            </div>
+            <div className="rounded-lg bg-amber-50 p-4">
+              <p className="text-xs text-muted-foreground">Comissões de afiliados</p>
+              <p className="mt-1 text-xl font-bold text-amber-700">{Number(earningsSummary?.affiliate_commissions_deducted || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</p>
+            </div>
+            <div className="rounded-lg bg-green-50 p-4">
+              <p className="text-xs text-muted-foreground">Receita líquida estimada</p>
+              <p className="mt-1 text-xl font-bold text-green-700">{Number(earningsSummary?.net_seller_revenue || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Encomenda</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Produto</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Afiliado</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Taxa</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Comissão</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {affiliateCommissions.map((commission) => (
+                  <tr key={commission.id} className="hover:bg-muted/20">
+                    <td className="px-4 py-3 font-medium whitespace-nowrap">{commission.order_number}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{commission.product_name || '—'}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{commission.affiliate_name}</p>
+                      <p className="text-xs text-muted-foreground">{commission.affiliate_email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">{Number(commission.commission_rate).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })}%</td>
+                    <td className="px-4 py-3 text-right font-semibold whitespace-nowrap text-amber-700">
+                      -{Number(commission.net_amount).toLocaleString('pt-MZ', { minimumFractionDigits: 2 })} MZN
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{commission.status}</td>
+                  </tr>
+                ))}
+                {affiliateCommissions.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                      Nenhuma comissão de afiliado foi aplicada às suas vendas.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <div className="bg-card border border-border rounded-xl">

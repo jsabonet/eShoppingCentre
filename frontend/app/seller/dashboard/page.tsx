@@ -96,7 +96,9 @@ export default function SellerDashboardPage() {
 
   const baseStats = [
     { label: 'Vendas Hoje', value: fmtNum(data.today_sales), icon: TrendingUp, color: 'bg-green-100 text-green-700', sub: fmtPrice(data.today_revenue) },
-    { label: 'Receita Total', value: fmtPrice(data.total_revenue), icon: DollarSign, color: 'bg-blue-100 text-blue-700', sub: `${fmtNum(data.total_orders)} encomendas` },
+    { label: 'Receita Bruta', value: fmtPrice(data.total_revenue), icon: DollarSign, color: 'bg-blue-100 text-blue-700', sub: `${fmtNum(data.total_orders)} encomendas` },
+    { label: 'Comissão Afiliados', value: fmtPrice(data.affiliate_commissions_deducted || 0), icon: TrendingDown, color: 'bg-amber-100 text-amber-700', sub: 'deduzida das vendas por afiliados' },
+    { label: 'Receita Líquida', value: fmtPrice(data.net_seller_revenue ?? data.total_revenue), icon: ArrowUp, color: 'bg-green-100 text-green-700', sub: 'antes da taxa de saque de 11%' },
     { label: 'Produtos Activos', value: fmtNum(data.total_products), icon: Package, color: 'bg-purple-100 text-purple-700', sub: 'em catálogo' },
     { label: 'Avaliação', value: `${data.store_rating.toFixed(1)} ★`, icon: Star, color: 'bg-pink-100 text-pink-700', sub: 'média da loja' },
     { label: 'Seguidores', value: fmtNum((data as any).followers_count || 0), icon: Users, color: 'bg-amber-100 text-amber-700', sub: 'na loja' },
@@ -164,7 +166,7 @@ export default function SellerDashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
