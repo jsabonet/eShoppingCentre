@@ -149,3 +149,109 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
         model = WalletTransaction
         fields = ('id', 'type', 'amount', 'balance_before', 'balance_after',
                   'reference_type', 'reference_id', 'description', 'status', 'created_at')
+
+
+class AdminWalletTransactionSerializer(serializers.ModelSerializer):
+    ledger_entries = serializers.SerializerMethodField()
+    origin = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WalletTransaction
+        fields = (
+            'id', 'type', 'amount', 'balance_before', 'balance_after',
+            'reference_type', 'reference_id', 'description', 'status',
+            'idempotency_key', 'created_at', 'ledger_entries', 'origin',
+        )
+
+    def get_ledger_entries(self, obj):
+        return [
+            {
+                'id': str(entry.id),
+                'direction': entry.direction,
+                'amount': str(entry.amount),
+                'balance_before': str(entry.balance_before),
+                'balance_after': str(entry.balance_after),
+                'kind': entry.kind,
+                'counterparty': entry.counterparty,
+                'created_at': entry.created_at.isoformat(),
+            }
+            for entry in obj.entries.all().order_by('created_at')
+        ]
+
+    def get_origin(self, obj):
+        reference_id = str(obj.reference_id)
+        if obj.reference_type == 'order':
+            from apps.orders.models import Order
+            order = Order.objects.select_related('store', 'buyer', 'affiliate').filter(
+                pk=obj.reference_id
+            ).first()
+            if order:
+                return {
+                    'type': 'order',
+                    'id': str(order.id),
+                    'order_number': order.order_number,
+                    'store_id': str(order.store_id) if order.store_id else None,
+                    'store_name': order.store.name if order.store else order.store_name,
+                    'buyer_email': order.buyer.email,
+                    'payment_status': order.payment_status,
+                    'order_status': order.status,
+                    'order_total': str(order.total),
+                    'platform_fee': str(order.platform_fee),
+                    'affiliate_commission': str(order.affiliate_commission),
+                }
+        elif obj.reference_type == 'payout':
+            from .models import PayoutRequest
+            payout = PayoutRequest.objects.select_related('user', 'approved_by', 'paid_by').filter(
+                pk=obj.reference_id
+            ).first()
+            if payout:
+                return {
+                    'type': 'payout',
+                    'id': str(payout.id),
+                    'role': payout.role,
+                    'amount': str(payout.amount),
+                    'fee': str(payout.fee),
+                    'net_amount': str(payout.net_amount),
+                    'method': payout.method,
+                    'status': payout.status,
+                    'admin_reference': payout.admin_reference,
+                    'paid_at': payout.paid_at.isoformat() if payout.paid_at else None,
+                }
+        elif obj.reference_type in ('affiliate_commission', 'affiliate_commission_refund'):
+            from apps.affiliates.models import AffiliateCommission
+            commission = AffiliateCommission.objects.select_related(
+                'affiliate__user', 'order', 'product'
+            ).filter(pk=obj.reference_id).first()
+            if commission:
+                return {
+                    'type': 'affiliate_commission',
+                    'id': str(commission.id),
+                    'affiliate_email': commission.affiliate.user.email,
+                    'order_number': commission.order.order_number,
+                    'product_name': commission.product.name if commission.product else None,
+                    'commission_rate': str(commission.commission_rate),
+                    'amount': str(commission.amount),
+                    'reversed_amount': str(commission.reversed_amount),
+                    'status': commission.status,
+                }
+        elif obj.reference_type == 'affiliate_payout':
+            from apps.affiliates.models import AffiliatePayout
+            payout = AffiliatePayout.objects.select_related(
+                'affiliate__user', 'approved_by', 'paid_by'
+            ).filter(pk=obj.reference_id).first()
+            if payout:
+                return {
+                    'type': 'affiliate_payout',
+                    'id': str(payout.id),
+                    'affiliate_email': payout.affiliate.user.email,
+                    'amount': str(payout.amount),
+                    'fee': str(payout.fee),
+                    'net_amount': str(payout.net_amount),
+                    'method': payout.method,
+                    'status': payout.status,
+                    'admin_reference': payout.admin_reference,
+                }
+        return {
+            'type': obj.reference_type,
+            'id': reference_id,
+        }

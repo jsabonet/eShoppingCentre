@@ -31,6 +31,7 @@ from apps.wallet.views import (
     AdminPayoutListView,
     AdminReconciliationView,
     AdminWalletListView,
+    AdminWalletTransactionsView,
     WalletPayoutView,
 )
 
@@ -143,6 +144,66 @@ def test_admin_wallet_list_shows_balances_and_user_types(admin, user):
     assert 'seller' in wallets[seller.email]['user_types']
     assert wallets[seller.email]['store_name'] == store.name
     assert 'affiliate' in wallets[affiliate_user.email]['user_types']
+
+
+@pytest.mark.django_db
+def test_admin_wallet_transactions_include_origin_and_ledger(admin, user):
+    seller = User.objects.create_user(
+        email='transaction-origin-seller@example.com',
+        username='transaction-origin-seller',
+        password='SenhaForte123!',
+        roles=['seller'],
+    )
+    store = Store.objects.create(
+        owner=seller,
+        name='Loja Auditoria',
+        description='Loja para auditoria',
+        category='geral',
+        product_type='physical',
+        phone='840000006',
+        email='transaction-origin-store@example.com',
+        location='Maputo',
+        status='active',
+    )
+    order = Order.objects.create(
+        buyer=user,
+        store=store,
+        order_number='PED-AUDIT-TRACE',
+        status='delivered',
+        subtotal=Decimal('300.00'),
+        total=Decimal('300.00'),
+        payment_method='mpesa',
+        payment_status='completed',
+        shipping_address={},
+    )
+    credit(
+        get_wallet(seller),
+        Decimal('300.00'),
+        kind='payout',
+        ref_type='order',
+        ref_id=order.id,
+        description='Crédito da encomenda PED-AUDIT-TRACE',
+        txn_type='sale',
+        idempotency_key='audit:wallet:transaction',
+        counterparty='escrow',
+    )
+
+    request = APIRequestFactory().get(
+        f'/api/v1/wallet/admin/wallets/{seller.id}/transactions/',
+        {'type': 'sale'},
+    )
+    force_authenticate(request, user=admin)
+    response = AdminWalletTransactionsView.as_view()(request, user_id=seller.id)
+
+    assert response.status_code == 200
+    assert response.data['count'] == 1
+    transaction = response.data['results'][0]
+    assert transaction['idempotency_key'] == 'audit:wallet:transaction'
+    assert transaction['origin']['order_number'] == 'PED-AUDIT-TRACE'
+    assert transaction['origin']['store_name'] == 'Loja Auditoria'
+    assert transaction['origin']['order_total'] == '300.00'
+    assert len(transaction['ledger_entries']) == 1
+    assert transaction['ledger_entries'][0]['counterparty'] == 'escrow'
 
 
 @pytest.mark.django_db

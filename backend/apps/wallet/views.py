@@ -7,6 +7,7 @@ from django.utils.dateparse import parse_date
 from rest_framework.exceptions import ValidationError
 from .models import PayoutRequest
 from .serializers import (
+    AdminWalletTransactionSerializer,
     AdminPendingCreditSerializer,
     AdminWalletSerializer,
     WalletSerializer,
@@ -283,6 +284,50 @@ class AdminWalletListView(generics.ListAPIView):
             user_has_affiliate_profile=Exists(affiliates),
             store_name=Subquery(stores.values('name')[:1]),
         ).order_by('user__email')
+
+
+class AdminWalletTransactionsView(generics.ListAPIView):
+    """Lista todas as transações financeiras de uma carteira e o respetivo ledger."""
+    serializer_class = AdminWalletTransactionSerializer
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get_queryset(self):
+        from .models import Wallet
+
+        user_id = self.kwargs['user_id']
+        wallet = get_object_or_404(Wallet, user_id=user_id)
+        queryset = wallet.transactions.select_related('wallet').prefetch_related(
+            'entries'
+        ).order_by('-created_at')
+
+        params = self.request.query_params
+        transaction_type = params.get('type', '').strip()
+        reference_type = params.get('reference_type', '').strip()
+        date_from = params.get('date_from', '').strip()
+        date_to = params.get('date_to', '').strip()
+        search = params.get('search', '').strip()
+
+        if transaction_type:
+            queryset = queryset.filter(type=transaction_type)
+        if reference_type:
+            queryset = queryset.filter(reference_type=reference_type)
+        if date_from:
+            parsed = parse_date(date_from)
+            if parsed is None:
+                raise ValidationError({'date_from': 'Use uma data válida no formato AAAA-MM-DD.'})
+            queryset = queryset.filter(created_at__date__gte=parsed)
+        if date_to:
+            parsed = parse_date(date_to)
+            if parsed is None:
+                raise ValidationError({'date_to': 'Use uma data válida no formato AAAA-MM-DD.'})
+            queryset = queryset.filter(created_at__date__lte=parsed)
+        if search:
+            queryset = queryset.filter(
+                Q(description__icontains=search)
+                | Q(idempotency_key__icontains=search)
+                | Q(reference_type__icontains=search)
+            )
+        return queryset
 
 
 class AdminPendingCreditsView(generics.ListAPIView):
