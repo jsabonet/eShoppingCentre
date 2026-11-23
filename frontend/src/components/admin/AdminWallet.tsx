@@ -434,7 +434,7 @@ export default function AdminWallet() {
                 <tr className="border-b border-border bg-muted/50">
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Utilizador</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tipo(s)</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Saldo comprador</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Saldo gasto</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">Disponível para saque</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">Reservado</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">Total levantado</th>
@@ -452,7 +452,7 @@ export default function AdminWallet() {
                     <td className="px-4 py-3">
                       {(wallet.user_types || []).map((type: string) => USER_TYPE_LABEL[type] || type).join(', ')}
                     </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(wallet.balance)} MZN</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(wallet.total_spent)} MZN</td>
                     <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">{fmt(wallet.available_payout)} MZN</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(wallet.reserved_balance)} MZN</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">{fmt(wallet.total_withdrawn)} MZN</td>

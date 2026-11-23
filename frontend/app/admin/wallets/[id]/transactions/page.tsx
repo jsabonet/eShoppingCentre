@@ -205,7 +205,7 @@ export default function AdminWalletTransactionsPage() {
             {(walletMode === 'buyer'
               ? [
                   ['Saldo comprador disponível', wallet.balance],
-                  ['Total comprado', wallet.total_spent],
+                  ['Saldo gasto', wallet.total_spent],
                   ['Transações do comprador', filtered.filter((transaction) => {
                     const kinds = (transaction.ledger_entries || []).map((entry: any) => entry.kind);
                     return kinds.includes('buyer');
