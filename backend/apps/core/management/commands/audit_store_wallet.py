@@ -418,6 +418,7 @@ class Command(BaseCommand):
                             Decimal(str(order.total))
                             - Decimal(str(order.platform_fee or 0))
                             - Decimal(str(order.affiliate_commission or 0))
+                            for order in orders
                         ),
                         Decimal('0'),
                     )
