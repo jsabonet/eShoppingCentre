@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Wallet, RefreshCw, Loader2, CheckCircle, AlertCircle, Search, Download, Eye } from 'lucide-react';
+import { Wallet, RefreshCw, Loader2, CheckCircle, AlertCircle, Search, Download, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { walletAPI } from '@/src/lib/api';
 import { downloadReportFromObjects, type ReportFormat } from '@/src/lib/export';
 
@@ -52,6 +52,8 @@ export default function AdminWallet() {
   const [search, setSearch] = useState('');
   const [walletSearch, setWalletSearch] = useState('');
   const [walletRoleFilter, setWalletRoleFilter] = useState('');
+  const [walletPage, setWalletPage] = useState(1);
+  const [walletPageSize, setWalletPageSize] = useState(20);
   const [creditSearch, setCreditSearch] = useState('');
   const [creditingOrderId, setCreditingOrderId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
@@ -86,6 +88,7 @@ export default function AdminWallet() {
   }, [showToast]);
 
   useEffect(() => { load(); }, [load]);
+
 
   const approve = async (id: string) => {
     try { await walletAPI.adminPayoutApprove(id); showToast('success', 'Saque aprovado.'); load(); }
@@ -146,6 +149,16 @@ export default function AdminWallet() {
     return (!query || searchable.includes(query))
       && (!walletRoleFilter || (wallet.user_types || []).includes(walletRoleFilter));
   });
+
+  const walletPageCount = Math.max(1, Math.ceil(filteredWallets.length / walletPageSize));
+  const paginatedWallets = filteredWallets.slice(
+    (walletPage - 1) * walletPageSize,
+    walletPage * walletPageSize,
+  );
+
+  useEffect(() => {
+    setWalletPage((page) => Math.min(page, walletPageCount));
+  }, [walletPageCount]);
 
   const filteredPendingCredits = pendingCredits.filter((order) => {
     const query = creditSearch.trim().toLowerCase();
@@ -390,13 +403,19 @@ export default function AdminWallet() {
             <input
               type="search"
               value={walletSearch}
-              onChange={(event) => setWalletSearch(event.target.value)}
+              onChange={(event) => {
+                setWalletSearch(event.target.value);
+                setWalletPage(1);
+              }}
               placeholder="Pesquisar nome, email ou loja"
               className="min-h-10 min-w-0 flex-1 rounded-lg border border-border px-3 text-sm"
             />
             <select
               value={walletRoleFilter}
-              onChange={(event) => setWalletRoleFilter(event.target.value)}
+              onChange={(event) => {
+                setWalletRoleFilter(event.target.value);
+                setWalletPage(1);
+              }}
               className="min-h-10 rounded-lg border border-border px-3 text-sm"
             >
               <option value="">Todos os tipos</option>
@@ -423,7 +442,7 @@ export default function AdminWallet() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredWallets.map((wallet) => (
+                {paginatedWallets.map((wallet) => (
                   <tr key={wallet.id} className="hover:bg-muted/20">
                     <td className="px-4 py-3">
                       <p className="font-medium">{wallet.user_name}</p>
@@ -455,9 +474,53 @@ export default function AdminWallet() {
             </table>
           </div>
         )}
-        <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-          {filteredWallets.length} de {wallets.length} carteiras
-        </p>
+        <footer className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center">
+            <span>
+              {filteredWallets.length
+                ? `${Math.min((walletPage - 1) * walletPageSize + 1, filteredWallets.length)}–${Math.min(walletPage * walletPageSize, filteredWallets.length)} de ${filteredWallets.length} carteiras`
+                : `0 de ${wallets.length} carteiras`}
+            </span>
+            <label className="flex items-center gap-2">
+              Por página
+              <select
+                value={walletPageSize}
+                onChange={(event) => {
+                  setWalletPageSize(Number(event.target.value));
+                  setWalletPage(1);
+                }}
+                className="min-h-9 rounded-md border border-border bg-white px-2 text-sm text-foreground"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setWalletPage((page) => Math.max(1, page - 1))}
+              disabled={walletPage === 1}
+              aria-label="Página anterior"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="min-w-24 text-center text-sm text-muted-foreground">
+              Página {walletPage} de {walletPageCount}
+            </span>
+            <button
+              type="button"
+              onClick={() => setWalletPage((page) => Math.min(walletPageCount, page + 1))}
+              disabled={walletPage === walletPageCount}
+              aria-label="Página seguinte"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </footer>
       </section>
 
       <section className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-border bg-white p-3 sm:grid-cols-2 xl:grid-cols-4">
