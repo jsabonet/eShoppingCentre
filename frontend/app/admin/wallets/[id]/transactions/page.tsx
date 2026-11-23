@@ -71,7 +71,7 @@ export default function AdminWalletTransactionsPage() {
   }, [id, isAuthenticated, isAdmin, authLoading, router]);
 
   const walletPurchaseOrderIds = new Set(
-    combinedTransactions
+    transactions
       .filter((transaction) =>
         transaction.reference_type === 'order'
         && (transaction.ledger_entries || []).some((entry: any) => entry.kind === 'buyer')
@@ -326,7 +326,7 @@ export default function AdminWalletTransactionsPage() {
               className="min-h-10 rounded-lg border border-border px-3 text-sm">
               <option value="">Todos</option>
               {Array.from(new Set(
-                transactions
+                combinedTransactions
                   .filter((item) => transactionMatchesMode(item))
                   .map((item) => item.type)
               )).sort().map((type) => (
