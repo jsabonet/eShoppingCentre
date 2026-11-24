@@ -114,7 +114,7 @@ function getNavGroups(productType: string, isAffiliate: boolean): SellerNavGroup
 export default function SellerLayout({ children }: SellerLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAffiliate } = useAuth();
+  const { isAffiliate, isAdmin } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [storeName, setStoreName] = useState<string | null>(cachedStore?.name ?? null);
@@ -186,12 +186,12 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
         setStoreStatus(data.status);
         setProductType(data.product_type || 'physical');
       } catch {
-        router.replace('/seller/register');
+        router.replace(isAdmin ? '/admin?tab=dashboard' : '/seller/register');
       } finally {
         setChecking(false);
       }
     })();
-  }, [pathname, router]);
+  }, [pathname, router, isAdmin]);
 
   // Loading state — only shown on first visit (no cache)
   if (checking && !cachedStore) {

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Package, ShoppingCart, DollarSign, TrendingUp, Star, Clock,
-  ArrowUp, ArrowDown, Plus, AlertCircle, RefreshCw, Download, Users
+  ArrowUp, ArrowDown, Plus, AlertCircle, RefreshCw, Download, Users, TrendingDown
 } from 'lucide-react';
 import SellerLayout from '@/src/components/SellerLayout';
 import LoadingSpinner from '@/src/components/LoadingSpinner';

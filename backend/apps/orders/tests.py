@@ -17,6 +17,8 @@ from apps.orders.views import (
     ReceiveReturnView,
     RefundReturnView,
     ShipReturnView,
+    StoreOrdersView,
+    StoreReturnsView,
 )
 from apps.orders.serializers import CreateOrderSerializer, OrderItemSerializer, ReturnRequestSerializer
 from apps.orders.services import cancel_order
@@ -729,3 +731,24 @@ def test_affiliate_conversion_is_recorded_only_after_payment(buyer, seller, stor
     assert affiliate.total_sales == 1
     assert link.conversions == 1
     assert commission.conversion_recorded is True
+
+
+@pytest.mark.django_db
+def test_store_order_and_return_views_return_empty_for_user_without_store():
+    user = User.objects.create_user(
+        email='no-store@example.com',
+        username='no-store',
+        password='SenhaForte123!',
+    )
+    orders_request = APIRequestFactory().get('/api/v1/orders/store/')
+    force_authenticate(orders_request, user=user)
+    orders_response = StoreOrdersView.as_view()(orders_request)
+
+    returns_request = APIRequestFactory().get('/api/v1/orders/returns/store/')
+    force_authenticate(returns_request, user=user)
+    returns_response = StoreReturnsView.as_view()(returns_request)
+
+    assert orders_response.status_code == 200
+    assert orders_response.data['count'] == 0
+    assert returns_response.status_code == 200
+    assert returns_response.data['count'] == 0

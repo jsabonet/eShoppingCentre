@@ -99,6 +99,8 @@ class StoreOrdersView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        if not hasattr(self.request.user, 'store'):
+            return Order.objects.none()
         return self.request.user.store.orders.order_by('-created_at')
 
 
@@ -319,6 +321,8 @@ class StoreReturnsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        if not hasattr(self.request.user, 'store'):
+            return ReturnRequest.objects.none()
         return ReturnRequest.objects.filter(
             store=self.request.user.store
         ).prefetch_related('images').order_by('-created_at')
